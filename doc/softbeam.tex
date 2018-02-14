@@ -1,0 +1,342 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+% \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading nips_2017
+%
+% to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{nips_2017}
+
+%\usepackage{nips_2017}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+\usepackage[final]{nips_2017}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+
+\usepackage{amsmath}	% for \begin{align}
+\usepackage{graphicx}	% for \includegraphics{filename}
+\usepackage{subcaption}	% for \begin{subfigure}[t]{0.5\textwidth}
+\usepackage{courier}	% for \texttt{}
+
+\newcommand{\bb}[1]{\boldsymbol{#1}}
+
+\title{Soft beam search}
+
+% The \author macro works with any number of authors. There are two
+% commands used to separate the names and addresses of multiple
+% authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to
+% break the lines. Using \AND forces a line break at that point. So,
+% if LaTeX puts 3 of 4 authors names on the first line, and the last
+% on the second line, try using \AND instead of \And before the third
+% author name.
+
+\author{
+	Yu-Hsiang Lin
+		%\thanks{Use footnote for providing further information about author (webpage, alternative address)---\emph{not} for acknowledging funding agencies.}%
+		\\
+	Language Technologies Institute\\
+	Carnegie Mellon University\\
+	Pittsburgh, PA 15213 \\
+	\texttt{yuhsianl@andrew.cmu.edu} \\
+  %% examples of more authors
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \AND
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+  %% \And
+  %% Coauthor \\
+  %% Affiliation \\
+  %% Address \\
+  %% \texttt{email} \\
+}
+
+\begin{document}
+% \nipsfinalcopy is no longer used
+
+\maketitle
+
+
+
+% ---------------------------------------------------------
+% ---------------------------------------------------------
+
+%\begin{abstract}
+%	Abstract.
+%\end{abstract}
+
+
+
+% ---------------------------------------------------------
+% ---------------------------------------------------------
+
+\section{Soft beam search}
+
+	Based on \cite{Goyal2018} and \cite{Bahdanau2015}. Use neural machine translation as as example of application.
+
+
+
+% ---------------------------------------------------------
+
+\subsection{I/O}
+
+	In row representation, each word $x$ is a one-hot vector. The word embedding is obtained as $E^x \bb{x} \in \mathbb{R}^m$ and $E^y \bb{y} \in \mathbb{R}^m$.
+
+
+\begin{table}[!htb]
+\centering
+%\caption{Symbols for encoder. For forward (backward) set of LSTMs, add right (left) arrow above the symbols.}
+\begin{tabular}{lll}
+\toprule
+Symbol & Dimension & Description \\
+\midrule
+$x_t$ & $K_x$ & an input word, one-hot, $t = 1$ to $T_x$ \\
+$y_t$ & $K_y$ & an output word, one-hot, $t = 1$ to $T_y$ \\
+$K_x$ & 1 & source domain vocabulary size \\
+$K_y$ & 1 & target domain vocabulary size \\
+$T_x$ & 1 & input sequence length \\
+$T_y$ & 1 & output sequence length \\
+$m$ & 1 & word embedding dimension in both source and target domains \\
+\bottomrule \\
+\end{tabular}
+\caption{Symbols for I/O representations.}
+\label{tab:IOSymbol}
+\end{table}
+
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{lll}
+\toprule
+Symbol & Dimension & Description \\
+\midrule
+$E^x$ & $m \times K_x$ & dictionary in source domain \\
+$E^y$ & $m \times K_y$ & dictionary in target domain \\
+\bottomrule \\
+\end{tabular}
+\caption{Model parameters for the word embedding.}
+\label{tab:IOModel}
+\end{table}
+
+
+
+% ---------------------------------------------------------
+
+\subsection{Encoder}
+
+	Encoder is a bi-directional 1-layer LSTM. In the forward direction, we use
+		\begin{align}
+			\overrightarrow{\underline{c}}_t &= \textrm{tanh}\left[ \overrightarrow{W}_c (E^x x_t) + \overrightarrow{U}_c h_{t-1} + \overrightarrow{b}_c \right], \\
+			%
+			\overrightarrow{i}_t &= \textrm{sigmoid}\left[ \overrightarrow{W}_i (E^x x_t) + \overrightarrow{U}_i h_{t-1} + \overrightarrow{b}_i \right], \\
+			%
+			\overrightarrow{f}_t &= \textrm{sigmoid}\left[ \overrightarrow{W}_f (E^x x_t) + \overrightarrow{U}_f h_{t-1} + \overrightarrow{b}_f \right], \\
+			%
+			\overrightarrow{c}_t &= \overrightarrow{i}_t \odot \overrightarrow{\underline{c}}_t + \overrightarrow{f}_t \odot \overrightarrow{c}_{t-1}, \\
+			%
+			\overrightarrow{o}_t &= \textrm{sigmoid}\left[ \overrightarrow{W}_o (E^x x_t) + \overrightarrow{U}_o h_{t-1} + \overrightarrow{b}_o \right], \\
+			%
+			\overrightarrow{h}_t &= \overrightarrow{o}_t \odot \textrm{tanh}(\overrightarrow{c}_t),
+		\end{align}
+		where $t = 1, 2, \dots, T_x$. The initial state is set as
+		\begin{align}
+			\overrightarrow{h}_0 = 0.
+		\end{align}
+	
+	In the backward direction, replace the right arrows by the left ones, subscripts $t - 1$ by $t + 1$, $t = T_x, T_x - 1, \dots, 1$, and use the initial state,
+		\begin{align}
+			\overleftarrow{h}_{T_x + 1} = 0.
+		\end{align}
+		Note that the word embedding dictionary $E^x$ is the same for both forward and backward LSTMs.
+	
+	The annotation for attention is obtained by concatenating the forward and backward hidden states,
+		\begin{align}
+			k_t = \left(\begin{array}{cc}
+				\overrightarrow{h}_t \\
+				\overleftarrow{h}_t
+			\end{array}\right).
+		\end{align}
+
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{lll}
+\toprule
+Symbol & Dimension & Description \\
+\midrule
+$t$ & 1 & time step \\
+$h_t$ & $n$ & hidden state \\
+$c_t$ & $n$ & cell state \\
+$\underline{c}_t$ & $n$ & cell state candidate \\
+$i_t$ & $n$ & input gate \\
+$f_t$ & $n$ & forget gate \\
+$o_t$ & $n$ & output gate \\
+$k_t$ & $2 n$ & annotation \\
+\bottomrule \\
+\end{tabular}
+\caption{Symbols for encoder. For forward (backward) set of LSTMs, add right (left) arrow above the symbols.}
+\label{tab:EncoderSymbol}
+\end{table}
+
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{lll}
+\toprule
+Symbol & Dimension & Description \\
+\midrule
+$W_c, W_i, W_f, W_o$ & $n \times m$ & from word embedding to state \\
+$U_c, U_i, U_f, U_o$ & $n \times n$ & from state to state \\
+$b_c, b_i, b_f, b_o$ & $n$ & bias of state \\
+\bottomrule \\
+\end{tabular}
+\caption{Model parameters for encoder. For forward (backward) set of LSTMs, add right (left) arrow above the symbols.}
+\label{tab:EncoderModel}
+\end{table}
+
+
+
+% ---------------------------------------------------------
+
+\subsection{Decoder}
+
+	The decoder is the single-direction LSTM incorporating the soft beam search.
+	
+	The initial conditions at $t = 0$ for each beam $b$ are%
+		\footnote{It's not very clear whether one should use $g^{0, b} = \textrm{tanh}(W_h \overleftarrow{h}_1 + b_h)$ and $\bar{y}^{0, b} = v_{\textrm{<s>}}$ as initial conditions. Here $v_{\textrm{<s>}}$ is the one-hot vector of the token of sentence beginning in the target space.}
+		%
+		\begin{align}
+			g^{0, b} &= 0, \\
+			%
+			\bar{y}^{0, b} &= 0, \\
+			%
+			\bar{s}^{0, b} &= 0,
+		\end{align}
+		where $b = 1, 2, \dots, B$. At time $t$ and for beam $b$, we denote the hidden state by $g^{t, b}$, the average (or ``soft'') word prediction by $\bar{y}^{t, b}$, and the average score (of this average prediction for beam $b$) by $\bar{s}^{t, b}$.
+	
+	At each time step $t$, first compute the score matrix element,
+		\begin{align}
+			S^t_{b i} = \bar{s}^{t-1, b} + f(y_i, g^{t-1, b}, \bar{y}^{t-1, b}, c^t),
+		\end{align}
+		where $f$ is the local score function roughly like
+		\begin{align}
+			f(y_i, g^{t-1, b}, \bar{y}^{t-1, b}, c^t) = \log P(y_i | g^{t-1, b}, \bar{y}^{t-1, b}, c^t),
+		\end{align}
+		$y_i$ is a word in the target-space vocabulary with $i = 1, 2, \dots, K_y$, and $c^t$ is the attention at $t$.
+
+	From $S^t$ we find the top $B$ highest scores, with each
+		\begin{align}
+			m^{b} = \textrm{the $b$-th greatest element in the matrix $S^t$}
+		\end{align}
+		where $b = 1, 2, \dots, B$.
+	
+	The probability matrix corresponding to $S^t$ and beam $b$ has the matrix element,
+		\begin{align}
+			P^{t, b}_{b' i} = \frac{\exp[-\alpha ( S^t_{b' i} - m^{b} )^2]}{\mathcal{Z}},
+		\end{align}
+		where $\alpha \geq 0$ is the softness parameter, and
+		\begin{align}
+			\mathcal{Z} = \sum_{b' = 1}^B \sum_{i = 1}^{K_y} \exp[-\alpha ( S^t_{b' i} - m^{b} )^2]
+		\end{align}
+		is the partition function. Note that there are $B$ such matrices $P^{t, b}$ at each time step $t$, one for each beam.
+
+	From the probability matrices $P^{t, b}$ one can compute the average word (which is actually the prediction of the probability distribution for the word at $t$ and beam $b$), whose components are
+		\begin{align}
+			\bar{y}^{t, b}_i = \sum_{b'=1}^B P^{t, b}_{b' i}
+		\end{align}
+		and the average back pointer, whose components are
+		\begin{align}
+			\bar{b}^{t, b}_{b'} = \sum_{i=1}^{K_y} P^{t, b}_{b' i}.
+		\end{align}
+		They can be viewed as the ``soft'' prediction of the $b$-th most probable word at time $t$ and the corresponding ``soft'' back pointer.
+
+	The average hidden state at time $t-1$ (the ``soft'' hidden state of the ``soft'' incoming beam, given by the ``soft'' back pointer) ``seen by'' beam $b$ at time $t$ is
+		\begin{align}
+			\bar{g}^{t-1, b} = \sum_{b'=1}^B g^{t-1, b'} \bar{b}^{t, b}_{b'}.
+		\end{align}
+		We use this average $\bar{g}^{t-1, b}$ to compute the new hidden state at time $t$,
+		\begin{align}
+			\underline{c}^{t, b} &= \textrm{tanh}\left[ W_c (E^y \bar{y}^{t, b}) + U_c \bar{g}^{t-1, b} + C_c c^{t, b} + b_c \right], \\
+			%
+			i^{t, b} &= \textrm{sigmoid}\left[ W_i (E^y \bar{y}^{t, b}) + U_i \bar{g}^{t-1, b} + C_i c^{t, b} + b_i \right], \\
+			%
+			f^{t, b} &= \textrm{sigmoid}\left[ W_f (E^y \bar{y}^{t, b}) + U_f \bar{g}^{t-1, b} + C_f c^{t, b} + b_f \right], \\
+			%
+			c^{t, b} &= i^{t, b} \odot \underline{c}^{t, b} + f^{t, b} \odot c^{t-1, b}, \\
+			%
+			o^{t, b} &= \textrm{sigmoid}\left[ W_o (E^y \bar{y}^{t, b}) + U_o \bar{g}^{t-1, b} + C_o c^{t, b} + b_o \right], \\
+			%
+			g^{t, b} &= o^{t, b} \odot \textrm{tanh}(c^{t, b}).
+		\end{align}
+
+	The average score of beam $b$ at time $t$ is
+		\begin{align}
+			\bar{s}^{t, b} = \sum_{b' = 1}^B \sum_{i = 1}^{K_y} S^t_{b' i} P^{t, b}_{b' i}.
+		\end{align}
+
+	The accumulated average loss for beam $b$ at time $t$ is
+		\begin{align}
+			\bar{\ell}^{t, b} = \sum_{i=1}^{K_y} d(y_i, y^{t*}) \bar{y}^{t, b}_i + \sum_{b'=1}^B \bar{\ell}^{t-1, b'} \; \bar{b}^{t, b}_{b'},
+		\end{align}
+		where $d$ is the distance, e.g.
+		\begin{align}
+			d(y_i, y^{t*}) = || E^y y_i - E^y y^{t*} ||_2^2.
+		\end{align}
+		To train the model, we will minimize the surrogate objective function,
+		\begin{align}
+			L = \sum_{b=1}^B \bar{\ell}^{T_y, b} \bar{s}^{T_y, b}.
+		\end{align}
+
+
+
+
+
+
+% ---------------------------------------------------------
+
+%\begin{figure}[h]%{fig_reducer_num}
+%\centering
+%\includegraphics[width = 12 cm]{fig1}
+%\caption{$\sum_i \sum_c LCL_c(\boldsymbol{x}_i, y_{c, i})$ for small dataset with respect to iteration.}
+%\label{fig1}
+%\end{figure}
+
+% ---------------------------------------------------------
+
+
+% ---------------------------------------------------------
+% ---------------------------------------------------------
+
+%\subsubsection*{Acknowledgments}
+
+% Use unnumbered third level headings for the acknowledgments.
+
+
+
+% ---------------------------------------------------------
+% ---------------------------------------------------------
+
+\bibliographystyle{plain}
+\bibliography{MachineLearning}
+
+\end{document}
