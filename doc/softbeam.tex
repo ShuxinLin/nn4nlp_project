@@ -160,11 +160,15 @@ $E^y$ & $m \times K_y$ & dictionary in target domain \\
 		\end{align}
 		where $t = 1, 2, \dots, T_x$. The initial state is set as
 		\begin{align}
+			\overrightarrow{c}_0 = 0, \\
+			%
 			\overrightarrow{h}_0 = 0.
 		\end{align}
 	
 	In the backward direction, replace the right arrows by the left ones, subscripts $t - 1$ by $t + 1$, $t = T_x, T_x - 1, \dots, 1$, and use the initial state,
 		\begin{align}
+			\overleftarrow{c}_{T_x + 1} = 0, \\
+			%
 			\overleftarrow{h}_{T_x + 1} = 0.
 		\end{align}
 		Note that the word embedding dictionary $E^x$ is the same for both forward and backward LSTMs.
