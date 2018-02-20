@@ -7,4 +7,6 @@
 *.bbl
 *.blg
 
-softbeam.pdf
+doc/softbeam.pdf
+
+__pycache__
