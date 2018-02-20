@@ -10,7 +10,7 @@ import torch.optim as optim
 
 class ner(nn.Module):
 	def __init__(self,
-		embedding_dim, hidden_dim, cell_dim,
+		embedding_dim, hidden_dim,
 		vocab_size, type_size,
 		learning_rate = 0.1, minibatch_size = 1,
 		max_epoch = 300,
@@ -18,7 +18,6 @@ class ner(nn.Module):
 		super(ner, self).__init__()
 		self.embedding_dim = embedding_dim
 		self.hidden_dim = hidden_dim
-		self.cell_dim = cell_dim
 		self.vocab_size = vocab_size
 		self.type_size = type_size
 		self.learning_rate = learning_rate
@@ -26,17 +25,18 @@ class ner(nn.Module):
 		self.max_epoch = max_epoch
 		self.train_data = train_data
 
-		self.word_embedding = nn.Embedding(self.vocab_size,
-			self.embedding_dim)
-		self.lstm = nn.LSTM(self.embedding_dim, self.hidden_dim)
+		#self.word_embedding = nn.Embedding(self.vocab_size,
+		#	self.embedding_dim)
+		slef.word_embedding = onmt.modules.Embeddings(self.embedding_dim, self.vocab_size, word_padding_idx=src_padding)
 
-		# The linear layer that maps from hidden state space to type space
-		self.hidden2type = nn.Linear(self.hidden_dim, self.type_size)
+		self.encoder = nn.LSTM(self.embedding_dim, self.hidden_dim)
+		# Temporarily use same hidden dim for decoder
+		self.decoder_cell = nn.LSTMCell(self.type_size, self.hidden_dim)
 
-		self.hidden, self.cell = self.init_hidden_cell()
+		self.enc_hidden, self.enc_cell = self.init_enc_hidden_cell()
 
 
-	def init_hidden_cell(self):
+	def init_enc_hidden_cell(self):
 		# Initialize hidden state h_0 and cell state c_0
 		# The axes semantics are (num_layers, minibatch_size, hidden_dim)
 		return (
@@ -44,16 +44,31 @@ class ner(nn.Module):
 			Variable(torch.zeros(1, self.minibatch_size, self.hidden_dim)))
 
 
-	def forward(self, sentence):
+	def encode(self, sentence):
 		sentence_emb = self.word_embedding(sentence)
-		hidden_seq, (self.hidden, self.cell) = self.lstm(
+		enc_hidden_seq, (self.enc_hidden, self.enc_cell) = self.encoder(
 			self.word_embedding(sentence).view(
 			len(sentence), self.minibatch_size, -1),
-			(self.hidden, self.cell))
-		type_score = F.log_softmax(self.hidden2type(
-			hidden_seq.view(len(sentence), -1)), dim = 1)
+			(self.enc_hidden, self.enc_cell))
 
-		return type_score
+
+	def decode(self, type_train):
+		type_seq_len = type_train.size()
+		print(type_seq_len)
+
+		self.dec_hidden_seq = []
+		for i in range(type_seq_len):
+			self.dec_hidden, self.dec_cell = self.decoder_cell(type_train[i], (self.enc_hidden, self.enc_cell))
+			self.dec_hidden_seq.append(self.dec_hidden)
+
+		# Then for loop to pass each self.dec_hidden into a Linear layer
+		# to obtain the scores for all possible types,
+
+
+		# The following can be in other function
+		# then take softmax to get normalized probability
+		# Then compute the cross entropy between our prob and true one-hot type label
+		# to be our loss function
 
 
 	def train(self):

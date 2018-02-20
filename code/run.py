@@ -7,6 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+import onmt
+import onmt.io
+import onmt.modules
+
 from ner import ner
 
 
@@ -43,9 +47,8 @@ def main():
 	######################################
 	embedding_dim = 6
 	hidden_dim = 6
-	cell_dim = 6
 
-	machine = ner(embedding_dim, hidden_dim, cell_dim, len(word_to_ix), len(tag_to_ix), learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index)
+	machine = ner(embedding_dim, hidden_dim, len(word_to_ix), len(tag_to_ix), learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index)
 
 	machine.train()
 
