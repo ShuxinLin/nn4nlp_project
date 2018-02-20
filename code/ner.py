@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import torch
 import torch.autograd as autograd
 from torch.autograd import Variable
@@ -60,6 +62,8 @@ class ner(nn.Module):
 		optimizer = optim.SGD(self.parameters(), lr = self.learning_rate)
 
 		for epoch in range(self.max_epoch):
+			loss_sum = 0
+			train_size = len(self.train_data)
 			for sen, typ in self.train_data:
 				# Always clear the gradients before use
 				self.zero_grad()
@@ -68,12 +72,17 @@ class ner(nn.Module):
 				self.hidden, self.cell = self.init_hidden_cell()
 
 				type_score = self.forward(sen)
+				#print(type_score)
 				loss = loss_function(type_score, typ)
+				loss_sum += loss.data.numpy()[0]
 				loss.backward()
 				optimizer.step()
+			avg_loss = loss_sum / train_size
+			print("epoch", epoch, ", loss =", avg_loss)
 
 
-#	def write_log
+	def write_log(self):
+		pass
 
 
 
