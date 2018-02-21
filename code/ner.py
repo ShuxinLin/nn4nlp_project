@@ -33,6 +33,10 @@ class ner(nn.Module):
 		# Temporarily use same hidden dim for decoder
 		self.decoder_cell = nn.LSTMCell(self.type_size, self.hidden_dim)
 
+		# Transform from hidden state to scores of all possible types
+		# Is this a good model?
+		self.hidden2score = nn.Linear(self.hidden_dim, self.type_size)
+
 		self.enc_hidden, self.enc_cell = self.init_enc_hidden_cell()
 
 
@@ -52,14 +56,32 @@ class ner(nn.Module):
 			(self.enc_hidden, self.enc_cell))
 
 
-	def decode(self, type_train):
+	# Define a function to output a one-hot vector of size type_size
+	# given the index of the type
+	# Assume type_size has included <s> as the beginning of a sentence
+	# and <p> as padding after the end of a sentence
+
+
+	def decode_train(self, type_train):
 		type_seq_len = type_train.size()
 		print(type_seq_len)
 
 		self.dec_hidden_seq = []
+		score_seq = []
+		# WE ARE HERE...
+		#init_type_train = Variable(torch.zeros())
 		for i in range(type_seq_len):
 			self.dec_hidden, self.dec_cell = self.decoder_cell(type_train[i], (self.enc_hidden, self.enc_cell))
 			self.dec_hidden_seq.append(self.dec_hidden)
+
+			# 1 means this is only a word in the sentence
+			score = self.hidden2score(self.dec_hidden.view(1, self.hidden_dim))
+
+			score_seq.append(score)
+
+		self.dec_hidden_seq = torch.cat(self.dec_hidden_seq)
+
+		return torch.cat(score_seq)
 
 		# Then for loop to pass each self.dec_hidden into a Linear layer
 		# to obtain the scores for all possible types,
@@ -72,7 +94,7 @@ class ner(nn.Module):
 
 
 	def train(self):
-		loss_function = nn.NLLLoss()
+		loss_function = nn.CrossEntropyLoss()
 		# Note that here we called nn.Module.parameters()
 		optimizer = optim.SGD(self.parameters(), lr = self.learning_rate)
 
@@ -85,6 +107,8 @@ class ner(nn.Module):
 
 				# Clear the hidden and cell states
 				self.hidden, self.cell = self.init_hidden_cell()
+
+				self.encode()
 
 				type_score = self.forward(sen)
 				#print(type_score)
