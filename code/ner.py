@@ -14,6 +14,7 @@ class ner(nn.Module):
 	def __init__(self,
 		embedding_dim, hidden_dim,
 		vocab_size, type_size,
+		word_to_ix, tag_to_ix,
 		learning_rate = 0.1, minibatch_size = 1,
 		max_epoch = 300,
 		train_data = None):
@@ -26,6 +27,10 @@ class ner(nn.Module):
 		self.minibatch_size = minibatch_size
 		self.max_epoch = max_epoch
 		self.train_data = train_data
+
+		self.word_to_ix = word_to_ix
+		self.tag_to_ix = tag_to_ix
+
 
 		self.word_embedding = nn.Embedding(self.vocab_size,
 			self.embedding_dim)
@@ -97,18 +102,18 @@ class ner(nn.Module):
 	# that is fed into the decoder
 	def decode_train(self, type_index_seq):
 		type_seq_len = type_index_seq.size()[0]
-		print("type_seq_len", type_seq_len)
+		#print("type_seq_len", type_seq_len)
 
 		self.dec_hidden_seq = []
 		score_seq = []
 		type_vector_seq = self.make_type_vector_seq(type_index_seq)
-		print("type_vector_seq", type_vector_seq)
-		print("type_vector_seq[0].view(1, 1, self.type_size)", type_vector_seq[0].view(1, 1, self.type_size))
-		print("type_vector_seq[0].view(1, 1, self.type_size).size()", type_vector_seq[0].view(1, 1, self.type_size).size())
-		print("self.enc_hidden", self.enc_hidden)
-		print("self.enc_cell", self.enc_cell)
+		#print("type_vector_seq", type_vector_seq)
+		#print("type_vector_seq[0].view(1, 1, self.type_size)", type_vector_seq[0].view(1, 1, self.type_size))
+		#print("type_vector_seq[0].view(1, 1, self.type_size).size()", type_vector_seq[0].view(1, 1, self.type_size).size())
+		#print("self.enc_hidden", self.enc_hidden)
+		#print("self.enc_cell", self.enc_cell)
 		for i in range(type_seq_len):
-			self.dec_hidden, self.dec_cell = self.decoder_cell(type_vector_seq[i].view((1, 1, self.type_size)), (self.enc_hidden, self.enc_cell))
+			self.dec_hidden, self.dec_cell = self.decoder_cell(type_vector_seq[i].view((1, self.type_size)), (self.enc_hidden.view(1, self.hidden_dim), self.enc_cell.view(1, self.hidden_dim)))
 			self.dec_hidden_seq.append(self.dec_hidden)
 
 			# 1 means this is only a word in the sentence
@@ -135,6 +140,14 @@ class ner(nn.Module):
 		# Note that here we called nn.Module.parameters()
 		optimizer = optim.SGD(self.parameters(), lr = self.learning_rate)
 
+
+		def prepare_sequence(seq, to_ix):
+			idxs = [to_ix[w] for w in seq]
+			tensor = torch.LongTensor(idxs)
+			return Variable(tensor)
+
+
+
 		#for epoch in range(self.max_epoch):
 		for epoch in range(3):
 			loss_sum = 0
@@ -146,9 +159,20 @@ class ner(nn.Module):
 				# Clear the hidden and cell states
 				self.hidden, self.cell = self.init_enc_hidden_cell()
 
+				print("epoch", epoch)
+				print("sen", sen)
+				print("typ", typ)
+
+				#training_data_in_index = [(prepare_sequence(sen, word_to_ix), prepare_sequence(typ, tag_to_ix)) for sen, typ in training_data]
+
+
 				self.encode(sen)
 				score_seq = self.decode_train(typ)
 				#print(type_score)
+
+				loss_function = nn.CrossEntropyLoss()
+
+				
 				loss = loss_function(score_seq, typ)
 				loss_sum += loss.data.numpy()[0]
 				loss.backward()
