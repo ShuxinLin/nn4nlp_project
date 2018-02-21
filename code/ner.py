@@ -14,7 +14,7 @@ class ner(nn.Module):
 	def __init__(self,
 		embedding_dim, hidden_dim,
 		vocab_size, type_size,
-		word_to_ix, tag_to_ix,
+		#word_to_ix, tag_to_ix,
 		learning_rate = 0.1, minibatch_size = 1,
 		max_epoch = 300,
 		train_data = None):
@@ -28,8 +28,8 @@ class ner(nn.Module):
 		self.max_epoch = max_epoch
 		self.train_data = train_data
 
-		self.word_to_ix = word_to_ix
-		self.tag_to_ix = tag_to_ix
+		#self.word_to_ix = word_to_ix
+		#self.tag_to_ix = tag_to_ix
 
 
 		self.word_embedding = nn.Embedding(self.vocab_size,
@@ -140,16 +140,16 @@ class ner(nn.Module):
 		# Note that here we called nn.Module.parameters()
 		optimizer = optim.SGD(self.parameters(), lr = self.learning_rate)
 
-
+		"""
 		def prepare_sequence(seq, to_ix):
 			idxs = [to_ix[w] for w in seq]
 			tensor = torch.LongTensor(idxs)
 			return Variable(tensor)
+		"""
 
 
-
-		#for epoch in range(self.max_epoch):
-		for epoch in range(3):
+		for epoch in range(self.max_epoch):
+		#for epoch in range(3):
 			loss_sum = 0
 			train_size = len(self.train_data)
 			for sen, typ in self.train_data:
@@ -159,9 +159,9 @@ class ner(nn.Module):
 				# Clear the hidden and cell states
 				self.hidden, self.cell = self.init_enc_hidden_cell()
 
-				print("epoch", epoch)
-				print("sen", sen)
-				print("typ", typ)
+				#print("epoch", epoch)
+				#print("sen", sen)
+				#print("typ", typ)
 
 				#training_data_in_index = [(prepare_sequence(sen, word_to_ix), prepare_sequence(typ, tag_to_ix)) for sen, typ in training_data]
 
@@ -170,12 +170,12 @@ class ner(nn.Module):
 				score_seq = self.decode_train(typ)
 				#print(type_score)
 
-				loss_function = nn.CrossEntropyLoss()
+				#loss_function = nn.CrossEntropyLoss()
 
-				
+
 				loss = loss_function(score_seq, typ)
 				loss_sum += loss.data.numpy()[0]
-				loss.backward()
+				loss.backward(retain_graph = True)
 				optimizer.step()
 			avg_loss = loss_sum / train_size
 			print("epoch", epoch, ", loss =", avg_loss)
