@@ -7,6 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+import time
+
 import numpy as np
 
 
@@ -82,7 +84,7 @@ class ner(nn.Module):
 
 		# type_seq_len, type_size
 		#type_vector_seq = np.zeros((type_seq_len, self.type_size))
-		type_vector_seq = Variable(torch.zeros((type_seq_len, self.type_size)))
+		type_vector_seq = Variable(torch.zeros((type_seq_len, self.type_size)), requires_grad=False)
 		type_index_seq_np = type_index_seq.data.numpy().astype(int)
 		#print("type_index_seq_np", type_index_seq_np)
 		# Mark the sentence beginning
@@ -141,44 +143,66 @@ class ner(nn.Module):
 		optimizer = optim.SGD(self.parameters(), lr = self.learning_rate)
 
 		"""
-		def prepare_sequence(seq, to_ix):
+		def prepare_sequence(seq):
 			idxs = [to_ix[w] for w in seq]
 			tensor = torch.LongTensor(idxs)
 			return Variable(tensor)
 		"""
 
+		"""
+		train_data_var = [(
+			Variable(torch.LongTensor(sen), volatile=False, requires_grad=False), 
+			Variable(torch.LongTensor(typ), volatile=False, requires_grad=False))
+			for sen, typ in self.train_data]
+		print("train_data_var", train_data_var)
+		"""
 
+
+		start_time = time.time()
 		for epoch in range(self.max_epoch):
 		#for epoch in range(3):
 			loss_sum = 0
 			train_size = len(self.train_data)
+			#train_size = len(train_data_var)
 			for sen, typ in self.train_data:
 				# Always clear the gradients before use
 				self.zero_grad()
 
+				print("epoch", epoch)
+				print("sen", sen)
+				print("typ", typ)
+
+				sen_var = Variable(torch.LongTensor(sen), volatile=False, requires_grad=False)
+				#sen_var = Variable(torch.LongTensor(sen))
+				typ_var = Variable(torch.LongTensor(typ), volatile=False, requires_grad=False)
+				#typ_var = Variable(torch.LongTensor(typ))
+
 				# Clear the hidden and cell states
 				self.hidden, self.cell = self.init_enc_hidden_cell()
 
-				#print("epoch", epoch)
-				#print("sen", sen)
-				#print("typ", typ)
+				
+				print("sen_var", sen_var)
+				print("typ_var", typ_var)
 
 				#training_data_in_index = [(prepare_sequence(sen, word_to_ix), prepare_sequence(typ, tag_to_ix)) for sen, typ in training_data]
 
 
-				self.encode(sen)
-				score_seq = self.decode_train(typ)
-				#print(type_score)
+				self.encode(sen_var)
+				score_seq = self.decode_train(typ_var)
+				print(score_seq)
 
 				#loss_function = nn.CrossEntropyLoss()
 
 
-				loss = loss_function(score_seq, typ)
+				loss = loss_function(score_seq, typ_var)
+				print(loss)
 				loss_sum += loss.data.numpy()[0]
-				loss.backward(retain_graph = True)
+				loss.backward()
+				#loss.backward(retain_graph = True)
 				optimizer.step()
 			avg_loss = loss_sum / train_size
-			print("epoch", epoch, ", loss =", avg_loss)
+			print("epoch", epoch, ", loss =", avg_loss, "time=", time.time() - start_time)
+			start_time = time.time()
 
 
 	def write_log(self):
