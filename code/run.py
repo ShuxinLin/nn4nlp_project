@@ -7,10 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-import onmt
-import onmt.io
-import onmt.modules
-
 from ner import ner
 
 
