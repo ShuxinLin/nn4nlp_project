@@ -7,22 +7,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-import time
-
 import numpy as np
+import time
 
 
 class ner(nn.Module):
 	def __init__(self,
-		embedding_dim, hidden_dim,
+		word_embedding_dim, hidden_dim, type_embedding_dim,
 		vocab_size, type_size,
 		#word_to_ix, tag_to_ix,
 		learning_rate = 0.1, minibatch_size = 1,
 		max_epoch = 300,
 		train_data = None):
 		super(ner, self).__init__()
-		self.embedding_dim = embedding_dim
+		self.word_embedding_dim = word_embedding_dim
 		self.hidden_dim = hidden_dim
+		self.type_embedding_dim = type_embedding_dim
 		self.vocab_size = vocab_size
 		self.type_size = type_size
 		self.learning_rate = learning_rate
@@ -35,35 +35,42 @@ class ner(nn.Module):
 
 
 		self.word_embedding = nn.Embedding(self.vocab_size,
-			self.embedding_dim)
+			self.word_embedding_dim)
+		self.type_embedding = nn.Embedding(self.type_size,
+			self.type_embedding_dim)
 
-		self.encoder = nn.LSTM(self.embedding_dim, self.hidden_dim)
+		self.encoder = nn.LSTM(self.word_embedding_dim, self.hidden_dim)
 		# Temporarily use same hidden dim for decoder
-		self.decoder_cell = nn.LSTMCell(self.type_size, self.hidden_dim)
+		self.decoder_cell = nn.LSTMCell(self.type_embedding_dim, self.hidden_dim)
 
 		# Transform from hidden state to scores of all possible types
 		# Is this a good model?
 		self.hidden2score = nn.Linear(self.hidden_dim, self.type_size)
 
-		self.enc_hidden, self.enc_cell = self.init_enc_hidden_cell()
+		#self.enc_hidden, self.enc_cell = self.init_enc_hidden_cell()
 
 
+	"""
 	def init_enc_hidden_cell(self):
 		# Initialize hidden state h_0 and cell state c_0
 		# The axes semantics are (num_layers, minibatch_size, hidden_dim)
 		return (
 			Variable(torch.zeros((1, self.minibatch_size, self.hidden_dim))),
 			Variable(torch.zeros((1, self.minibatch_size, self.hidden_dim))))
+	"""
 
 
-	def encode(self, sentence):
+	def encode(self, sentence, init_enc_hidden, init_enc_cell):
 		sentence_emb = self.word_embedding(sentence)
-		enc_hidden_seq, (self.enc_hidden, self.enc_cell) = self.encoder(
+		enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encoder(
 			self.word_embedding(sentence).view(
 			(len(sentence), self.minibatch_size, -1)),
-			(self.enc_hidden, self.enc_cell))
+			(init_enc_hidden, init_enc_cell))
+
+		return enc_hidden_seq, (enc_hidden_out, enc_cell_out)
 
 
+	"""
 	# Define a function to output a one-hot vector of size type_size
 	# given the index of the type
 	# Assume type_size has included <s> as the beginning of a sentence
@@ -96,36 +103,56 @@ class ner(nn.Module):
 		#print("type_vector_seq", type_vector_seq)
 
 		return type_vector_seq
+	"""
+
 
 
 	# type_index_seq is the gold truth to compared with (the one that goes
 	# into the loss function)
 	# type_vector_seq is the teacher forcing one-hot vector sequence
 	# that is fed into the decoder
-	def decode_train(self, type_index_seq):
+	def decode_train(self, type_index_seq, init_dec_hidden, init_dec_cell):
 		type_seq_len = type_index_seq.size()[0]
 		#print("type_seq_len", type_seq_len)
 
-		self.dec_hidden_seq = []
+		dec_hidden_seq = []
 		score_seq = []
-		type_vector_seq = self.make_type_vector_seq(type_index_seq)
+		#type_vector_seq = self.make_type_vector_seq(type_index_seq)
+		type_vector_seq = self.type_embedding(type_index_seq)
+
+
 		#print("type_vector_seq", type_vector_seq)
 		#print("type_vector_seq[0].view(1, 1, self.type_size)", type_vector_seq[0].view(1, 1, self.type_size))
 		#print("type_vector_seq[0].view(1, 1, self.type_size).size()", type_vector_seq[0].view(1, 1, self.type_size).size())
 		#print("self.enc_hidden", self.enc_hidden)
 		#print("self.enc_cell", self.enc_cell)
-		for i in range(type_seq_len):
-			self.dec_hidden, self.dec_cell = self.decoder_cell(type_vector_seq[i].view((1, self.type_size)), (self.enc_hidden.view(1, self.hidden_dim), self.enc_cell.view(1, self.hidden_dim)))
-			self.dec_hidden_seq.append(self.dec_hidden)
+
+		# Sentence beginning
+		#print("initial", self.type_embedding(Variable(torch.LongTensor([[0, 1, 2, 3, 4]]))))
+		#print("initial", self.type_embedding(Variable(torch.LongTensor([0]))))
+		dec_hidden_out, dec_cell_out = self.decoder_cell(
+			self.type_embedding(Variable(torch.LongTensor([0]))).view(1, self.type_embedding_dim),
+			(init_dec_hidden.view(1, self.hidden_dim),
+			init_dec_cell.view(1, self.hidden_dim))
+			)
+		dec_hidden_seq.append(dec_hidden_out)
+		score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
+		score_seq.append(score)
+
+		# The rest parts of the sentence
+		for i in range(type_seq_len - 1):
+			dec_hidden_out, dec_cell_out = self.decoder_cell(
+				type_vector_seq[i].view((1, self.type_embedding_dim)),
+				(dec_hidden_out.view(1, self.hidden_dim),
+				dec_cell_out.view(1, self.hidden_dim))
+				)
+			dec_hidden_seq.append(dec_hidden_out)
 
 			# 1 means this is only a word in the sentence
-			score = self.hidden2score(self.dec_hidden.view((1, self.hidden_dim)))
-
+			score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
 			score_seq.append(score)
 
-		self.dec_hidden_seq = torch.cat(self.dec_hidden_seq)
-
-		return torch.cat(score_seq)
+		return torch.cat(dec_hidden_seq), torch.cat(score_seq)
 
 		# Then for loop to pass each self.dec_hidden into a Linear layer
 		# to obtain the scores for all possible types,
@@ -168,40 +195,41 @@ class ner(nn.Module):
 				# Always clear the gradients before use
 				self.zero_grad()
 
-				print("epoch", epoch)
-				print("sen", sen)
-				print("typ", typ)
+				#print("epoch", epoch)
+				#print("sen", sen)
+				#print("typ", typ)
 
-				sen_var = Variable(torch.LongTensor(sen), volatile=False, requires_grad=False)
-				#sen_var = Variable(torch.LongTensor(sen))
-				typ_var = Variable(torch.LongTensor(typ), volatile=False, requires_grad=False)
-				#typ_var = Variable(torch.LongTensor(typ))
+				#sen_var = Variable(torch.LongTensor(sen), volatile=False, requires_grad=False)
+				sen_var = Variable(torch.LongTensor(sen))
+				#typ_var = Variable(torch.LongTensor(typ), volatile=False, requires_grad=False)
+				typ_var = Variable(torch.LongTensor(typ))
 
 				# Clear the hidden and cell states
-				self.hidden, self.cell = self.init_enc_hidden_cell()
+				#self.hidden, self.cell = self.init_enc_hidden_cell()
+				init_enc_hidden = Variable( torch.zeros((1, self.minibatch_size, self.hidden_dim)) )
+				init_enc_cell = Variable( torch.zeros((1, self.minibatch_size, self.hidden_dim)) )
+
 
 				
-				print("sen_var", sen_var)
-				print("typ_var", typ_var)
+				#print("sen_var", sen_var)
+				#print("typ_var", typ_var)
 
 				#training_data_in_index = [(prepare_sequence(sen, word_to_ix), prepare_sequence(typ, tag_to_ix)) for sen, typ in training_data]
 
 
-				self.encode(sen_var)
-				score_seq = self.decode_train(typ_var)
-				print(score_seq)
-
-				#loss_function = nn.CrossEntropyLoss()
-
+				enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
+				dec_hidden_seq, score_seq = self.decode_train(typ_var, enc_hidden_out, enc_cell_out)
+				#print("score_seq", score_seq)
+				#print("typ_var", typ_var)
 
 				loss = loss_function(score_seq, typ_var)
-				print(loss)
+				#print("loss", loss)
 				loss_sum += loss.data.numpy()[0]
 				loss.backward()
 				#loss.backward(retain_graph = True)
 				optimizer.step()
 			avg_loss = loss_sum / train_size
-			print("epoch", epoch, ", loss =", avg_loss, "time=", time.time() - start_time)
+			print("epoch", epoch, ", loss =", avg_loss, ", time =", time.time() - start_time)
 			start_time = time.time()
 
 
