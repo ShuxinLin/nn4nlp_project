@@ -18,7 +18,7 @@ class ner(nn.Module):
 		#word_to_ix, tag_to_ix,
 		learning_rate = 0.1, minibatch_size = 1,
 		max_epoch = 300,
-		train_data = None):
+		train_data = None, test_data = None):
 		super(ner, self).__init__()
 		self.word_embedding_dim = word_embedding_dim
 		self.hidden_dim = hidden_dim
@@ -29,6 +29,7 @@ class ner(nn.Module):
 		self.minibatch_size = minibatch_size
 		self.max_epoch = max_epoch
 		self.train_data = train_data
+		self.test_data = test_data
 
 		#self.word_to_ix = word_to_ix
 		#self.tag_to_ix = tag_to_ix
@@ -235,6 +236,72 @@ class ner(nn.Module):
 
 	def write_log(self):
 		pass
+
+
+	def decode_greedy(self, seq_len, init_dec_hidden, init_dec_cell):
+		# Just try to keep beam search in mind
+		# Can eventually use torch.max instead
+		beam_size = 1
+
+		type_pred_seq = []
+		seq_logprob = 0
+
+		# Sentence beginning
+		dec_hidden_out, dec_cell_out = self.decoder_cell(
+			self.type_embedding(Variable(torch.LongTensor([0]))).view(1, self.type_embedding_dim),
+			(init_dec_hidden.view(1, self.hidden_dim),
+			init_dec_cell.view(1, self.hidden_dim))
+			)
+		score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
+		#print("score", score)
+		logprob = nn.LogSoftmax(dim = 1)(score) + seq_logprob
+		#print("logprob", logprob)
+		topk_logprob, topk_type = torch.topk(logprob, beam_size)
+		#print("topk_logprob", topk_logprob)
+		#print("topk_type", topk_type)
+		seq_logprob += topk_logprob[0]
+		#print("seq_logprob", seq_logprob)
+		type_pred_seq.append(topk_type[0])
+		#print("type_pred_seq", type_pred_seq)
+
+		# The rest parts of the sentence
+		for i in range(seq_len - 1):
+			#print("type_pred_seq[-1]", type_pred_seq[-1])
+			dec_hidden_out, dec_cell_out = self.decoder_cell(
+				self.type_embedding(type_pred_seq[-1]).view(1, self.type_embedding_dim),
+				(dec_hidden_out.view(1, self.hidden_dim),
+				dec_cell_out.view(1, self.hidden_dim))
+				)
+			score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
+			logprob = nn.LogSoftmax(dim = 1)(score) + seq_logprob
+			topk_logprob, topk_type = torch.topk(logprob, beam_size)
+			seq_logprob += topk_logprob[0]
+			type_pred_seq.append(topk_type[0])
+
+		return type_pred_seq
+
+
+	def test(self):
+		for sen, typ in self.test_data:
+			# Always clear the gradients before use
+			self.zero_grad()
+			sen_var = Variable(torch.LongTensor(sen))
+			typ_var = Variable(torch.LongTensor(typ))
+			init_enc_hidden = Variable( torch.zeros((1, self.minibatch_size, self.hidden_dim)) )
+			init_enc_cell = Variable( torch.zeros((1, self.minibatch_size, self.hidden_dim)) )
+
+			enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
+
+			type_pred_seq = self.decode_greedy(len(sen), enc_hidden_out, enc_cell_out)
+
+			print("sen =", sen)
+			print("type pred =", type_pred_seq)
+
+
+
+
+
+
 
 
 

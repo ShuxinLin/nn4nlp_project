@@ -40,11 +40,12 @@ def main():
 	hidden_dim = 6
 	type_embedding_dim = 6
 
-	machine = ner(word_embedding_dim, hidden_dim, type_embedding_dim, len(word_to_ix), len(type_to_ix), learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index)
+	machine = ner(word_embedding_dim, hidden_dim, type_embedding_dim, len(word_to_ix), len(type_to_ix), learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index, test_data = training_data_in_index)
 	#machine = ner(embedding_dim, hidden_dim, len(word_to_ix), len(tag_to_ix), word_to_ix, tag_to_ix, learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index)
 
 	machine.train()
 
+	machine.test()
 
 
 
