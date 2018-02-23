@@ -30,15 +30,16 @@ def main():
 				if word not in word_to_idx:
 					word_to_idx[word] = cur_idx
 					cur_idx += 1
-	print(word_to_idx)
 
 	label_to_idx = {"<p>": 0, "<s>": 1, "DET": 2, "NN": 3, "V": 4}
-	print(label_to_idx)
 
 	train_X = [[[word_to_idx[w] for w in sen] for sen in batch] for batch in train_X_raw]
 	train_Y = [[[label_to_idx[t] for t in label] for label in batch] for batch in train_Y_raw]
 
 	"""
+	print(word_to_idx)
+	print(label_to_idx)
+
 	for b_idx, batch in enumerate(train_X):
 		print("batch index", b_idx)
 		for idx, sen in enumerate(batch):
@@ -59,16 +60,9 @@ def main():
 	label_embedding_dim = 16
 
 	machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, len(word_to_idx), len(label_to_idx), learning_rate = 0.1, minibatch_size = 2, max_epoch = 300, train_X = train_X, train_Y = train_Y, test_X = train_X, test_Y = train_Y)
-	#machine = ner(embedding_dim, hidden_dim, len(word_to_idx), len(tag_to_idx), word_to_idx, tag_to_idx, learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index)
 
 	machine.train()
-
 	machine.test()
-
-
-
-
-
 
 
 if __name__ == "__main__":
