@@ -288,40 +288,58 @@ class ner(nn.Module):
 		beam_size = 1
 
 		label_pred_seq = []
-		seq_logprob = 0
+		seq_logprob = Variable(torch.FloatTensor(self.minibatch_size, 1).zero_())
 
 		# Sentence beginning
+		LABEL_BEGIN_INDEX = 1
+		init_label_emb = self.label_embedding(Variable(torch.LongTensor(self.minibatch_size, 1).zero_() + LABEL_BEGIN_INDEX)).view(self.minibatch_size, self.label_embedding_dim)
+
 		dec_hidden_out, dec_cell_out = self.decoder_cell(
-			self.label_embedding(Variable(torch.LongTensor([0]))).view(1, self.label_embedding_dim),
-			(init_dec_hidden.view(1, self.hidden_dim),
-			init_dec_cell.view(1, self.hidden_dim))
-			)
-		score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
+			init_label_emb,	(init_dec_hidden, init_dec_cell))
+
+		score = self.hidden2score(dec_hidden_out)
 		#print("score", score)
+		#print("nn.log...", nn.LogSoftmax(dim = 1)(score))
+
 		logprob = nn.LogSoftmax(dim = 1)(score) + seq_logprob
 		#print("logprob", logprob)
-		topk_logprob, topk_label = torch.topk(logprob, beam_size)
+
+		topk_logprob, topk_label = torch.topk(logprob, beam_size, dim = 1)
 		#print("topk_logprob", topk_logprob)
 		#print("topk_label", topk_label)
-		seq_logprob += topk_logprob[0]
+
+		# We have already added seq_logprob
+		# So simply let topk_logprob be the updated accumulated seq_logprob
+		seq_logprob = topk_logprob
 		#print("seq_logprob", seq_logprob)
-		label_pred_seq.append(topk_label[0])
+
+		label_pred_seq.append(topk_label)
 		#print("label_pred_seq", label_pred_seq)
+
+		#print("here", self.label_embedding(label_pred_seq[-1]))
+		#print("here", self.label_embedding(label_pred_seq[-1]).view(self.minibatch_size, self.label_embedding_dim))
+
 
 		# The rest parts of the sentence
 		for i in range(seq_len - 1):
-			#print("label_pred_seq[-1]", label_pred_seq[-1])
+			#print("--------------- i", i)
+			prev_pred_label_emb = self.label_embedding(label_pred_seq[-1]) \
+				.view(self.minibatch_size, self.label_embedding_dim)
 			dec_hidden_out, dec_cell_out = self.decoder_cell(
-				self.label_embedding(label_pred_seq[-1]).view(1, self.label_embedding_dim),
-				(dec_hidden_out.view(1, self.hidden_dim),
-				dec_cell_out.view(1, self.hidden_dim))
-				)
-			score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
+				prev_pred_label_emb, (init_dec_hidden, init_dec_cell))
+			score = self.hidden2score(dec_hidden_out)
 			logprob = nn.LogSoftmax(dim = 1)(score) + seq_logprob
-			topk_logprob, topk_label = torch.topk(logprob, beam_size)
-			seq_logprob += topk_logprob[0]
-			label_pred_seq.append(topk_label[0])
+			#print("logprob", logprob)
+			topk_logprob, topk_label = torch.topk(logprob, beam_size, dim = 1)
+			#print("topk_logprob", topk_logprob)
+			#print("topk_label", topk_label)
+			seq_logprob = topk_logprob
+			#print("seq_logprob", seq_logprob)
+			label_pred_seq.append(topk_label)
+			#print("label_pred_seq", label_pred_seq)
 
+		#print("==========")
+		#print("label_pred_seq", label_pred_seq)
 		return label_pred_seq
 
 
@@ -381,23 +399,32 @@ class ner(nn.Module):
 
 
 	def test(self):
-		for sen, label in self.test_data:
+		batch_num = len(self.test_X)
+		for batch_idx in range(batch_num):
+			sen = self.test_X[batch_idx]
+			label = self.test_Y[batch_idx]
+			current_sen_len = len(sen[0])
+
 			# Always clear the gradients before use
 			self.zero_grad()
 			sen_var = Variable(torch.LongTensor(sen))
 			label_var = Variable(torch.LongTensor(label))
+
 			init_enc_hidden = Variable( torch.zeros((1, self.minibatch_size, self.hidden_dim)) )
 			init_enc_cell = Variable( torch.zeros((1, self.minibatch_size, self.hidden_dim)) )
 
 			enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
-			label_pred_seq = self.decode_greedy(len(sen), enc_hidden_out, enc_cell_out)
+			init_dec_hidden = enc_hidden_out[0]
+			init_dec_cell = enc_cell_out[0]
+
+			label_pred_seq = self.decode_greedy(current_sen_len, init_dec_hidden, init_dec_cell)
 			#beam_size = 3
 			#label_pred_seq = self.decode_beam(len(sen), enc_hidden_out, enc_cell_out, beam_size)
 
 			print("sen =", sen)
 			print("label pred =", label_pred_seq)
-
+			print("label", label)
 
 
 

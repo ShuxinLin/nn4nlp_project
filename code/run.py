@@ -54,16 +54,16 @@ def main():
 
 
 	######################################
-	word_embedding_dim = 7
-	hidden_dim = 6
-	label_embedding_dim = 4
+	word_embedding_dim = 16
+	hidden_dim = 16
+	label_embedding_dim = 16
 
 	machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, len(word_to_idx), len(label_to_idx), learning_rate = 0.1, minibatch_size = 2, max_epoch = 300, train_X = train_X, train_Y = train_Y, test_X = train_X, test_Y = train_Y)
 	#machine = ner(embedding_dim, hidden_dim, len(word_to_idx), len(tag_to_idx), word_to_idx, tag_to_idx, learning_rate = 0.1, minibatch_size = 1, max_epoch = 300, train_data = training_data_in_index)
 
 	machine.train()
 
-	#machine.test()
+	machine.test()
 
 
 
