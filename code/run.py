@@ -22,15 +22,17 @@ def main():
 		[["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]],
 		[["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]]]
 
-	word_to_idx = {}
+	word_to_idx = {"<p>": 0}
+	cur_idx = 1
 	for batch in train_X_raw:
 		for sen in batch:
 			for word in sen:
 				if word not in word_to_idx:
-					word_to_idx[word] = len(word_to_idx)
+					word_to_idx[word] = cur_idx
+					cur_idx += 1
 	print(word_to_idx)
 
-	label_to_idx = {"<s>": 0, "<p>": 1, "DET": 2, "NN": 3, "V": 4}
+	label_to_idx = {"<p>": 0, "<s>": 1, "DET": 2, "NN": 3, "V": 4}
 	print(label_to_idx)
 
 	train_X = [[[word_to_idx[w] for w in sen] for sen in batch] for batch in train_X_raw]

@@ -150,7 +150,8 @@ class ner(nn.Module):
 		#init_label_emb = self.label_embedding(Variable(torch.LongTensor([[0], [0]])))
 		#init_label_emb = self.label_embedding(Variable(torch.LongTensor(torch.zeros((self.minibatch_size, 1)))))
 
-		init_label_emb = self.label_embedding(Variable(torch.LongTensor(self.minibatch_size, 1).zero_())).view(self.minibatch_size, self.label_embedding_dim)
+		LABEL_BEGIN_INDEX = 1
+		init_label_emb = self.label_embedding(Variable(torch.LongTensor(self.minibatch_size, 1).zero_() + LABEL_BEGIN_INDEX)).view(self.minibatch_size, self.label_embedding_dim)
 		#print("init_label_emb", init_label_emb)
 		#print("init_label_emb.view =>", init_label_emb.view(self.minibatch_size, self.label_embedding_dim))
 		dec_hidden_out, dec_cell_out = self.decoder_cell(
