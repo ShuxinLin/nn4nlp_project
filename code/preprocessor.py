@@ -1,0 +1,227 @@
+import pandas as pd
+import re
+import collections
+import json
+import csv
+from operator import itemgetter
+
+class Preprocessor(object):
+    def __init__(self, data_path, filename):
+        self.path = data_path
+        self.filename = filename
+        self.UNK_TOKEN = '<UNK>'
+        self.PAD_TOKEN = '<PAD>'
+        self.EOS_TOKEN = '<EOS>'
+        self.SEP = '\t'
+        self.data = None
+        self.max_sentence_length = 300
+        self._remove_digits = re.compile(r"""[.+-\/\\]?\d+([.,-:]\d+)?([.:]\d+)?(\.)?""")
+        self.LENGTH_UNIT = 5
+        self.new_data = None
+        self.data_size = 0
+        self.vocab_dict = dict()
+        self.vocabulary_size = 0
+        self.entity_dict = {'<PAD>': 0, 'O': 1, 'PER': 2, 'ORG': 3, 'LOC': 4, 'MISC': 5}
+        self.entity_dict_size = 6
+        self.indexed_data = None
+
+    def read_file(self):
+        raw_file = self.path + self.filename
+        all_words, all_pos, all_chunk, all_entity = [], [], [], []
+        all_examples = []
+        inside_sentence = False
+        with open(raw_file, 'r') as f:
+            for line in f:
+                if self._is_valid_line(line):
+                    inside_sentence = True
+                    word, pos, chunk, entity = line.strip().split()
+
+                    all_words.append(self._preprocess_word(word))
+                    all_pos.append(self._preprocess_pos(pos))
+                    all_chunk.append(self._preprocess_chunk(chunk))
+                    all_entity.append(self._preprocess_entity(entity))
+
+                elif inside_sentence:
+                    if inside_sentence: # end of sentence
+                        word_in_one_sentence = ' '.join(all_words)
+                        pos_in_one_sentence = ' '.join(all_pos)
+                        chunk_in_one_sentence = ' '.join(all_chunk)
+                        entity_in_one_sentence = ' '.join(all_entity)
+
+                        all_examples.append([word_in_one_sentence, pos_in_one_sentence, chunk_in_one_sentence, entity_in_one_sentence])
+                        all_words, all_pos, all_chunk, all_entity = [], [], [], []
+                    inside_sentence = False # end of processing one sentence
+            self.data = pd.DataFrame(data=all_examples, columns=['SENTENCE', 'POS', 'CHUNK', 'ENTITY'])
+
+    def preprocess(self, columns_to_process=['SENTENCE', 'ENTITY']):
+        new_data = self.data.loc[self.data['SENTENCE'].str.len() <= self.max_sentence_length].copy()
+        if 'SENTENCE' in columns_to_process:
+            new_data['SENTENCE'] = new_data['SENTENCE'].apply(lambda x: self._preprocess_sentence(x))
+        if 'ENTITY' in columns_to_process:
+            new_data['ENTITY'] = new_data['ENTITY'].apply(lambda x: self._preprocess_entites(x))
+
+        self._build_vocab(new_data)
+        self.new_data = new_data.loc[:, columns_to_process]
+        self.data_size = self.new_data.shape[0]
+        for column in columns_to_process:
+            preprocessed_file = self.path + 'processed_' + column + '_' + self.filename
+            self.new_data.loc[:, [column]].to_csv(preprocessed_file, sep=self.SEP, index=False, quoting=csv.QUOTE_NONE)
+        print('Successfully saved preprocessed file')
+
+    def index_preprocess(self, columns_to_process=['SENTENCE', 'ENTITY']):
+        indexed_data = self.new_data.copy()
+        indexed_data['SENTENCE'] = indexed_data['SENTENCE'].apply(lambda x: self._index_sentence(x))
+        indexed_data['ENTITY'] = indexed_data['ENTITY'].apply(lambda x: self._index_entity(x))
+        self.indexed_data = indexed_data
+        for column in columns_to_process:
+            indexed_file = self.path + 'indexed_' + column + '_' + self.filename
+            self.indexed_data.loc[:, [column]].to_csv(indexed_file, sep=self.SEP, index=False, quoting=csv.QUOTE_NONE)
+        print('Successfully saved indexed_file file')
+
+    def _index_sentence(self, sentence):
+        words = sentence.split()
+        indexes = [str(self.vocab_dict[word]) for word in words]
+        return ' '.join(indexes)
+
+    def _index_entity(self, entites):
+        entities = entites.split()
+        indexes = [str(self.entity_dict[e]) for e in entities]
+        return ' '.join(indexes)
+
+    def _build_vocab(self, data):
+        all_text = []
+        for sentence in data['SENTENCE']:
+            all_text.extend(sentence.split())
+
+        all_text = filter(lambda a: a != self.PAD_TOKEN, all_text)
+        all_words = collections.Counter(all_text).most_common()
+
+        sorted_by_name = sorted(all_words, key=lambda x: x[0])
+        all_words = sorted(sorted_by_name, key=lambda x: x[1], reverse=True)
+        tokens = [(self.PAD_TOKEN, -1), (self.UNK_TOKEN, -1), (self.EOS_TOKEN, -1)]
+        all_words = tokens + all_words
+        self.vocab_dict = dict()
+        for word in all_words:
+            if word[0] not in self.vocab_dict:
+                self.vocab_dict[word[0]] = len(self.vocab_dict)
+        self.vocabulary_size = len(self.vocab_dict)
+        vocab_file = self.path + "vocab_" + self.filename
+        with open(vocab_file, 'w') as f:
+            for word in all_words:
+                f.write("%s\t%d\n" % (word[0], self.vocab_dict[word[0]]))
+        print('Saved vocabulary to vocabulary file. vocab_size: ', self.vocabulary_size)
+
+
+    def _preprocess_sentence(self, sentence):
+        sentence = self._regex_preprocess(sentence)
+        sentence = self._add_paddings(sentence)
+        return sentence
+
+    def _regex_preprocess(self, sentence):
+        sentence = self._remove_digits.sub('reg_digitz', sentence)
+        sentence = sentence.replace('"', 'reg_quotes')
+        return sentence
+
+    def _add_paddings(self, sentence):
+        words = sentence.split()
+        length = len(words)
+        num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
+        words.extend([self.PAD_TOKEN] * num_of_paddings)
+        # words.append(self.EOS_TOKEN)
+        sentence = ' '.join(words)
+        return sentence
+
+    def _preprocess_entites(self, entities):
+        entities = entities.split()
+        length = len(entities)
+        num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
+        entities.extend([self.PAD_TOKEN] * num_of_paddings)
+        # words.append(self.EOS_TOKEN)
+        return ' '.join(entities)
+
+
+    def _preprocess_word(self, word):
+        return word.lower()
+        # add more in the future
+
+    def _preprocess_pos(self, pos):
+        result = None
+
+        if pos == 'NN' or pos == 'NNS':
+            result = 'NN'
+        elif pos == 'FW':
+            result = 'FW'
+        elif pos == 'NNP' or pos == 'NNPS':
+            result = 'NNP'
+        elif 'VB' in pos:
+            result = 'VB'
+        else:
+            result = 'OTHER'
+
+        return result
+
+
+    def _preprocess_chunk(self, chunk):
+        result = None
+
+        if 'NP' in chunk:
+            result = 'NP'
+        elif 'VP' in chunk:
+            result = 'VP'
+        elif 'PP' in chunk:
+            result = 'PP'
+        elif chunk == 'O':
+            result = 'O'
+        else:
+            result = 'OTHER'
+
+        return result
+
+    def _preprocess_entity(self, entity):
+        entity = entity.split('-')
+        entity = entity[0] if len(entity) == 1 else entity[1]
+
+        return entity
+
+    def _is_valid_line(self, line):
+        if line.strip() == "" or len(line.split()) == 0:
+            return False
+
+        if '-DOCSTART-' in line:
+            return False
+
+        return True
+
+    def minibatch(self, batch_size=5, columns_to_batch=[['SENTENCE', 'ENTITY']]):
+        X_batch = []
+        Y_batch = []
+        all_data = []
+        for index, row in self.indexed_data.iterrows():
+            splitted_sentence = map(int, row['SENTENCE'].split())
+            splitted_entities = map(int, row['ENTITY'].split())
+            assert len(splitted_entities) == len(splitted_sentence)
+            all_data.append((len(splitted_sentence), splitted_sentence, splitted_entities))
+
+        sorted_all_data = sorted(all_data, key=itemgetter(0))
+        prev_len = 5
+        X_minibatch = []
+        Y_minibatch = []
+        for data in sorted_all_data:
+            if prev_len == data[0]:
+                X_minibatch.append(data[1])
+                Y_minibatch.append(data[2])
+            else:
+                X_minibatch = [X_minibatch[x:x + batch_size] for x in xrange(0, len(X_minibatch), batch_size)]
+                Y_minibatch = [Y_minibatch[x:x + batch_size] for x in xrange(0, len(Y_minibatch), batch_size)]
+                X_batch.extend(X_minibatch)
+                Y_batch.extend(Y_minibatch)
+                X_minibatch = []
+                Y_minibatch = []
+                X_minibatch.append(data[1])
+                Y_minibatch.append(data[2])
+                prev_len = data[0]
+        X_minibatch = [X_minibatch[x:x + batch_size] for x in xrange(0, len(X_minibatch), batch_size)]
+        Y_minibatch = [Y_minibatch[x:x + batch_size] for x in xrange(0, len(Y_minibatch), batch_size)]
+        X_batch.extend(X_minibatch)
+        Y_batch.extend(Y_minibatch)
+        return X_batch, Y_batch
