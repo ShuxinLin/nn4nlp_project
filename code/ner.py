@@ -119,7 +119,9 @@ class NER(nn.Module):
         sen = self.train_X[batch_idx]
         label = self.train_Y[batch_idx]
 
+        # import pdb; pdb.set_trace()
         # current_batch_size = len(sen)
+
         current_sen_len = len(sen[0])
 
         # Always clear the gradients before use

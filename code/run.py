@@ -1,65 +1,39 @@
 #!/usr/bin/python3
 
 from ner import NER
+from data.ner_data import parse_data
+from data.data_feeder import get_word2idx, naive_batch, label_to_idx
+
+batch_size = 3
 
 
 def main():
-  # Temporarily generate data by hand for test purpose
-  train_X_raw = [
-    ["The dog ate the apple".split(" "),
-     "Everybody read that book <p>".split(" ")],
-    ["The dog ate the apple".split(" "),
-     "Everybody read that book <p>".split(" ")],
-    ["The dog ate the apple".split(" "),
-     "Everybody read that book <p>".split(" ")]]
+  testa = "../dataset/CoNLL-2003/eng.testa"
+  testb = "../dataset/CoNLL-2003/eng.testb"
+  train = "../dataset/CoNLL-2003/eng.train"
+  X_testa, y_testa = parse_data(testa)
+  X_testb, y_testb = parse_data(testb)
+  X_train, y_train = parse_data(train)
 
-  train_Y_raw = [
-    [["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]],
-    [["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]],
-    [["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]]]
+  word_to_idx = get_word2idx([X_train, X_testa, X_testb])
+  print word_to_idx
+  print(len(word_to_idx))
 
-  word_to_idx = {"<p>": 0}
-  cur_idx = 1
-  for batch in train_X_raw:
-    for sen in batch:
-      for word in sen:
-        if word not in word_to_idx:
-          word_to_idx[word] = cur_idx
-          cur_idx += 1
+  X_train_batch, y_train_batch = naive_batch(X_train, y_train,
+                                             batch_size, word_to_idx)
+  X_testa_batch, y_testa_batch = naive_batch(X_testa, y_testa,
+                                             batch_size, word_to_idx)
+  # import pdb; pdb.set_trace()
 
-  label_to_idx = {"<p>": 0, "<s>": 1, "DET": 2, "NN": 3, "V": 4}
-
-  train_X = [[[word_to_idx[w] for w in sen] for sen in batch] for batch in
-             train_X_raw]
-  train_Y = [[[label_to_idx[t] for t in label] for label in batch] for batch in
-             train_Y_raw]
-
-  """
-  print(word_to_idx)
-  print(label_to_idx)
-
-  for b_idx, batch in enumerate(train_X):
-    print("batch index", b_idx)
-    for idx, sen in enumerate(batch):
-      print("instance index", idx)
-      print("sen", sen)
-
-  for b_idx, batch in enumerate(train_Y):
-    print("batch index", b_idx)
-    for idx, label in enumerate(batch):
-      print("instance index", idx)
-      print("label", label)
-  """
-
-  ######################################
-  word_embedding_dim = 16
-  hidden_dim = 16
-  label_embedding_dim = 16
+  word_embedding_dim = 500
+  hidden_dim = 512
+  label_embedding_dim = 10
 
   machine = NER(word_embedding_dim, hidden_dim, label_embedding_dim,
                 len(word_to_idx), len(label_to_idx), learning_rate=0.1,
-                minibatch_size=2, max_epoch=300, train_X=train_X,
-                train_Y=train_Y, test_X=train_X, test_Y=train_Y)
+                minibatch_size=3, max_epoch=300,
+                train_X=X_train_batch, train_Y=y_train_batch,
+                test_X=X_testa_batch, test_Y=y_testa_batch)
 
   machine.train()
   machine.test()
