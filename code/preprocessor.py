@@ -21,8 +21,8 @@ class Preprocessor(object):
         self.data_size = 0
         self.vocab_dict = dict()
         self.vocabulary_size = 0
-        self.entity_dict = {'<PAD>': 0, '<EOS>': 1, 'O': 2, 'PER': 3, 'ORG': 4, 'LOC': 5, 'MISC': 6}
-        self.entity_dict_size = 7
+        self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<EOS>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
+        self.entity_dict_size = 10
         self.indexed_data = None
 
     def read_file(self):
@@ -39,7 +39,8 @@ class Preprocessor(object):
                     all_words.append(self._preprocess_word(word))
                     all_pos.append(self._preprocess_pos(pos))
                     all_chunk.append(self._preprocess_chunk(chunk))
-                    all_entity.append(self._preprocess_entity(entity))
+                    # all_entity.append(self._preprocess_entity(entity))
+                    all_entity.append(entity)
 
                 elif inside_sentence:
                     if inside_sentence: # end of sentence
@@ -58,7 +59,7 @@ class Preprocessor(object):
         if 'SENTENCE' in columns_to_process:
             new_data['SENTENCE'] = new_data['SENTENCE'].apply(lambda x: self._preprocess_sentence(x))
         if 'ENTITY' in columns_to_process:
-            new_data['ENTITY'] = new_data['ENTITY'].apply(lambda x: self._preprocess_entites(x))
+            new_data['ENTITY'] = new_data['ENTITY'].apply(lambda x: self._preprocess_entities(x))
 
         self.new_data = new_data.loc[:, columns_to_process]
         self.data_size = self.new_data.shape[0]
@@ -129,7 +130,7 @@ class Preprocessor(object):
         sentence = ' '.join(words)
         return sentence
 
-    def _preprocess_entites(self, entities):
+    def _preprocess_entities(self, entities):
         entities = entities.split()
         length = len(entities)
         num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
@@ -176,8 +177,8 @@ class Preprocessor(object):
         return result
 
     def _preprocess_entity(self, entity):
-        entity = entity.split('-')
-        entity = entity[0] if len(entity) == 1 else entity[1]
+        if entity not in self.entity_dict:
+            self.entity_dict[entity] = len(self.entity_dict)
 
         return entity
 

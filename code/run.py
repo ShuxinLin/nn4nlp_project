@@ -66,6 +66,7 @@ def main():
                   test_Y=val_Y)
 
     machine.train()
+    machine.eval_on_train()
     machine.test()
 
 

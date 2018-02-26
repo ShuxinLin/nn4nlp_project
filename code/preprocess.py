@@ -56,5 +56,18 @@ def build_vocab(train_preprocessor, val_preprocessor):
             f.write("%s\t%d\n" % (word[0], vocab_dict[word[0]]))
     print('Saved vocabulary to vocabulary file. vocab_size: ', vocabulary_size)
 
+def get_index2word():
+    index2word = dict()
+    dict_file = '../dataset/CoNLL-2003/vocab_dict'
+    with open(dict_file) as f:
+        for line in f:
+            (word, index) = line.split()
+            index2word[int(index)] = word
+    return index2word
+
+def get_index2label():
+    index2label = {0: '<PAD>', 1: '<EOS>', 2: 'I-ORG', 3: 'O', 4: 'I-MISC', 5: 'I-PER', 6: 'I-LOC', 7: 'B-LOC', 8: 'B-MISC', 9: 'B-ORG'}
+
+    return index2label
 
 # prepocess(train_file, val_file)
