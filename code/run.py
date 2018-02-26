@@ -62,7 +62,7 @@ def main():
     label_embedding_dim = 16
 
     machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size,
-                  learning_rate=0.1, minibatch_size=64, max_epoch=300, train_X=train_X, train_Y=train_Y, test_X=val_X,
+                  learning_rate=0.1, minibatch_size=64, max_epoch=10, train_X=train_X, train_Y=train_Y, test_X=val_X,
                   test_Y=val_Y)
 
     machine.train()

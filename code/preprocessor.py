@@ -229,4 +229,4 @@ class Preprocessor(object):
         X_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, X_batch)
         Y_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, Y_batch)
 
-        return X_batch, Y_batch
+        return list(X_batch), list(Y_batch)
