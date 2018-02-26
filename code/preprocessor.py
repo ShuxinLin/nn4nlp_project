@@ -210,8 +210,8 @@ class Preprocessor(object):
                 X_minibatch.append(data[1])
                 Y_minibatch.append(data[2])
             else:
-                X_minibatch = [X_minibatch[x:x + batch_size] for x in xrange(0, len(X_minibatch), batch_size)]
-                Y_minibatch = [Y_minibatch[x:x + batch_size] for x in xrange(0, len(Y_minibatch), batch_size)]
+                X_minibatch = [X_minibatch[x:x + batch_size] for x in range(0, len(X_minibatch), batch_size)]
+                Y_minibatch = [Y_minibatch[x:x + batch_size] for x in range(0, len(Y_minibatch), batch_size)]
                 X_batch.extend(X_minibatch)
                 Y_batch.extend(Y_minibatch)
                 X_minibatch = []
@@ -219,8 +219,8 @@ class Preprocessor(object):
                 X_minibatch.append(data[1])
                 Y_minibatch.append(data[2])
                 prev_len = data[0]
-        X_minibatch = [X_minibatch[x:x + batch_size] for x in xrange(0, len(X_minibatch), batch_size)]
-        Y_minibatch = [Y_minibatch[x:x + batch_size] for x in xrange(0, len(Y_minibatch), batch_size)]
+        X_minibatch = [X_minibatch[x:x + batch_size] for x in range(0, len(X_minibatch), batch_size)]
+        Y_minibatch = [Y_minibatch[x:x + batch_size] for x in range(0, len(Y_minibatch), batch_size)]
         X_batch.extend(X_minibatch)
         Y_batch.extend(Y_minibatch)
         assert len(X_batch) == len(Y_batch)
