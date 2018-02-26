@@ -7,7 +7,8 @@
 *.bbl
 *.blg
 
-doc/softbeam.pdf
+doc/softbeam/softbeam.pdf
+doc/checkpoint1/acl2018.pdf
 
 __pycache__
 

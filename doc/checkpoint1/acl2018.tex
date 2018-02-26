@@ -1,0 +1,229 @@
+ %
+% File acl2018.tex
+%
+%% Based on the style files for ACL-2017, with some changes, which were, in turn,
+%% Based on the style files for ACL-2015, with some improvements
+%%  taken from the NAACL-2016 style
+%% Based on the style files for ACL-2014, which were, in turn,
+%% based on ACL-2013, ACL-2012, ACL-2011, ACL-2010, ACL-IJCNLP-2009,
+%% EACL-2009, IJCNLP-2008...
+%% Based on the style files for EACL 2006 by 
+%%e.agirre@ehu.es or Sergi.Balari@uab.es
+%% and that of ACL 08 by Joakim Nivre and Noah Smith
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[hyperref]{acl2018}
+\usepackage{times}
+\usepackage{latexsym}
+
+\usepackage{url}
+
+\aclfinalcopy % Uncomment this line for the final submission
+%\def\aclpaperid{***} %  Enter the acl Paper ID here
+
+%\setlength\titlebox{5cm}
+% You can expand the titlebox if you need extra space
+% to show all the authors. Please do not make the titlebox
+% smaller than 5cm (the original size); we will check this
+% in the camera-ready version and ask you to change it back.
+
+\newcommand\BibTeX{B{\sc ib}\TeX}
+
+\title{Assignment 1\\IMPROVING SEQ2SEQ WITH ADAPTIVE BEAM SEARCH}
+
+\author{Yu-Hsiang Lin \quad Shuxin Lin \quad Hai Pham \\
+  Language Technologies Institute \\
+  Carnegie Mellon University \\
+%   Affiliation / Address line 3 \\
+{\tt\small $\left\{yuhsianl, shuxinl, htpham\right\}$@cs.cmu.edu}
+%   {\tt email@domain} 
+%   \\\And
+%   Second Author \\
+%   Affiliation / Address line 1 \\
+%   Affiliation / Address line 2 \\
+%   Affiliation / Address line 3 \\
+%   {\tt email@domain} \\
+  }
+
+\date{}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+  We plan to apply new techniques such as dynamic beam search to boost up the training phase in sequence-to-sequence model. In this report, we review related approaches and mention some preliminary setting and baseline results. 
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         INTRODUCTION              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction} \label{sec:introduction}
+Since its invention, sequence-to-sequence (seq2seq) model \cite{seq2seq_2014} has been a go-to model for many translation-related tasks,  % probably more examples needed 
+especially since the advent of attention model \cite{bahdanau2014neural,luong2015effective}. Despite its great successes in many domains, how to train and decode seq2seq model is still an open problem because of the drawback of traditional maximum likelihood training which is, most of the cases, unable to find the maximum-a-posteriori of a to-be-decoded single sentence over the whole corpus. 
+
+Amongst many heuristic approaches to remediate that problem, \textit{greedy search} and \textit{beam search} are probably the most popular. While greedy search is known for its lightweight, elegant characteristics, beam search is generally better in practice by considering not only the best-scored word at each time step but maintaining a window of best words. 
+In this project, we will be addressing the disadvantages of previous approaches for seq2seq using beam search and proposing an improvement for it in training and decoding phases. We also present our results on two tasks: name entity recognition and CCG super tagging. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         RELATED WORK              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Related Work} \label{sec:related_work}% Literature Review 
+The straightforward approach to improve seq2seq model trained with the traditional maximum likelihood method  of ground truths is to improve the decoding phase. While beam search is consider the de-factor approach \cite{seq2seq_2014}, greedy search if designed properly can yield a comparable performance, if not better in some cases, while having a much more lightweight architecture. \citet{goyal2017differentiable} proposed an approximated version of greedy search over the scheduled sampling training procedure \cite{bengio2015scheduled}. 
+%% PROBABLY NEED MORE REFERENCE for REINFORCE
+% Reinforcement learning 
+Unlike tackling with decoding phase solely, another useful approach to improve seq2seq is to design a better architecture or technique of helping decode right on the training phase. One widely-employed approach is to 
+%is to avoid the low performance of greedy search and high delay of beam search, 
+convert it into an imitation learning problem \cite{daume2009search,ross2011reduction,bengio2015scheduled} where expert guidance from human is injected to make the agent more robust and efficient. 
+A naturally connected method is to use reinforcement learning \cite{sutton1998reinforcement} which employs a reward-based loss instead of maximum likelihood-based \cite{ranzato2015sequence, gu2017learning}, giving rise to a new family of techniques which is fitted to the discrete text domain. 
+
+% Reinforcemcent learning
+While discriminative training is the straightforward method for seq2seq training, another generalized method is to pose it as a generative model. Amongst such solutions, Generative Adversarial Network \cite{goodfellow2014generative} broadly used for diverse tasks, predominantly in generating images \cite{dcgan2015,berthelot2017began,zhang2017stackgan,progressive_gan_2017} and videos \cite{vondrick2016generating} based on what model learned from training, or \textit{translating} them given a style of images \cite{conditional_gan_2014,pix2pix2017,discoGAN2017,mechrez2017photorealistic,luan2017deep,zhu2017unpaired} and videos \cite{ruder2016artistic}. Despite the booming trend of GAN, its application to text domain faces a difficult obstacle of inherent discrete properties of text domain. Nonetheless, there have been successes of translating text from a style to another 
+%using professor-forcing \cite{professor_forcing_2016} 
+to deal with discrete texts \cite{boundaryseeking_gan_2017,yu2017seqgan,shen2017style}.  
+Another workaround when facing discrete text in designing a generative model is to use variational autoencoder \cite{} with maximum likelihood objective to learn the disentangled latent representations into some controlled attributes \cite{controlled_text_gen_2017}. 
+
+Inspired by GAN's design, similar approaches have been made to seq2seq in conjunction with reinforcement learning \cite{kusner2016gans, yu2017seqgan,gu2017neural, gumbel2017}. And although not directly connected, actor-critic setting which shares a close equivalence with GAN \cite{pfau2016connecting}, has been also employed to replace maximum-likelihood method \cite{bahdanau2017actor}. And while sharing the same methodology in that we improve the decoding performance by making the model learn to decode right on the training phase, our approach still sticks to maximum likelihood method objective for its straightforwardness and more simplicity in its design.  
+
+%%% TODO: discrete search-based 
+While reinforcement learning can yield a fast decoding model, training with maximum likelihood has its own merit of being simple yet comparably efficient. For such approach, some attempts to make the model learn how to decode right on the training phase have also taken place. There were some solutions that optimize beam search in discrete space such as from \citet{wiseman2016sequence, andor2016globally} whose target is to get rid of label bias problem and design a model that is globally--rather than locally--normalized. Another work, from which our work extends, instead aims at design a new surrogate training objective to convert from discrete space into a continuous approximation of the beam search \cite{goyal2018continuous}. In detail, because using beam search right at training phase largely degrades the performance due to its resources consumption and its search space, we plan to use a tactic of dynamic beam search \cite{buckman2016transition} to make the training faster while retaining its efficacy. 
+% Our work instead tackles with the training phase rather than only looking at improving decoding. 
+
+% Other more efficient seq2seq improvement approach is to address the disadvantages of maximum likelihood training and so change the target objective. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         EXPERIMENT              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiment}
+\subsection{Baseline} \label{ssec:baseline}
+% detail of setup e.g. OpenNMT, PyTorch, hyper params etc 
+
+% results 
+\subsection{Discussion} \label{ssec:discussion}% of baseline 
+% discussion of results 
+
+
+% \begin{quote}
+% \begin{verbatim}
+% \usepackage{times}
+% \usepackage{latexsym}
+% \end{verbatim}
+% \end{quote}
+% in the preamble. If Times Roman is unavailable, use \textbf{Computer
+%   Modern Roman} (\LaTeX2e{}'s default).  Note that the latter is about
+%   10\% less dense than Adobe's Times Roman font.
+
+% \begin{table}[t!]
+% \begin{center}
+% \begin{tabular}{|l|rl|}
+% \hline \bf Type of Text & \bf Font Size & \bf Style \\ \hline
+% paper title & 15 pt & bold \\
+% author names & 12 pt & bold \\
+% author affiliation & 12 pt & \\
+% the word ``Abstract'' & 12 pt & bold \\
+% section titles & 12 pt & bold \\
+% subsection titles & 11 pt & bold \\
+% document text & 11 pt  &\\
+% captions & 11 pt & \\
+% abstract text & 11 pt & \\
+% bibliography & 10 pt & \\
+% footnotes & 9 pt & \\
+% \hline
+% \end{tabular}
+% \end{center}
+% \caption{\label{font-table} Font guide. }
+% \end{table}
+
+
+% %Use 11 points for text and subsection headings, 12 points for section headings and 15 points for the title. 
+
+
+% \begin{table}
+% \centering
+% \small
+% \begin{tabular}{cc}
+% \begin{tabular}{|l|l|}
+% \hline
+% \textbf{Command} & \textbf{Output}\\\hline
+% \verb|{\"a}| & {\"a} \\
+% \verb|{\^e}| & {\^e} \\
+% \verb|{\`i}| & {\`i} \\ 
+% \verb|{\.I}| & {\.I} \\ 
+% \verb|{\o}| & {\o} \\
+% \verb|{\'u}| & {\'u}  \\ 
+% \verb|{\aa}| & {\aa}  \\\hline
+% \end{tabular} & 
+% \begin{tabular}{|l|l|}
+% \hline
+% \textbf{Command} & \textbf{ Output}\\\hline
+% \verb|{\c c}| & {\c c} \\ 
+% \verb|{\u g}| & {\u g} \\ 
+% \verb|{\l}| & {\l} \\ 
+% \verb|{\~n}| & {\~n} \\ 
+% \verb|{\H o}| & {\H o} \\ 
+% \verb|{\v r}| & {\v r} \\ 
+% \verb|{\ss}| & {\ss} \\\hline
+% \end{tabular}
+% \end{tabular}
+% \caption{Example commands for accented characters, to be used in, {\em e.g.}, \BibTeX\ names.}\label{tab:accents}
+% \end{table}
+
+
+
+\begin{table*}
+\centering
+\begin{tabular}{lll}
+  output & natbib & previous ACL style files\\
+  \hline
+  \citep{Gusfield:97} & \verb|\citep| & \verb|\cite| \\
+  \citet{Gusfield:97} & \verb|\citet| & \verb|\newcite| \\
+  \citeyearpar{Gusfield:97} & \verb|\citeyearpar| & \verb|\shortcite| \\
+\end{tabular}
+\caption{Citation commands supported by the style file.
+  The citation style is based on the natbib package and
+  supports all natbib citation commands.
+  It also supports commands defined in previous ACL style files
+  for compatibility.
+  }
+\end{table*}
+
+
+
+% include your own bib file like this:
+%\bibliographystyle{acl}
+%\bibliography{acl2018}
+\bibliography{acl2018}
+\bibliographystyle{acl_natbib}
+
+% \appendix
+
+% \section{Supplemental Material}
+% \label{sec:supplemental}
+% ACL 2018 also encourages the submission of supplementary material
+% to report preprocessing decisions, model parameters, and other details
+% necessary for the replication of the experiments reported in the 
+% paper. Seemingly small preprocessing decisions can sometimes make
+% a large difference in performance, so it is crucial to record such
+% decisions to precisely characterize state-of-the-art methods.
+
+% Nonetheless, supplementary material should be supplementary (rather
+% than central) to the paper. \textbf{Submissions that misuse the supplementary 
+% material may be rejected without review.}
+% Essentially, supplementary material may include explanations or details
+% of proofs or derivations that do not fit into the paper, lists of
+% features or feature templates, sample inputs and outputs for a system,
+% pseudo-code or source code, and data. (Source code and data should
+% be separate uploads, rather than part of the paper).
+
+% The paper should not rely on the supplementary material: while the paper
+% may refer to and cite the supplementary material and the supplementary material will be available to the
+% reviewers, they will not be asked to review the
+% supplementary material.
+
+% Appendices ({\em i.e.} supplementary material in the form of proofs, tables,
+% or pseudo-code) should come after the references, as shown here. Use
+% \verb|\appendix| before any appendix section to switch the section
+% numbering over to letters.
+
+% \section{Multiple Appendices}
+% \dots can be gotten by using more than one section. We hope you won't
+% need that.
+
+\end{document}
