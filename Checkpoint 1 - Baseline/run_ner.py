@@ -8,9 +8,9 @@ batch_size = 3
 
 
 def main():
-  testa = "../../dataset/CoNLL-2003/eng.testa"
-  testb = "../../dataset/CoNLL-2003/eng.testb"
-  train = "../../dataset/CoNLL-2003/eng.train"
+  testa = "../dataset/CoNLL-2003/eng.testa"
+  testb = "../dataset/CoNLL-2003/eng.testb"
+  train = "../dataset/CoNLL-2003/eng.train"
   X_testa, y_testa = parse_data(testa)
   X_testb, y_testb = parse_data(testb)
   X_train, y_train = parse_data(train)

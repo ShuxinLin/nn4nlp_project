@@ -1,1 +1,1 @@
-# nn4nlp
+# Checkpoint 1 - Baseline 
