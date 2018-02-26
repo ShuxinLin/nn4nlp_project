@@ -51,6 +51,8 @@ def naive_batch(X, y, batch_size, word2index, shuffle=True):
   Args:
     X: samples, list of list 
     y: labels, list of list, same cardinality format as X 
+    word2index:
+    shuffle: or  not
     batch_size: number of sentences  
 
   Returns:
@@ -93,10 +95,9 @@ def naive_batch(X, y, batch_size, word2index, shuffle=True):
       current_lengths.append(len(X[j]))
 
     # sort descending based on lengths
-    # Zip into pairs, sort by length (descending), unzip
-    seq_pairs = sorted(zip(current_x, current_y), key=lambda p: len(p[0]),
-                       reverse=True)
-    input_seqs, target_seqs = zip(*seq_pairs)
+    seq_pairs = sorted(zip(current_x, current_y, current_lengths),
+                       key=lambda k: len(k[0]), reverse=True)
+    input_seqs, target_seqs, current_lengths = zip(*seq_pairs)
 
     # debug
     print(input_seqs)
