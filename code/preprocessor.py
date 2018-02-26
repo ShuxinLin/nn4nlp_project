@@ -134,7 +134,7 @@ class Preprocessor(object):
         entities = entities.split()
         length = len(entities)
         num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
-        entities.extend([self.PAD_TOKEN] * num_of_paddings)
+        entities.extend(['O'] * num_of_paddings)
         entities.append(self.EOS_TOKEN)
         return ' '.join(entities)
 
