@@ -134,7 +134,7 @@ class Preprocessor(object):
         entities = entities.split()
         length = len(entities)
         num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
-        entities.extend([self.PAD_TOKEN] * num_of_paddings)
+        entities.extend(['O'] * num_of_paddings)
         entities.append(self.EOS_TOKEN)
         return ' '.join(entities)
 
@@ -226,7 +226,6 @@ class Preprocessor(object):
         Y_batch.extend(Y_minibatch)
         assert len(X_batch) == len(Y_batch)
 
-        X_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, X_batch)
-        Y_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, Y_batch)
-
+        X_batch = list(filter(lambda mini_batch: len(mini_batch) == batch_size, X_batch))
+        Y_batch = list(filter(lambda mini_batch: len(mini_batch) == batch_size, Y_batch))
         return X_batch, Y_batch

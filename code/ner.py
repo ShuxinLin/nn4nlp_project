@@ -369,9 +369,7 @@ class ner(nn.Module):
         f_sen = open(result_path + "sen.txt", 'w')
         f_pred = open(result_path + "pred.txt", 'w')
         f_label = open(result_path + "label.txt", 'w')
-        f_sen_processed = open(result_path + "sen_processed.txt", 'w')
-        f_pred_processed = open(result_path + "pred_processed.txt", 'w')
-        f_label_processed = open(result_path + "label_processed.txt", 'w')
+        f_result_processed = open(result_path + "result_processed.txt", 'w')
 
         for batch_idx in range(batch_num):
             sen = self.test_X[batch_idx]
@@ -415,13 +413,12 @@ class ner(nn.Module):
 
                 # clean version (does not print <PAD>, print a newline instead of <EOS>)
                 if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
-                    f_sen_processed.write(index2word[sen[i]] + '\n')
-                    f_label_processed.write(index2label[label[i]] + '\n')
-                    f_pred_processed.write(index2label[label_pred_seq[i]] + '\n')
+                    result_sen = index2word[sen[i]]
+                    result_label = index2label[label[i]]
+                    result_pred = index2label[label_pred_seq[i]]
+                    f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
                 elif sen[i] == 2:   # <EOS>
-                    f_sen_processed.write('\n')
-                    f_label_processed.write('\n')
-                    f_pred_processed.write('\n')
+                    f_result_processed.write('\n')
 
     # just a copy of test() but use train data
     def eval_on_train(self):
@@ -431,9 +428,7 @@ class ner(nn.Module):
         f_sen_train = open(result_path + "sen_train.txt", 'w')
         f_pred_train = open(result_path + "pred_train.txt", 'w')
         f_label_train = open(result_path + "label_train.txt", 'w')
-        f_sen_processed_train = open(result_path + "sen_processed_train.txt", 'w')
-        f_pred_processed_train = open(result_path + "pred_processed_train.txt", 'w')
-        f_label_processed_train = open(result_path + "label_processed_train.txt", 'w')
+        f_result_processed_train = open(result_path + "result_processed_train.txt", 'w')
 
         for batch_idx in range(batch_num):
             sen = self.train_X[batch_idx]
@@ -473,13 +468,13 @@ class ner(nn.Module):
 
                 # clean version
                 if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
-                    f_sen_processed_train.write(index2word[sen[i]] + '\n')
-                    f_label_processed_train.write(index2label[label[i]] + '\n')
-                    f_pred_processed_train.write(index2label[label_pred_seq[i]] + '\n')
+                    result_sen = index2word[sen[i]]
+                    result_label = index2label[label[i]]
+                    result_pred = index2label[label_pred_seq[i]]
+                    f_result_processed_train.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+
                 elif sen[i] == 2:   # <EOS>
-                    f_sen_processed_train.write('\n')
-                    f_label_processed_train.write('\n')
-                    f_pred_processed_train.write('\n')
+                    f_result_processed_train.write('\n')
 
 
 
