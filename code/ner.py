@@ -248,6 +248,11 @@ class ner(nn.Module):
 
     def test(self):
         batch_num = len(self.test_X)
+        result_path = "../result/"
+
+        f_sen = open(result_path + "sen", 'w')
+        f_pred = open(result_path + "pred", 'w')
+        f_label = open(result_path + "label", 'w')
         for batch_idx in range(batch_num):
             sen = self.test_X[batch_idx]
             label = self.test_Y[batch_idx]
@@ -271,3 +276,6 @@ class ner(nn.Module):
             print("sen =", sen)
             print("label pred =", label_pred_seq)
             print("label", label)
+            f_sen.write(sen + '\n')
+            f_pred.write(label_pred_seq + '\n')
+            f_label.write(label + '\n')

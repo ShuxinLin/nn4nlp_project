@@ -6,7 +6,7 @@ data_path = "../dataset/CoNLL-2003/"
 train_file = "eng.train"
 val_file = "eng.testa"
 test_file = "eng.testb"
-
+result_path = "../result/"
 def main():
     # Temporarily generate data by hand for test purpose
 
