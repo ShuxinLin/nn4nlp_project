@@ -5,6 +5,8 @@ Ref: https://www.clips.uantwerpen.be/conll2003/ner/
 from collections import defaultdict
 from pprint import pprint
 
+from ner_data_feeder import NERData
+
 
 def parse_data(filename=None):
   """
@@ -84,4 +86,14 @@ if __name__ == "__main__":
   s = 0
   for k in all_ne_set:
     s += all_ne_set[k]
-  print s
+  print(s)
+
+  train_ner_data = NERData(X_train, y_train)
+  # print(train_ner_data.sentences)
+  # print(train_ner_data.word_to_idx)
+  # X_train_batches, y_train_batches = train_ner_data.naive_batch(3)
+  # import pdb; pdb.set_trace()
+
+  word2idx = train_ner_data.word_to_idx
+  testa_ner_data = NERData(X_testa, y_testa, word2idx)
+  batches_x, batches_y = testa_ner_data.naive_batch(3)

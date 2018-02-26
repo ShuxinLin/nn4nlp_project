@@ -2,7 +2,7 @@
 
 from ner import NER
 from data.ner_data import parse_data
-from data.ner_data_feeder import get_word2idx, naive_batch, label_to_idx
+from data.ner_data_feeder import NERData
 
 batch_size = 3
 
@@ -15,15 +15,23 @@ def main():
   X_testb, y_testb = parse_data(testb)
   X_train, y_train = parse_data(train)
 
-  word_to_idx = get_word2idx([X_train, X_testa, X_testb])
-  print word_to_idx
-  print(len(word_to_idx))
+  train_ner_data = NERData(X_train, y_train)
 
-  X_train_batch, y_train_batch = naive_batch(X_train, y_train,
-                                             batch_size, word_to_idx)
-  X_testa_batch, y_testa_batch = naive_batch(X_testa, y_testa,
-                                             batch_size, word_to_idx)
-  # import pdb; pdb.set_trace()
+  # get word to idx and apply to dev and test
+  word_to_idx = train_ner_data.word_to_idx
+  # print(word_to_idx)
+  label_to_idx = train_ner_data.label_to_idx
+  # print(label_to_idx)
+  testa_ner_data = NERData(X_testa, y_testa, word_to_idx)
+  testb_ner_data = NERData(X_testb, y_testb, word_to_idx)
+  # print(testa_ner_data.word_to_idx)
+
+  batch_size = 3
+  X_train_batch, y_train_batch = train_ner_data.naive_batch(batch_size)
+  X_testa_batch, y_testa_batch = testa_ner_data.naive_batch(batch_size)
+  X_testb_batch, y_testb_batch = testb_ner_data.naive_batch(batch_size)
+
+  # # import pdb; pdb.set_trace()
 
   word_embedding_dim = 50
   hidden_dim = 10
@@ -31,7 +39,7 @@ def main():
 
   machine = NER(word_embedding_dim, hidden_dim, label_embedding_dim,
                 len(word_to_idx), len(label_to_idx), learning_rate=0.1,
-                minibatch_size=3, max_epoch=3,
+                minibatch_size=batch_size, max_epoch=3,
                 train_X=X_train_batch, train_Y=y_train_batch,
                 test_X=X_testa_batch, test_Y=y_testa_batch)
 
