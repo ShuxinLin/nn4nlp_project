@@ -21,8 +21,8 @@ class Preprocessor(object):
         self.data_size = 0
         self.vocab_dict = dict()
         self.vocabulary_size = 0
-        self.entity_dict = {'<PAD>': 0, 'O': 1, 'PER': 2, 'ORG': 3, 'LOC': 4, 'MISC': 5}
-        self.entity_dict_size = 6
+        self.entity_dict = {'<PAD>': 0, '<EOS>': 1, 'O': 2, 'PER': 3, 'ORG': 4, 'LOC': 5, 'MISC': 6}
+        self.entity_dict_size = 7
         self.indexed_data = None
 
     def read_file(self):
@@ -60,7 +60,6 @@ class Preprocessor(object):
         if 'ENTITY' in columns_to_process:
             new_data['ENTITY'] = new_data['ENTITY'].apply(lambda x: self._preprocess_entites(x))
 
-        self._build_vocab(new_data)
         self.new_data = new_data.loc[:, columns_to_process]
         self.data_size = self.new_data.shape[0]
         for column in columns_to_process:
@@ -111,10 +110,9 @@ class Preprocessor(object):
                 f.write("%s\t%d\n" % (word[0], self.vocab_dict[word[0]]))
         print('Saved vocabulary to vocabulary file. vocab_size: ', self.vocabulary_size)
 
-
     def _preprocess_sentence(self, sentence):
         sentence = self._regex_preprocess(sentence)
-        sentence = self._add_paddings(sentence)
+        sentence = self._add_paddings_eos(sentence)
         return sentence
 
     def _regex_preprocess(self, sentence):
@@ -122,12 +120,12 @@ class Preprocessor(object):
         sentence = sentence.replace('"', 'reg_quotes')
         return sentence
 
-    def _add_paddings(self, sentence):
+    def _add_paddings_eos(self, sentence):
         words = sentence.split()
         length = len(words)
         num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
         words.extend([self.PAD_TOKEN] * num_of_paddings)
-        # words.append(self.EOS_TOKEN)
+        words.append(self.EOS_TOKEN)
         sentence = ' '.join(words)
         return sentence
 
@@ -136,7 +134,7 @@ class Preprocessor(object):
         length = len(entities)
         num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
         entities.extend([self.PAD_TOKEN] * num_of_paddings)
-        # words.append(self.EOS_TOKEN)
+        entities.append(self.EOS_TOKEN)
         return ' '.join(entities)
 
 
@@ -192,7 +190,8 @@ class Preprocessor(object):
 
         return True
 
-    def minibatch(self, batch_size=5, columns_to_batch=[['SENTENCE', 'ENTITY']]):
+    def minibatch(self, batch_size=64, columns_to_batch=[['SENTENCE', 'ENTITY']]):
+        print("generate mini batches.")
         X_batch = []
         Y_batch = []
         all_data = []
@@ -224,4 +223,9 @@ class Preprocessor(object):
         Y_minibatch = [Y_minibatch[x:x + batch_size] for x in xrange(0, len(Y_minibatch), batch_size)]
         X_batch.extend(X_minibatch)
         Y_batch.extend(Y_minibatch)
+        assert len(X_batch) == len(Y_batch)
+
+        X_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, X_batch)
+        Y_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, Y_batch)
+
         return X_batch, Y_batch
