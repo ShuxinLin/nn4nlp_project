@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from ner import NER
+from seq2seq_model import Seq2Seq
 from data.ner_data import parse_data
 from data.ner_data_feeder import NERData
 
@@ -37,11 +37,11 @@ def main():
   hidden_dim = 10
   label_embedding_dim = 10
 
-  machine = NER(word_embedding_dim, hidden_dim, label_embedding_dim,
-                len(word_to_idx), len(label_to_idx), learning_rate=0.1,
-                minibatch_size=batch_size, max_epoch=3,
-                train_X=X_train_batch, train_Y=y_train_batch,
-                test_X=X_testa_batch, test_Y=y_testa_batch)
+  machine = Seq2Seq(word_embedding_dim, hidden_dim, label_embedding_dim,
+                    len(word_to_idx), len(label_to_idx), learning_rate=0.1,
+                    minibatch_size=batch_size, max_epoch=3,
+                    train_X=X_train_batch, train_Y=y_train_batch,
+                    test_X=X_testa_batch, test_Y=y_testa_batch)
 
   machine.train()
   machine.test()

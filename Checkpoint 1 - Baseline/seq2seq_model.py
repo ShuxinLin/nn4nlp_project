@@ -11,7 +11,7 @@ import numpy as np
 import time
 
 
-class NER(nn.Module):
+class Seq2Seq(nn.Module):
   def __init__(self,
                word_embedding_dim, hidden_dim, label_embedding_dim,
                vocab_size, label_size,
@@ -19,7 +19,8 @@ class NER(nn.Module):
                max_epoch=300,
                train_X=None, train_Y=None,
                test_X=None, test_Y=None):
-    super(NER, self).__init__()
+    # super(Seq2Seq, self).__init__()  # python 2
+    super().__init__()
     self.word_embedding_dim = word_embedding_dim
     self.hidden_dim = hidden_dim
     self.label_embedding_dim = label_embedding_dim
