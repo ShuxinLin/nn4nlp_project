@@ -18,7 +18,7 @@ def parse_data(filename=None):
     filename: eng.testa or eng.testb or eng.train 
 
   Returns:
-    X: list of words 
+    X: list of sentences, each of which is a list of words  
     y: list of Name Entity, of the same length as X
 
   """
