@@ -393,9 +393,13 @@ class ner(nn.Module):
 
             label_pred_seq = self.decode_greedy(current_sen_len, init_dec_hidden, init_dec_cell)
 
+            # write results to file
+            # each element in label_pred_seq is pytorch.Variable, thus convert to list first
             label_pred_seq = [seq.data.numpy().squeeze() for seq in label_pred_seq]
             label_pred_seq = np.asarray(label_pred_seq).transpose().tolist()
 
+            # sen, label, label_pred_seq are list of lists,
+            # thus I would like to flatten them for iterating easier
             sen = list(itertools.chain.from_iterable(sen))
             label = list(itertools.chain.from_iterable(label))
             label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
@@ -409,7 +413,7 @@ class ner(nn.Module):
                 f_label.write(str(label[i]) + '\n')
                 f_pred.write(str(label_pred_seq[i]) + '\n')
 
-                # clean version
+                # clean version (does not print <PAD>, print a newline instead of <EOS>)
                 if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
                     f_sen_processed.write(index2word[sen[i]] + '\n')
                     f_label_processed.write(index2label[label[i]] + '\n')
@@ -419,6 +423,7 @@ class ner(nn.Module):
                     f_label_processed.write('\n')
                     f_pred_processed.write('\n')
 
+    # just a copy of test() but use train data
     def eval_on_train(self):
         batch_num = len(self.train_X)
         result_path = "../result/"
