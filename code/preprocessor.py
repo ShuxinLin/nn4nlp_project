@@ -196,8 +196,8 @@ class Preprocessor(object):
         Y_batch = []
         all_data = []
         for index, row in self.indexed_data.iterrows():
-            splitted_sentence = map(int, row['SENTENCE'].split())
-            splitted_entities = map(int, row['ENTITY'].split())
+            splitted_sentence = list(map(int, row['SENTENCE'].split()))
+            splitted_entities = list(map(int, row['ENTITY'].split()))
             assert len(splitted_entities) == len(splitted_sentence)
             all_data.append((len(splitted_sentence), splitted_sentence, splitted_entities))
 
