@@ -281,5 +281,5 @@ class Seq2Seq(nn.Module):
                                           init_dec_cell)
 
       print("sen =", sen)
-      print("label pred =", label_pred_seq)
+      print("label pred =", [x.data for x in label_pred_seq])
       print("label", label)

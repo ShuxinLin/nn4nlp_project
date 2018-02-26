@@ -43,7 +43,7 @@ class DataFeeder(object):
       UNK_TOKEN is used for CCG tagging where there are at least 1285 diff. tags
     """
     self._label_to_idx = {PAD_token: 0, EOS_token: 1, UNK_token: 2}
-    current = 2
+    current = 3
 
     for line in self.__tags:
       for tag in line:
