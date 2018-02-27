@@ -191,7 +191,7 @@ class Preprocessor(object):
 
         return True
 
-    def minibatch(self, batch_size=64, columns_to_batch=[['SENTENCE', 'ENTITY']]):
+    def minibatch(self, batch_size=32, columns_to_batch=[['SENTENCE', 'ENTITY']]):
         print("generate mini batches.")
         X_batch = []
         Y_batch = []
