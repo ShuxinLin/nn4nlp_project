@@ -5,7 +5,8 @@ from data_feeder import DataFeeder
 
 
 class CCGData(DataFeeder):
-  def __init__(self, X, y, word_to_idx=None, label_to_idx=None):
+  def __init__(self, X, y, word_to_idx=None, label_to_idx=None,
+               idx_to_word=None, idx_to_label=None):
     """
     Construtor for NER data 
         
@@ -24,9 +25,11 @@ class CCGData(DataFeeder):
       self._populate_word2idx()
     else:
       # dev or test data
-       self._word_to_idx = word_to_idx
+      self._word_to_idx = word_to_idx
+      self._idx_to_word = idx_to_word
 
     if label_to_idx is None:
       self._populate_label2idx()
     else:
       self._label_to_idx = label_to_idx
+      self._idx_to_label = idx_to_label

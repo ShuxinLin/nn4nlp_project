@@ -18,9 +18,12 @@ class DataFeeder(object):
     self.__sentences = X
     self.__tags = y
 
-    # protected fields - inherited classes must implement those 2 dictionaries
+    # protected fields - inherited classes must implement those 4 dictionaries
     self._word_to_idx = None
+    self._idx_to_word = None
+
     self._label_to_idx = None
+    self._idx_to_label = None
 
   def _populate_word2idx(self):
     """
@@ -28,12 +31,15 @@ class DataFeeder(object):
      
     Given a list of all available data (not incl. labels), get word2idx"""
     self._word_to_idx = {PAD_token: 0, EOS_token: 1, UNK_token: 2}
+    self._idx_to_word = {0: PAD_token, 1: EOS_token, 2: UNK_token}
+
     current = 3
     for line in self.__sentences:
       for word in line:
         word = word.lower()
         if word not in self._word_to_idx:
           self._word_to_idx[word] = current
+          self._idx_to_word[current] = word
           current += 1
     print("There are totally {} unique words in this dataset".
           format(len(self._word_to_idx)))
@@ -43,12 +49,14 @@ class DataFeeder(object):
       UNK_TOKEN is used for CCG tagging where there are at least 1285 diff. tags
     """
     self._label_to_idx = {PAD_token: 0, EOS_token: 1, UNK_token: 2}
-    current = 3
+    self._idx_to_label = {0: PAD_token, 1: EOS_token, 2: UNK_token}
 
+    current = 3
     for line in self.__tags:
       for tag in line:
         if tag not in self._label_to_idx:
           self._label_to_idx[tag] = current
+          self._idx_to_label[current] = tag
           current += 1
     print("There are totally {} unique labels in this dataset".
           format(len(self._label_to_idx)))
@@ -66,8 +74,16 @@ class DataFeeder(object):
     return self._label_to_idx
 
   @property
+  def idx_to_label(self):
+    return self._idx_to_label
+
+  @property
   def word_to_idx(self):
     return self._word_to_idx
+
+  @property
+  def idx_to_word(self):
+    return self._idx_to_word
 
   def __to_word_index(self, sentence):
     """
