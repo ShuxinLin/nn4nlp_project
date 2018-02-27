@@ -34,7 +34,8 @@
 
 \newcommand\BibTeX{B{\sc ib}\TeX}
 
-\title{Assignment 1\\IMPROVING SEQ2SEQ WITH ADAPTIVE BEAM SEARCH}
+\title{Improving Sequence-to-Sequence with Adaptive Beam Search \newline \newline	
+		Assignment 1}
 
 \author{Yu-Hsiang Lin \quad Shuxin Lin \quad Hai Pham \\
   Language Technologies Institute \\
@@ -84,7 +85,7 @@ A naturally connected method is to use reinforcement learning \cite{sutton1998re
 While discriminative training is the straightforward method for seq2seq training, another generalized method is to pose it as a generative model. Amongst such solutions, Generative Adversarial Network \cite{goodfellow2014generative} broadly used for diverse tasks, predominantly in generating images \cite{dcgan2015,berthelot2017began,zhang2017stackgan,progressive_gan_2017} and videos \cite{vondrick2016generating} based on what model learned from training, or \textit{translating} them given a style of images \cite{conditional_gan_2014,pix2pix2017,discoGAN2017,mechrez2017photorealistic,luan2017deep,zhu2017unpaired} and videos \cite{ruder2016artistic}. Despite the booming trend of GAN, its application to text domain faces a difficult obstacle of inherent discrete properties of text domain. Nonetheless, there have been successes of translating text from a style to another 
 %using professor-forcing \cite{professor_forcing_2016} 
 to deal with discrete texts \cite{boundaryseeking_gan_2017,yu2017seqgan,shen2017style}.  
-Another workaround when facing discrete text in designing a generative model is to use variational autoencoder \cite{} with maximum likelihood objective to learn the disentangled latent representations into some controlled attributes \cite{controlled_text_gen_2017}. 
+Another workaround when facing discrete text in designing a generative model is to use variational autoencoder \cite{kingma2013auto} with maximum likelihood objective to learn the disentangled latent representations into some controlled attributes \cite{controlled_text_gen_2017}. 
 
 Inspired by GAN's design, similar approaches have been made to seq2seq in conjunction with reinforcement learning \cite{kusner2016gans, yu2017seqgan,gu2017neural, gumbel2017}. And although not directly connected, actor-critic setting which shares a close equivalence with GAN \cite{pfau2016connecting}, has been also employed to replace maximum-likelihood method \cite{bahdanau2017actor}. And while sharing the same methodology in that we improve the decoding performance by making the model learn to decode right on the training phase, our approach still sticks to maximum likelihood method objective for its straightforwardness and more simplicity in its design.  
 
@@ -101,7 +102,10 @@ While reinforcement learning can yield a fast decoding model, training with maxi
 
 The seq2seq model we use for this assignment is based on the encoder-decoder structure.
 
+
+
 \subsection{Encoder}
+
 The encoder and decoder each consists of a single-layer long short-term memory (LSTM) network. The input sequence $X = \{x_1, x_2, \dots, x_{T_x}\}$ is first fed into an embedding layer $E^x$, and the resulting embeddings of $X$ are then feed into the encoding LSTM:%
 \footnote{The overhead right arrow is used to pave the way for the later extension to the bi-directional LSTM network.}
 \begin{align}
@@ -123,6 +127,8 @@ where $t = 1, 2, \dots, T_x$. The initial state is set as
 	%
 	\overrightarrow{h}_0 = 0.
 \end{align}
+
+
 
 \subsection{Training-time decoding}
 
@@ -146,17 +152,20 @@ The golden label sequence $Y = \{y_1, y_2, \dots, y_{T_y}\}$ is also first caste
 	%
 	h_t &= o_t \odot \textrm{tanh}(c_t).
 \end{align}
-Note that, slightly different from the encoder, here it is $y_{t-1}$ that is fed into the LSTM cell at step $t$ (hence actually the last label $y_{T_y}$ is not fed as the input of the decoder; the input sequence is $\{y_0, y_1, \dots, y_{T_y - 1}\}$). For the initial input at step 0, we use an universal $y_0 = y_0^*$ to denote the beginning of the label sequence. The hidden states $h_t$ is then fed into a linear layer to produce the score vector $s_t$, where each element of $s_t$ is the score for each of the possible labels at step $t$:
+Note that, slightly different from the encoder, here it is $y_{t-1}$ that is fed into the LSTM cell at step $t$ (hence actually the last label $y_{T_y}$ is not fed as the input of the decoder; the input sequence is $\{y_0, y_1, \dots, y_{T_y - 1}\}$). For the initial input at step $t = 1$, we use an universal $y_0 = y_0^*$ to denote the beginning of the label sequence.
+
+The hidden states $h_t$ is then fed into a linear layer to produce the score vector $s_t$, where each element of $s_t$ is the score for each of the possible labels at step $t$:
 \begin{align}
 	s_t = W_s h_t + b_s.
 \end{align}
 We then take the softmax over the score vector $s_t$ to obtain the probabilities of all possible labels at step $t$,
 \begin{align}
-	\hat{y}_t = \textrm{softmax}(s_t).
+	\label{eq:pt} p_t = \textrm{softmax}(s_t).
 \end{align}
-The loss at step $t$ is the cross entropy between the prediction $\hat{y}_t$ and the golden label $y_t$,
+
+The loss at step $t$ is the cross entropy between the prediction $p_t$ and the golden label $y_t$,
 \begin{align}
-	L_t = -\sum_j (y_t)_j \log (\hat{y}_t)_j.
+	L_t = -\log (p_t)_{y_t}.
 \end{align}
 The total loss for this sequence instance is the average of the loss over the steps,
 \begin{align}
@@ -164,7 +173,13 @@ The total loss for this sequence instance is the average of the loss over the st
 \end{align}
 We take average in hope to remove the bias introduced by the length of the sequence.
 
+
+
 \subsection{Test-time decoding}
+
+In test time, as in training time, the decoder receives the last hidden and cell states from the encoder as the initial hidden and cell states. The initial input at step $t = 1$ is also the universal $y_0 = y_0^*$. Different from training time, the inputs at time $t = 2, \dots, T_y - 1$ depend on the predicted label at the previous step. Roughly speaking, we would ``replace'' the input $y_{t-1}$ in training time by $\hat{y}_{t-1}$ at test time. The exact way to do so is determined by the decoding algorithm.
+
+In this assignment, we use the greedy decoding (beam search with fixed beam width 1) at test time. At step $t = 1$, we compute $p_1$ using \eqref{eq:pt}, and pick element $\hat{y}_1$ who has the highest probability $p_1$ as our predicted label. We keep an accumulated probability $P_t$ initialized as $P_1 = p_1$. At step $t = 2, 3, \dots, T_y$, after computing $p_t$, we first compute the accumulated probability $P_t = p_t P_{t-1}$, and then pick element $\hat{y}_t$ who has the highest probability $P_t$ as our predicted label at step $t$.
 
 
 
@@ -172,6 +187,15 @@ We take average in hope to remove the bias introduced by the length of the seque
 %         EXPERIMENT              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Experiment}
+\subsection{Named Entity Recognition} \label{ssec:ner}
+
+For named entity recognition, we use the data of CONLL-2003 shared task \cite{tjongkimsang2003conll} for English and German language. The data consists of three files per language: one training file and two test files testa and testb. We use testa for development data, testb for final test data. In the current development phase, only train data and development data are used for finding good parameters for the seq2seq model. 
+
+Since the purpose of this project is to evaluate the effectiveness of the approaches on seq2seq models not for the optimal approach to NER task, we perform minimum preprocessing on the data. The label of each word has 9 possible values including a tag of end of sentence (EOS). Thus, the size of label embeddings is 9. 
+
+\subsection{Paramater Tuning} \label{ssec:paratune}
+Before we explore different search approaches of seq2seq model, we tune some of the hyperparameters related to neural networks for optimization. These hyperparameters are batch size, learning rate, the dimension of word embeddings, and the number of hidden units in 1-layer encoding neural networks. Once the parameter tuning is done, we plan to use pre-trained model for transfer learning and further fine tuning.
+
 \subsection{Baseline} \label{ssec:baseline}
 % detail of setup e.g. OpenNMT, PyTorch, hyper params etc 
 
@@ -247,22 +271,22 @@ We take average in hope to remove the bias introduced by the length of the seque
 
 
 
-\begin{table*}
-\centering
-\begin{tabular}{lll}
-  output & natbib & previous ACL style files\\
-  \hline
-  \citep{Gusfield:97} & \verb|\citep| & \verb|\cite| \\
-  \citet{Gusfield:97} & \verb|\citet| & \verb|\newcite| \\
-  \citeyearpar{Gusfield:97} & \verb|\citeyearpar| & \verb|\shortcite| \\
-\end{tabular}
-\caption{Citation commands supported by the style file.
-  The citation style is based on the natbib package and
-  supports all natbib citation commands.
-  It also supports commands defined in previous ACL style files
-  for compatibility.
-  }
-\end{table*}
+% \begin{table*}
+% \centering
+% \begin{tabular}{lll}
+%   output & natbib & previous ACL style files\\
+%   \hline
+%   \citep{Gusfield:97} & \verb|\citep| & \verb|\cite| \\
+%   \citet{Gusfield:97} & \verb|\citet| & \verb|\newcite| \\
+%   \citeyearpar{Gusfield:97} & \verb|\citeyearpar| & \verb|\shortcite| \\
+% \end{tabular}
+% \caption{Citation commands supported by the style file.
+%   The citation style is based on the natbib package and
+%   supports all natbib citation commands.
+%   It also supports commands defined in previous ACL style files
+%   for compatibility.
+%   }
+% \end{table*}
 
 
 
