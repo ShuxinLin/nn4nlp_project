@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import os
 
 import torch
 import torch.autograd as autograd
@@ -259,6 +260,8 @@ class Seq2Seq(nn.Module):
   def test(self):
     batch_num = len(self.test_X)
     result_path = "./result"
+    if not os.path.exists(result_path):
+      os.mkdir(result_path)
 
     f_sen = open(result_path + "sen.txt", 'w')
     f_pred = open(result_path + "pred.txt", 'w')
@@ -387,6 +390,8 @@ class Seq2Seq(nn.Module):
   def eval_on_train(self):
     batch_num = len(self.train_X)
     result_path = "./result"
+    if not os.path.exists(result_path):
+      os.mkdir(result_path)
 
     f_sen_train = open(result_path + "sen_train.txt", 'w')
     f_pred_train = open(result_path + "pred_train.txt", 'w')
