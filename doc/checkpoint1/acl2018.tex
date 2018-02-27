@@ -15,9 +15,8 @@
 \usepackage[hyperref]{acl2018}
 \usepackage{times}
 \usepackage{latexsym}
-
+\usepackage{booktabs}
 \usepackage{url}
-
 \usepackage{amsmath}	% for \begin{align}
 \usepackage{graphicx}	% for \includegraphics{filename}
 \usepackage{subcaption}	% for \begin{subfigure}[t]{0.5\textwidth}
@@ -98,7 +97,7 @@ While reinforcement learning can yield a fast decoding model, training with maxi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %           MODEL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Model}
+\section{Model} \label{ssec:model}
 
 The seq2seq model we use for this assignment is based on the encoder-decoder structure.
 
@@ -187,21 +186,124 @@ In this assignment, we use the greedy decoding (beam search with fixed beam widt
 %         EXPERIMENT              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Experiment}
+Our impelementation\footnote{Github repository: \href{url}{github.com/ShuxinLin/nn4nlp\_project/}} is built based on PyTorch \cite{paszke2017automatic}. We conducted all experiments on AWS EC2. As it is discussed in Section \ref{ssec:model}, the current seq2seq model is encoder-decoder architecture which each consists of a 1-layer LSTM. We perform experiments using mini-batch training and stochastic gradient descent (SGD) optimizer on a common natural language processing tasks: Named Entity Recognition (NER). Although an encoder-decoder model might not be the most suitable for NER task, we still conduct experiments on this task because the purpose of this project is to evaluate the effectiveness of the approaches on seq2seq models so we do not focus on achieving the best performance. 
+
 \subsection{Named Entity Recognition} \label{ssec:ner}
 
 For named entity recognition, we use the data of CONLL-2003 shared task \cite{tjongkimsang2003conll} for English and German language. The data consists of three files per language: one training file and two test files testa and testb. We use testa for development data, testb for final test data. In the current development phase, only train data and development data are used for finding good parameters for the seq2seq model. 
 
-Since the purpose of this project is to evaluate the effectiveness of the approaches on seq2seq models not for the optimal approach to NER task, we perform minimum preprocessing on the data. The label of each word has 9 possible values including a tag of end of sentence (EOS). Thus, the size of label embeddings is 9. 
+As mentioned before, the best performance is not our ultimate goal thus we perform minimum preprocessing on the data. The label of each word has 9 possible values including a tag of end of sentence (EOS). Thus, the size of label embeddings is 9. 
+
 
 \subsection{Paramater Tuning} \label{ssec:paratune}
 Before we explore different search approaches of seq2seq model, we tune some of the hyperparameters related to neural networks for optimization. These hyperparameters are batch size, learning rate, the dimension of word embeddings, and the number of hidden units in 1-layer encoding neural networks. Once the parameter tuning is done, we plan to use pre-trained model for transfer learning and further fine tuning.
 
 \subsection{Baseline} \label{ssec:baseline}
 % detail of setup e.g. OpenNMT, PyTorch, hyper params etc 
+Currently we have conduct 4 experiments on NER tasks. The basic model has hyper-parameter settings of $batch\_size=16$, $learning\_rate = 0.1$, $dim\_word\_embed =100$, and $hidden\_units=64$. For each experiments, we run 300 iterations due to the limited time. The figure \ref{fig:fig_exp1} shows the cross-entropy loss of the train data of NER task over 300 iterations. 
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{fig_exp1.png}
+\caption{Result on Name Entity Recognition: the cross-entropy loss of training data over 300 iterations using basic model as defined.}
+\label{fig:fig_exp1}
+\end{figure}
+
+% Please add the following required packages to your document preamble:
+% 
+\begin{table*}[]
+\centering
+\caption{Results on Named Entity Recognition. The first four columns are the parameters of each model, the last two columns are the F1 scores on the train data and dev data}
+\label{f1table}
+\begin{tabular}{@{}cccc|cc@{}}
+\toprule
+batch size & learning rate & hidden units & dim\_word\_embed & F1 on train data & F1 on dev data \\ \midrule
+16         & 0.1           & 64           & 100              & 1.64             & 1.52           \\
+16         & 0.01          & 64           & 100              & 5.36             & 1.58           \\
+32         & 0.01          & 64           & 100              & 13.13            & 1.24           \\
+32         & 0.01          & 128          & 100              & 17.45            & 5.85           \\
+32         & 0.01          & 128          & 200              & 3.44             & 2.63           \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[]
+\centering
+\caption{The precision, recall and F1 score of the best model on train data of NER task. Note that the tags in the table are not completely the same as the labels we use in the experiments. These labels are for evaluation purpose.}
+\label{precision}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+Tag            & Precision        & Recall           & F1 score       \\ \midrule
+LOC              & 37.53\%          & 8.22\%           & 13.49          \\ \midrule
+MISC             & 18.96\%          & 4.18\%           & 6.85           \\ \midrule
+ORG              & 58.32\%          & 23.10\%          & 33.10          \\ \midrule
+PER              & 16.40\%          & 8.95\%           & 11.58          \\ \midrule
+\textbf{Overall} & \textbf{33.05\%} & \textbf{11.86\%} & \textbf{17.45} \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+
+
+% \begin{table*}
+% \renewcommand\thetable{1}
+% \begin{center}
+% \begin{tabular}{l|c|c|c|c}
+% \hline
+% Tag & Precision(\%) & Recall(\%) & F-score\\
+% \hline\hline
+% avg & 80.03 & 33.05 & 11.86 & 17.45 \\
+% \hline
+% LOC & 37.53 & 8.22 & 13.49 & 1524\\
+% MISC & 18.96 & 4.18 & 6.85 & 733 \\
+% \hline
+% \end{tabular}
+% \end{center}
+% \caption{NER baseline result}
+% \label{tbl:ner_baseline}
+% \end{table*}
+
+We also report performance of different parameter settings on train data and development data sets for NER tasks in Table \ref{f1table}. Starting from the basic model, we try several values for each hyper-parameters and report the F1 scores using the official CONLL-2003 evaluation tool \cite{tjongkimsang2003conll}. Table \ref{precision} records the precision, recall and F1 score of the best model found in Table \ref{f1table}. 
+
+% For the CCG SuperTagging task, we perform a preliminary experiment with $batch\_size=32$, $learning\_rate = 0.05$, $dim\_word\_embed =50$, $dim\_label\_embed =10$ and $hidden\_units=64$
 
 % results 
-\subsection{Discussion} \label{ssec:discussion}% of baseline 
+\section{Discussion} \label{sec:discussion}% of baseline 
 % discussion of results 
+
+\subsection{Analysis of the Current Results}
+\subsubsection{Name Entity Recognition}
+
+\begin{figure}[t]
+\centering
+%\fbox{\rule{0pt}{2in} \rule{0.9\linewidth}{0pt}}
+   \includegraphics[width=0.8\linewidth]{NER_groundtruths.png}
+   \caption{Distribution of NER dataset. Tag 'O' is dominant.}
+\label{fig_ner_gt}
+\end{figure}
+
+As seen in Figure~\ref{fig_ner_gt}, the dataset is largely skewed, particularly to the tag 'O', which makes the task hard. Empirically, we find the following trend from Table \ref{f1table}:
+\begin{enumerate}
+	\item The loss function value decreases faster when using some smaller batch size (we found the batch size of 32 works well). This can be understood by realizing that, with smaller batch size, we perform more updates within one epoch, therefore improving the loss decreasing rate per epoch. However, if the batch size is too small, the training speed will become much slower.
+    \item Larger dimension for the hidden state helps. This is expected because with large hidden dimension more context is remembered to be passed from the encoder to the decoder. Since we do not use attention in this assignment, we heavily rely on the hidden state to deliver all the information in the input sequence.
+    \item Using smaller learning rate for the stochastic gradient descent (SGD) can be helpful. In Figure \ref{fig:fig_exp1} we observe that the loss function tends to be unstable at the later epochs of training. We found that by using smaller learning rate we can usually allelivate the problem. However, if the learning rate is too small, the training process will also become too slow.
+    \item We find in our experiments using smaller size of word embedding dimension (e.g.~around 100) seems to lead to better performance. At this stage we have not identified the reason or whether this is really a general trend.
+\end{enumerate}
+
+
+
+
+\subsection{Improvement Directions}
+\label{ssec:Improvement}
+
+We find that our F1 score is much lower than the baseline number shown in \citet{goyal2018continuous}. In addition, from Figure \ref{fig:fig_exp1} we notice that the training loss curve become unstable at later epochs. To improve the F1 score and the training process, there are a many possible directions to pursue:
+
+\begin{enumerate}
+	\item \emph{Use bi-directional LSTM for encoder.} We currently only use the single direction LSTM for encoder. To capture the context better, we can use bi-directional LSTM for encoder in the future.
+    \item \emph{Add attention mechanism.} There is no attention mechanism adopted here. In the task such as NER, even if there is only some fixed attention applied, the result is likely to be improved. This is because the named entity type of each word in the input sequence is mostly determined by the word itself (from human experience).
+    \item \emph{Add general beam search (not just greedy search).} Currently in test time decoding we only implemented the greedy search, which is only a special case of the general beam search (with beam size of 1). With adjustable beam size can potentially improve the search results.
+    \item \emph{Experiment on different optimizers.} We use the vanilla SGD optimizer in this assignment. Without suitably adjusting the learning rate dynamically, it is likely that our training saturates at some point during the training process, and cannot improve the F1 score or accuracy. We can try to use different optimizers to see whether the training process would improve.
+    \item \emph{Be aware of the exploding gradient (or also the vanishing gradient) problem.} We noticed the instability of the training loss curve. We plan to check whether it is caused by the exploding gradient problem.
+\end{enumerate}
+
 
 
 % \begin{quote}
