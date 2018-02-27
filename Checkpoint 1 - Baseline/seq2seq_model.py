@@ -259,7 +259,7 @@ class Seq2Seq(nn.Module):
 
   def test(self):
     batch_num = len(self.test_X)
-    result_path = "./result"
+    result_path = "./result/"
     if not os.path.exists(result_path):
       os.mkdir(result_path)
 
@@ -389,7 +389,7 @@ class Seq2Seq(nn.Module):
   # just a copy of test() but use train data
   def eval_on_train(self):
     batch_num = len(self.train_X)
-    result_path = "./result"
+    result_path = "./result/"
     if not os.path.exists(result_path):
       os.mkdir(result_path)
 
