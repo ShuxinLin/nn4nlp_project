@@ -2,6 +2,9 @@
 from ner import ner
 from preprocess import *
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 data_path = "../dataset/CoNLL-2003/"
 train_file = "eng.train"
 val_file = "eng.testa"
@@ -61,13 +64,27 @@ def main():
     hidden_dim = 64
     label_embedding_dim = 10
 
+    max_epoch = 300
+
     machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size,
-                  learning_rate=0.01, minibatch_size=32, max_epoch=300, train_X=train_X, train_Y=train_Y, test_X=val_X,
+                  learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X,
                   test_Y=val_Y)
 
-    machine.train()
+    train_loss_list = machine.train()
     machine.eval_on_train()
     machine.test()
+
+    print(train_loss_list)
+
+    # Plot training loss
+    plt.figure(1)
+    plt.plot(list(range(len(train_loss_list))) , train_loss_list, "k-")
+    #plt.xlim([0, 11])
+    #plt.ylim([0, 0.5])
+    plt.xlabel("Epoch")
+    plt.ylabel("Cross-entropy loss")
+    plt.savefig("fig_exp1.pdf")
+
 
 
 if __name__ == "__main__":

@@ -73,7 +73,7 @@ class ner(nn.Module):
         LABEL_BEGIN_INDEX = 1
         init_label_emb = self.label_embedding(
             Variable(torch.LongTensor(self.minibatch_size, 1).zero_() + LABEL_BEGIN_INDEX)).view(self.minibatch_size,
-                                                                                                 self.label_embedding_dim)
+             self.label_embedding_dim)
         dec_hidden_out, dec_cell_out = self.decoder_cell(
             init_label_emb, (init_dec_hidden, init_dec_cell))
         dec_hidden_seq.append(dec_hidden_out)
@@ -107,6 +107,8 @@ class ner(nn.Module):
         instance_num = 0
         for batch in self.train_X:
             instance_num += len(batch)
+
+        train_loss_list = []
 
         start_time = time.time()
         for epoch in range(self.max_epoch):
@@ -150,9 +152,12 @@ class ner(nn.Module):
                 loss.backward()
                 optimizer.step()
             avg_loss = loss_sum / instance_num
+            train_loss_list.append(avg_loss)
             print("epoch", epoch, ", loss =", avg_loss,
                   ", time =", time.time() - start_time)
             start_time = time.time()
+
+        return train_loss_list
 
     def write_log(self):
         pass
@@ -360,10 +365,4 @@ class ner(nn.Module):
 
                 elif sen[i] == 2:   # <EOS>
                     f_result_processed_train.write('\n')
-
-
-
-
-
-
 
