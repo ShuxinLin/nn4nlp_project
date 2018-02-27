@@ -18,6 +18,11 @@
 
 \usepackage{url}
 
+\usepackage{amsmath}	% for \begin{align}
+\usepackage{graphicx}	% for \includegraphics{filename}
+\usepackage{subcaption}	% for \begin{subfigure}[t]{0.5\textwidth}
+\usepackage{courier}	% for \texttt{}
+
 \aclfinalcopy % Uncomment this line for the final submission
 %\def\aclpaperid{***} %  Enter the acl Paper ID here
 
@@ -87,7 +92,82 @@ Inspired by GAN's design, similar approaches have been made to seq2seq in conjun
 While reinforcement learning can yield a fast decoding model, training with maximum likelihood has its own merit of being simple yet comparably efficient. For such approach, some attempts to make the model learn how to decode right on the training phase have also taken place. There were some solutions that optimize beam search in discrete space such as from \citet{wiseman2016sequence, andor2016globally} whose target is to get rid of label bias problem and design a model that is globally--rather than locally--normalized. Another work, from which our work extends, instead aims at design a new surrogate training objective to convert from discrete space into a continuous approximation of the beam search \cite{goyal2018continuous}. In detail, because using beam search right at training phase largely degrades the performance due to its resources consumption and its search space, we plan to use a tactic of dynamic beam search \cite{buckman2016transition} to make the training faster while retaining its efficacy. 
 % Our work instead tackles with the training phase rather than only looking at improving decoding. 
 
-% Other more efficient seq2seq improvement approach is to address the disadvantages of maximum likelihood training and so change the target objective. 
+% Other more efficient seq2seq improvement approach is to address the disadvantages of maximum likelihood training and so change the target objective.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%           MODEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Model}
+
+The seq2seq model we use for this assignment is based on the encoder-decoder structure.
+
+\subsection{Encoder}
+The encoder and decoder each consists of a single-layer long short-term memory (LSTM) network. The input sequence $X = \{x_1, x_2, \dots, x_{T_x}\}$ is first fed into an embedding layer $E^x$, and the resulting embeddings of $X$ are then feed into the encoding LSTM:%
+\footnote{The overhead right arrow is used to pave the way for the later extension to the bi-directional LSTM network.}
+\begin{align}
+	\overrightarrow{\underline{c}}_t &= \textrm{tanh}\left[ \overrightarrow{W}_c (E^x x_t) + \overrightarrow{U}_c h_{t-1} + \overrightarrow{b}_c \right], \\
+	%
+	\overrightarrow{i}_t &= \textrm{sigmoid}\left[ \overrightarrow{W}_i (E^x x_t) + \overrightarrow{U}_i h_{t-1} + \overrightarrow{b}_i \right], \\
+	%
+	\overrightarrow{f}_t &= \textrm{sigmoid}\left[ \overrightarrow{W}_f (E^x x_t) + \overrightarrow{U}_f h_{t-1} + \overrightarrow{b}_f \right], \\
+	%
+	\overrightarrow{c}_t &= \overrightarrow{i}_t \odot \overrightarrow{\underline{c}}_t + \overrightarrow{f}_t \odot \overrightarrow{c}_{t-1}, \\
+	%
+	\overrightarrow{o}_t &= \textrm{sigmoid}\left[ \overrightarrow{W}_o (E^x x_t) + \overrightarrow{U}_o h_{t-1} + \overrightarrow{b}_o \right], \\
+	%
+	\overrightarrow{h}_t &= \overrightarrow{o}_t \odot \textrm{tanh}(\overrightarrow{c}_t),
+\end{align}
+where $t = 1, 2, \dots, T_x$. The initial state is set as
+\begin{align}
+	\overrightarrow{c}_0 = 0, \\
+	%
+	\overrightarrow{h}_0 = 0.
+\end{align}
+
+\subsection{Training-time decoding}
+
+In training time, the decoder receives the last hidden and cell states from the encoder as the initial hidden and cell states, respectively:
+\begin{align}
+	h_0 &= \overrightarrow{h}_{T_x}, \\
+	%
+	c_0 &= \overrightarrow{c}_{T_x}.
+\end{align}
+The golden label sequence $Y = \{y_1, y_2, \dots, y_{T_y}\}$ is also first casted into an embedding created by the target-space embedding layer $E^y$, and then fed into the decoding LSTM network:
+\begin{align}
+	\underline{c}_t &= \textrm{tanh}\left[ W_c (E^y y_{t-1}) + U_c h_{t-1} + b_c \right], \\
+	%
+	i_t &= \textrm{sigmoid}\left[ W_i (E^y y_{t-1}) + U_i h_{t-1} + b_i \right], \\
+	%
+	f_t &= \textrm{sigmoid}\left[ W_f (E^y y_{t-1}) + U_f h_{t-1} + b_f \right], \\
+	%
+	c_t &= i_t \odot \overrightarrow{\underline{c}}_t + f_t \odot c_{t-1}, \\
+	%
+	o_t &= \textrm{sigmoid}\left[ W_o (E^y y_{t-1}) + U_o h_{t-1} + b_o \right], \\
+	%
+	h_t &= o_t \odot \textrm{tanh}(c_t).
+\end{align}
+Note that, slightly different from the encoder, here it is $y_{t-1}$ that is fed into the LSTM cell at step $t$ (hence actually the last label $y_{T_y}$ is not fed as the input of the decoder; the input sequence is $\{y_0, y_1, \dots, y_{T_y - 1}\}$). For the initial input at step 0, we use an universal $y_0 = y_0^*$ to denote the beginning of the label sequence. The hidden states $h_t$ is then fed into a linear layer to produce the score vector $s_t$, where each element of $s_t$ is the score for each of the possible labels at step $t$:
+\begin{align}
+	s_t = W_s h_t + b_s.
+\end{align}
+We then take the softmax over the score vector $s_t$ to obtain the probabilities of all possible labels at step $t$,
+\begin{align}
+	\hat{y}_t = \textrm{softmax}(s_t).
+\end{align}
+The loss at step $t$ is the cross entropy between the prediction $\hat{y}_t$ and the golden label $y_t$,
+\begin{align}
+	L_t = -\sum_j (y_t)_j \log (\hat{y}_t)_j.
+\end{align}
+The total loss for this sequence instance is the average of the loss over the steps,
+\begin{align}
+	L = \frac{1}{T_y} \sum_t L_t.
+\end{align}
+We take average in hope to remove the bias introduced by the length of the sequence.
+
+\subsection{Test-time decoding}
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %         EXPERIMENT              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
