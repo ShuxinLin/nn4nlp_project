@@ -91,17 +91,8 @@ if __name__ == "__main__":
   print(s)
 
   # plotting
-  label_dict = {'<p>': 0, 'I-LOC': 1, 'B-ORG': 2, 'O': 3,
-                          'I-PER': 4, 'I-MISC': 5, 'B-MISC': 6, 'I-ORG': 7,
-                          'B-LOC': 8, '<e>': 9}
-
-  def convert_to_key_idx(l):
-    return [label_dict[k] for k in l]
-
-  arr = plt.bar(list(all_ne_set.keys()),
+  plt.bar(list(all_ne_set.keys()),
                 list(all_ne_set.values()), color='b')
-  # for i in range(len(all_ne_set)):
-  #   plt.text(arr[1][i], arr[0][i], str(arr[0][i]))
   plt.show()
 
   train_ner_data = NERData(X_train, y_train)
