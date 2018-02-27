@@ -57,13 +57,13 @@ def main():
     # print train_X
     train_X, train_Y, val_X, val_Y, vocab_size, label_size = prepocess(train_file, val_file)
     ######################################
-    word_embedding_dim = 100
+    word_embedding_dim = 200
     hidden_dim = 64
     label_embedding_dim = 10
 
-    max_epoch = 10
-
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=0.1, minibatch_size=64, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y)
+    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size,
+                  learning_rate=0.01, minibatch_size=32, max_epoch=300, train_X=train_X, train_Y=train_Y, test_X=val_X,
+                  test_Y=val_Y)
 
     machine.train()
     machine.eval_on_train()
