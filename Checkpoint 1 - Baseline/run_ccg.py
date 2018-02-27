@@ -54,6 +54,7 @@ def main():
                     test_X=X_dev_batch, test_Y=y_dev_batch)
 
   machine.train()
+  machine.eval_on_train()
   machine.test()
 
 
