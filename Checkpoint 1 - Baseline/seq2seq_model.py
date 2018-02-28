@@ -266,9 +266,7 @@ class Seq2Seq(nn.Module):
     f_sen = open(result_path + "sen.txt", 'w')
     f_pred = open(result_path + "pred.txt", 'w')
     f_label = open(result_path + "label.txt", 'w')
-    f_sen_processed = open(result_path + "sen_processed.txt", 'w')
-    f_pred_processed = open(result_path + "pred_processed.txt", 'w')
-    f_label_processed = open(result_path + "label_processed.txt", 'w')
+    f_result_processed = open(result_path + "result_processed.txt", 'w')
 
     for batch_idx in range(batch_num):
       sen = self.test_X[batch_idx]
@@ -295,9 +293,13 @@ class Seq2Seq(nn.Module):
       label_pred_seq = self.decode_greedy(current_sen_len, init_dec_hidden,
                                           init_dec_cell)
 
+      # write results to file
+      # each element in label_pred_seq is pytorch.Variable, thus convert to list first
       label_pred_seq = [seq.data.numpy().squeeze() for seq in label_pred_seq]
       label_pred_seq = np.asarray(label_pred_seq).transpose().tolist()
 
+      # sen, label, label_pred_seq are list of lists,
+      # thus I would like to flatten them for iterating easier
       sen = list(itertools.chain.from_iterable(sen))
       label = list(itertools.chain.from_iterable(label))
       label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
@@ -308,83 +310,15 @@ class Seq2Seq(nn.Module):
         f_label.write(str(label[i]) + '\n')
         f_pred.write(str(label_pred_seq[i]) + '\n')
 
-        # clean version
+        # clean version (does not print <PAD>, print a newline instead of <EOS>)
         if sen[i] != 0 and sen[i] != 2:  # not <PAD> and not <EOS>
-          f_sen_processed.write(self.index2word[sen[i]] + '\n')
-          f_label_processed.write(self.index2label[label[i]] + '\n')
-          f_pred_processed.write(self.index2label[label_pred_seq[i]] + '\n')
+          result_sen = self.index2word[sen[i]]
+          result_label = self.index2label[label[i]]
+          result_pred = self.index2label[label_pred_seq[i]]
+          f_result_processed.write(
+            "%s %s %s\n" % (result_sen, result_label, result_pred))
         elif sen[i] == 2:  # <EOS>
-          f_sen_processed.write('\n')
-          f_label_processed.write('\n')
-          f_pred_processed.write('\n')
-
-        def test(self):
-          batch_num = len(self.test_X)
-          result_path = "./result"
-
-          f_sen = open(result_path + "sen.txt", 'w')
-          f_pred = open(result_path + "pred.txt", 'w')
-          f_label = open(result_path + "label.txt", 'w')
-          f_result_processed = open(
-            result_path + "result_processed.txt", 'w')
-
-          for batch_idx in range(batch_num):
-            sen = self.test_X[batch_idx]
-            label = self.test_Y[batch_idx]
-            current_sen_len = len(sen[0])
-
-            # Always clear the gradients before use
-            self.zero_grad()
-            sen_var = Variable(torch.LongTensor(sen))
-            label_var = Variable(torch.LongTensor(label))
-
-            init_enc_hidden = Variable(
-              torch.zeros((1, self.minibatch_size, self.hidden_dim)))
-            init_enc_cell = Variable(
-              torch.zeros((1, self.minibatch_size, self.hidden_dim)))
-
-            enc_hidden_seq, (
-              enc_hidden_out, enc_cell_out) = self.encode(sen_var,
-                                                          init_enc_hidden,
-                                                          init_enc_cell)
-
-            init_dec_hidden = enc_hidden_out[0]
-            init_dec_cell = enc_cell_out[0]
-
-            label_pred_seq = self.decode_greedy(current_sen_len,
-                                                init_dec_hidden,
-                                                init_dec_cell)
-
-            # write results to file
-            # each element in label_pred_seq is pytorch.Variable, thus convert to list first
-            label_pred_seq = [seq.data.numpy().squeeze() for seq in
-                              label_pred_seq]
-            label_pred_seq = np.asarray(
-              label_pred_seq).transpose().tolist()
-
-            # sen, label, label_pred_seq are list of lists,
-            # thus I would like to flatten them for iterating easier
-            sen = list(itertools.chain.from_iterable(sen))
-            label = list(itertools.chain.from_iterable(label))
-            label_pred_seq = list(
-              itertools.chain.from_iterable(label_pred_seq))
-            assert len(sen) == len(label) and len(label) == len(
-              label_pred_seq)
-
-            for i in range(len(sen)):
-              f_sen.write(str(sen[i]) + '\n')
-              f_label.write(str(label[i]) + '\n')
-              f_pred.write(str(label_pred_seq[i]) + '\n')
-
-              # clean version (does not print <PAD>, print a newline instead of <EOS>)
-              if sen[i] != 0 and sen[i] != 2:  # not <PAD> and not <EOS>
-                result_sen = self.index2word[sen[i]]
-                result_label = self.index2label[label[i]]
-                result_pred = self.index2label[label_pred_seq[i]]
-                f_result_processed.write("%s %s %s\n" % (
-                  result_sen, result_label, result_pred))
-              elif sen[i] == 2:  # <EOS>
-                f_result_processed.write('\n')
+          f_result_processed.write('\n')
 
   # just a copy of test() but use train data
   def eval_on_train(self):
