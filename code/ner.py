@@ -71,11 +71,14 @@ class ner(nn.Module):
         label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
 
         LABEL_BEGIN_INDEX = 1
-        init_label_emb = self.label_embedding(
-            Variable(torch.LongTensor(self.minibatch_size, 1).zero_() + LABEL_BEGIN_INDEX)).view(self.minibatch_size,
-             self.label_embedding_dim)
-        dec_hidden_out, dec_cell_out = self.decoder_cell(
-            init_label_emb, (init_dec_hidden, init_dec_cell))
+        init_label_emb =
+            self.label_embedding(
+            Variable(torch.LongTensor(self.minibatch_size, 1).zero_() \
+            + LABEL_BEGIN_INDEX)) \
+            .view(self.minibatch_size, self.label_embedding_dim)
+        dec_hidden_out, dec_cell_out =
+            self.decoder_cell(init_label_emb,
+            (init_dec_hidden, init_dec_cell))
         dec_hidden_seq.append(dec_hidden_out)
         score = self.hidden2score(dec_hidden_out)
         score_seq.append(score)
@@ -141,8 +144,9 @@ class ner(nn.Module):
                 init_dec_hidden = enc_hidden_out[0]
                 init_dec_cell = enc_cell_out[0]
 
-                dec_hidden_seq, score_seq = self.decode_train(label_var,
-                                                              init_dec_hidden, init_dec_cell)
+                dec_hidden_seq, score_seq =
+                    self.decode_train(label_var,
+                    init_dec_hidden, init_dec_cell)
 
                 label_var_for_loss = label_var.permute(1, 0) \
                     .contiguous().view(-1)
@@ -188,8 +192,13 @@ class ner(nn.Module):
         for i in range(seq_len - 1):
             prev_pred_label_emb = self.label_embedding(label_pred_seq[-1]) \
                 .view(self.minibatch_size, self.label_embedding_dim)
+            
+            # TODO: Check: here is a bug...
+            #dec_hidden_out, dec_cell_out = self.decoder_cell(
+            #    prev_pred_label_emb, (init_dec_hidden, init_dec_cell))
             dec_hidden_out, dec_cell_out = self.decoder_cell(
-                prev_pred_label_emb, (init_dec_hidden, init_dec_cell))
+                prev_pred_label_emb, (dec_hidden_out, dec_cell_out))
+
             score = self.hidden2score(dec_hidden_out)
             logprob = nn.LogSoftmax(dim=1)(score) + seq_logprob
             topk_logprob, topk_label = torch.topk(logprob, beam_size, dim=1)
@@ -198,8 +207,73 @@ class ner(nn.Module):
 
         return label_pred_seq
 
-    """
+    
     def decode_beam(self, seq_len, init_dec_hidden, init_dec_cell, beam_size):
+        LABEL_BEGIN_INDEX = 1
+        init_label_emb =
+            self.label_embedding(
+            Variable(torch.LongTensor(self.minibatch_size, 1).zero_() \
+            + LABEL_BEGIN_INDEX)) \
+            .view(self.minibatch_size, self.label_embedding_dim)
+        init_score = 0
+
+        beta_seq = []
+        y_seq = []
+
+        # t = 0, only one coming beam
+        # Only one dec_hidden_out, dec_cell_out
+        # => dec_hidden_out has shape (batch size, hidden dim)
+        dec_hidden_out, dec_cell_out =
+            self.decoder_cell(init_label_emb,
+            (init_dec_hidden, init_dec_cell))
+        # score_tilde.shape => (batch size, |V^y|)
+        score_tilde = self.hidden2score(dec_hidden_out) \
+            + Variable(torch.LongTensor( \
+            self.minibatch_size, self.label_size).zero_() \
+            + init_score)
+        # score_matrix has shape (1, |V^y|) for each instance,
+        # and for a batch, score_matrix.shape => (batch size, |V^y|)
+        score_matrix = score_tilde
+        # All beta^{t=0, b} are actually 0, and is not used during
+        # reconstruction, so we do not keep them.
+        # y_list.shape => (batch size, beam size),
+        # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B}]
+        s_got, indices_got = torch.topk(score_matrix, beam_size, dim = 1)
+        beta_seq.append(None)
+        y_seq.append(indices_got)
+        # score.shape => (batch size, beam size)
+        # each row is [s^{t, b=0}, s^{t, b=1}, ..., s^{t, b=B}]
+        score = s_got
+
+        # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
+        for t in range(1, seq_len):
+            for b in range(beam_size):
+                # Extract the b-th column of y matrix
+                prev_pred_label_emb = self.label_embedding(
+                    y_seq[t - 1][:, b]) \
+                    .view(self.minibatch_size, self.label_embedding_dim)
+                # TODO: Take care of the beam issue of dec_hidden_out...
+                dec_hidden_out, dec_cell_out = self.decoder_cell(
+                    prev_pred_label_emb, (dec_hidden_out, dec_cell_out))
+
+
+                init_label_emb =
+                    self.label_embedding(
+                    Variable(torch.LongTensor(self.minibatch_size, 1).zero_() \
+                    + LABEL_BEGIN_INDEX)) \
+                    .view(self.minibatch_size, self.label_embedding_dim)
+
+
+                prev_pred_label_emb = self.label_embedding(label_pred_seq[-1]) \
+                .view(self.minibatch_size, self.label_embedding_dim)
+
+                dec_hidden_out, dec_cell_out =
+                    self.decoder_cell(init_label_emb,
+                    (init_dec_hidden, init_dec_cell))
+
+
+
+
         label_pred_seq = []
         seq_logprob = 0
         #coming_from_beam = []
@@ -250,7 +324,7 @@ class ner(nn.Module):
             label_pred_seq.append(topk_label[0])
 
         return label_pred_seq
-    """
+    
 
     def test(self):
         batch_num = len(self.test_X)
