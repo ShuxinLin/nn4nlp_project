@@ -220,7 +220,7 @@ class ner(nn.Module):
         beta_seq = []
         y_seq = []
 
-        # t = 0, only one coming beam
+        # t = 0, only one input beam from init (t = -1)
         # Only one dec_hidden_out, dec_cell_out
         # => dec_hidden_out has shape (batch size, hidden dim)
         dec_hidden_out, dec_cell_out =
