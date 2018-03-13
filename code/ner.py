@@ -210,13 +210,20 @@ class ner(nn.Module):
     
     def decode_beam(self, seq_len, init_dec_hidden, init_dec_cell, beam_size):
         LABEL_BEGIN_INDEX = 1
+        # init_label's shape => (batch size, 1),
+        # with all elements LABEL_BEGIN_INDEX
         init_label_emb =
             self.label_embedding(
-            Variable(torch.LongTensor(self.minibatch_size, 1).zero_() \
-            + LABEL_BEGIN_INDEX)) \
+            torch.LongTensor(self.minibatch_size, 1).zero_() \
+            + LABEL_BEGIN_INDEX) \
             .view(self.minibatch_size, self.label_embedding_dim)
-        init_score = 0
+        # init_score's shape => (batch size, 1),
+        # with all elements 0
+        init_score = torch.LongTensor(self.minibatch_size, 1).zero_()
 
+        # Each beta is (batch size, beam size) matrix,
+        # and there will be T_y of them in the sequence
+        # y => same
         beta_seq = []
         y_seq = []
 
@@ -226,105 +233,73 @@ class ner(nn.Module):
         dec_hidden_out, dec_cell_out =
             self.decoder_cell(init_label_emb,
             (init_dec_hidden, init_dec_cell))
-        # score_tilde.shape => (batch size, |V^y|)
-        score_tilde = self.hidden2score(dec_hidden_out) \
-            + Variable(torch.LongTensor( \
-            self.minibatch_size, self.label_size).zero_() \
-            + init_score)
-        # score_matrix has shape (1, |V^y|) for each instance,
-        # and for a batch, score_matrix.shape => (batch size, |V^y|)
-        score_matrix = score_tilde
-        # All beta^{t=0, b} are actually 0, and is not used during
-        # reconstruction, so we do not keep them.
-        # y_list.shape => (batch size, beam size),
-        # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B}]
-        s_got, indices_got = torch.topk(score_matrix, beam_size, dim = 1)
-        beta_seq.append(None)
-        y_seq.append(indices_got)
-        # score.shape => (batch size, beam size)
-        # each row is [s^{t, b=0}, s^{t, b=1}, ..., s^{t, b=B}]
-        score = s_got
+        # dec_hidden_beam shape => (1, batch size, hidden dim),
+        # 1 because there is only 1 input beam
+        dec_hidden_beam = torch.stack([dec_hidden_out], dim = 0)
+        dec_cell_beam = torch.stack([dec_cell_out], dim = 0)
+        # score_out.shape => (batch size, |V^y|)
+        score_out = self.hidden2score(dec_hidden_out) + init_score
+        # score_matrix.shape => (batch size, |V^y| * 1)
+        # * 1 because there is only 1 input beam
+        score_matrix = torch.cat([score_out], dim = 1)
+        # All beta^{t=0, b} are actually 0
+        # beta_beam.shape => (batch size, beam size),
+        # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
+        # y_beam, score_beam => same
+        score_beam, indices_beam = torch.topk(score_matrix, beam_size, dim = 1)
+        beta_beam = torch.floor(indices_beam.float() / self.label_size).long()
+        y_beam = torch.remainder(indices_beam, self.label_size)
+        beta_seq.append(beta_beam)
+        y_seq.append(y_beam)
 
         # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
         for t in range(1, seq_len):
+            # We loop through beam because we expect that
+            # usually batch size > beam size
+            dec_hidden_out_list = []
+            dec_cell_out_list = []
+            score_out_list = []
             for b in range(beam_size):
-                # Extract the b-th column of y matrix
+                # Extract the b-th column of y_beam
                 prev_pred_label_emb = self.label_embedding(
-                    y_seq[t - 1][:, b]) \
-                    .view(self.minibatch_size, self.label_embedding_dim)
-                # TODO: Take care of the beam issue of dec_hidden_out...
-                dec_hidden_out, dec_cell_out = self.decoder_cell(
-                    prev_pred_label_emb, (dec_hidden_out, dec_cell_out))
-
-
-                init_label_emb =
-                    self.label_embedding(
-                    Variable(torch.LongTensor(self.minibatch_size, 1).zero_() \
-                    + LABEL_BEGIN_INDEX)) \
+                    (y_seq[t - 1][:, b]).view(self.minibatch_size, 1)) \
                     .view(self.minibatch_size, self.label_embedding_dim)
 
-
-                prev_pred_label_emb = self.label_embedding(label_pred_seq[-1]) \
-                .view(self.minibatch_size, self.label_embedding_dim)
-
-                dec_hidden_out, dec_cell_out =
-                    self.decoder_cell(init_label_emb,
-                    (init_dec_hidden, init_dec_cell))
-
-
-
-
-        label_pred_seq = []
-        seq_logprob = 0
-        #coming_from_beam = []
-
-        # Sentence beginning
-        dec_hidden_out, dec_cell_out = self.decoder_cell(
-            self.label_embedding(Variable(torch.LongTensor([0]))).view(1, self.label_embedding_dim),
-            (init_dec_hidden.view(1, self.hidden_dim),
-            init_dec_cell.view(1, self.hidden_dim))
-            )
-        score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
-        print("score", score)
-        logprob = nn.LogSoftmax(dim = 1)(score) + seq_logprob
-        print("logprob", logprob)
-        topk_logprob, topk_label = torch.topk(logprob, beam_size)
-        print("topk_logprob", topk_logprob)
-        print("topk_label", topk_label)
-        seq_logprob = torch.cat([seq_logprob + topk_logprob[0, i] for i in range(topk_logprob.size()[1])])
-        print("seq_logprob", seq_logprob)
-        label_pred_seq.append([[0, topk_label[0, i]] for i in range(topk_label.size()[1])])
-        print("label_pred_seq", label_pred_seq)
-
-        # The rest parts of the sentence
-        for i in range(seq_len - 1):
-            print("i", i)
-            last_label_pred_list = label_pred_seq[-1]
-            print("last_label_pred_list", last_label_pred_list)
-            for b, [coming_beam, label] in enumerate(last_label_pred_list):
-                print("b", b)
-                print("coming_beam", coming_beam)
-                print("label", label)
+                # Extract: beta-th beam, batch_index-th row of dec_hidden_beam
+                prev_dec_hidden_out =
+                    dec_hidden_beam[beta_seq[t - 1][:, b],
+                    list(range(self.minibatch_size))]
+                prev_dec_cell_out =
+                    dec_cell_beam[beta_seq[t - 1][:, b],
+                    list(range(self.minibatch_size))]
                 dec_hidden_out, dec_cell_out = self.decoder_cell(
-                    self.label_embedding(label_pred_seq[-1]).view(1, self.label_embedding_dim),
-                    (dec_hidden_out.view(1, self.hidden_dim),
-                    dec_cell_out.view(1, self.hidden_dim))
-                    )
+                    prev_pred_label_emb,
+                    (prev_dec_hidden_out, prev_dec_cell_out))
+                dec_hidden_out_list.append(dec_hidden_out)
+                dec_cell_out_list.append(dec_cell_out)
 
-            #print("label_pred_seq[-1]", label_pred_seq[-1])
-            dec_hidden_out, dec_cell_out = self.decoder_cell(
-                self.label_embedding(label_pred_seq[-1]).view(1, self.label_embedding_dim),
-                (dec_hidden_out.view(1, self.hidden_dim),
-                dec_cell_out.view(1, self.hidden_dim))
-                )
-            score = self.hidden2score(dec_hidden_out.view((1, self.hidden_dim)))
-            logprob = nn.LogSoftmax(dim = 1)(score) + seq_logprob
-            topk_logprob, topk_label = torch.topk(logprob, beam_size)
-            seq_logprob += topk_logprob[0]
-            label_pred_seq.append(topk_label[0])
+                prev_score = score_beam[:, b].view(self.minibatch_size, 1)
+                score_out = self.hidden2score(dec_hidden_out) + prev_score
+                score_out_list.append(score_out)
+            # End for b
 
-        return label_pred_seq
-    
+            # dec_hidden_beam shape => (beam size, batch size, hidden dim)
+            dec_hidden_beam = torch.stack(dec_hidden_out_list, dim = 0)
+            dec_cell_beam = torch.stack(dec_cell_out_list, dim = 0)
+
+            # score_matrix.shape => (batch size, |V^y| * beam_size)
+            score_matrix = torch.cat(score_out_list, dim = 1)
+
+            score_beam, indices_beam =
+                torch.topk(score_matrix, beam_size, dim = 1)
+            beta_beam = torch.floor(
+                indices_beam.float() / self.label_size).long()
+            y_beam = torch.remainder(indices_beam, self.label_size)
+            beta_seq.append(beta_beam)
+            y_seq.append(y_beam)
+        # End for t
+
+
 
     def test(self):
         batch_num = len(self.test_X)
