@@ -262,16 +262,16 @@ class ner(nn.Module):
             for b in range(beam_size):
                 # Extract the b-th column of y_beam
                 prev_pred_label_emb = self.label_embedding(
-                    (y_seq[t - 1][:, b]).view(self.minibatch_size, 1)) \
+                    y_seq[t - 1][:, b].view(self.minibatch_size, 1)) \
                     .view(self.minibatch_size, self.label_embedding_dim)
 
                 # Extract: beta-th beam, batch_index-th row of dec_hidden_beam
                 prev_dec_hidden_out =
                     dec_hidden_beam[beta_seq[t - 1][:, b],
-                    list(range(self.minibatch_size))]
+                    range(self.minibatch_size)]
                 prev_dec_cell_out =
                     dec_cell_beam[beta_seq[t - 1][:, b],
-                    list(range(self.minibatch_size))]
+                    range(self.minibatch_size)]
                 dec_hidden_out, dec_cell_out = self.decoder_cell(
                     prev_pred_label_emb,
                     (prev_dec_hidden_out, prev_dec_cell_out))
@@ -299,6 +299,14 @@ class ner(nn.Module):
             y_seq.append(y_beam)
         # End for t
 
+        # Only output the highest-scored beam (for each instance in the batch)
+        label_pred_seq = y_seq[seq_len - 1][:, 0].view(self.minibatch_size, 1)
+        input_beam = beta_seq[seq_len - 1][:, 0]
+        for t in range(seq_len - 2, -1, -1):
+            label_pred_seq = torch.cat(y_seq[t][range(self.minibatch_size), input_beam], label_pred_seq, dim = 1)
+            input_beam = beta_seq[t][range(self.minibatch_size), input_beam]
+
+        return label_pred_seq
 
 
     def test(self):
