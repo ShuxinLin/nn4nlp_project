@@ -24,3 +24,5 @@ dataset/CoNLL-2003/processed_SENTENCE_eng.testa
 dataset/CoNLL-2003/processed_SENTENCE_eng.train
 dataset/CoNLL-2003/vocab_dict
 
+gitignore
+
