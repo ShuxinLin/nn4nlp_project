@@ -163,51 +163,79 @@ class ner(nn.Module):
 
         return train_loss_list
 
+
     def write_log(self):
         pass
 
-    def decode_greedy(self, seq_len, init_dec_hidden, init_dec_cell):
-        # Just try to keep beam search in mind
-        # Can eventually use torch.max instead
-        beam_size = 1
 
-        label_pred_seq = []
-        seq_logprob = Variable(torch.FloatTensor(self.minibatch_size, 1).zero_())
+    def decode_greedy(self, seq_len, init_dec_hidden, init_dec_cell):
+        # Current version is as parallel to beam as possible
+        # for debugging purpose.
 
         # Sentence beginning
         LABEL_BEGIN_INDEX = 1
-        init_label_emb = self.label_embedding(
-            Variable(torch.LongTensor(self.minibatch_size, 1).zero_() +
-                     LABEL_BEGIN_INDEX)) \
+        # init_label's shape => (batch size, 1),
+        # with all elements LABEL_BEGIN_INDEX
+        init_label_emb = \
+            self.label_embedding(
+            Variable(torch.LongTensor(self.minibatch_size, 1).zero_()) \
+            + LABEL_BEGIN_INDEX) \
             .view(self.minibatch_size, self.label_embedding_dim)
-        dec_hidden_out, dec_cell_out = self.decoder_cell(
-            init_label_emb, (init_dec_hidden, init_dec_cell))
-        score = self.hidden2score(dec_hidden_out)
-        logprob = nn.LogSoftmax(dim=1)(score) + seq_logprob
-        topk_logprob, topk_label = torch.topk(logprob, beam_size, dim=1)
-        seq_logprob = topk_logprob
-        label_pred_seq.append(topk_label)
+        # init_score's shape => (batch size, 1),
+        # with all elements 0
+        # For greedy, it's actually no need for initial score:
+        # see the argument given later
+        ##init_score = Variable(torch.FloatTensor(self.minibatch_size, 1).zero_())
 
-        # The rest parts of the sentence
-        for i in range(seq_len - 1):
-            prev_pred_label_emb = self.label_embedding(label_pred_seq[-1]) \
+        # Each y is (batch size, beam size = 1) matrix,
+        # and there will be T_y of them in the sequence
+        y_seq = []
+
+        # dec_hidden_out has shape (batch size, hidden dim)
+        dec_hidden_out, dec_cell_out = \
+            self.decoder_cell(init_label_emb,
+            (init_dec_hidden, init_dec_cell))
+
+        # score_out.shape => (batch size, |V^y|)
+        ##score_out = self.hidden2score(dec_hidden_out) + init_score
+        score_out = self.hidden2score(dec_hidden_out)
+
+        # index.shape => (batch size, 1)
+        # score => same
+        # Here "1" in torch.max is "dim = 1"
+        #
+        # For greedy, it is actually unnecessary to record score,
+        # because at each time step we always pick the highest score among
+        # all possible words in vocab for the next step,
+        # and this highest score is the same as
+        # "this highest score + previous highest score (same constant added
+        # to each possible words in vocab)".
+        #
+        ##score, index = torch.max(score_out, 1, keepdim = True)
+        _, index = torch.max(score_out, 1, keepdim = True)
+        y_seq.append(index)
+
+        # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
+        for t in range(1, seq_len):
+            prev_pred_label_emb = self.label_embedding(y_seq[t - 1]) \
                 .view(self.minibatch_size, self.label_embedding_dim)
-            
-            # TODO: Check: here is a bug...
-            #dec_hidden_out, dec_cell_out = self.decoder_cell(
-            #    prev_pred_label_emb, (init_dec_hidden, init_dec_cell))
             dec_hidden_out, dec_cell_out = self.decoder_cell(
-                prev_pred_label_emb, (dec_hidden_out, dec_cell_out))
+                prev_pred_label_emb,
+                (dec_hidden_out, dec_cell_out))
 
-            score = self.hidden2score(dec_hidden_out)
-            logprob = nn.LogSoftmax(dim=1)(score) + seq_logprob
-            topk_logprob, topk_label = torch.topk(logprob, beam_size, dim=1)
-            seq_logprob = topk_logprob
-            label_pred_seq.append(topk_label)
+            # For greedy, no need to add (previous) score
+            ##score_out = self.hidden2score(dec_hidden_out) + score
+            score_out = self.hidden2score(dec_hidden_out)
+
+            _, index = torch.max(score_out, 1, keepdim = True)
+            y_seq.append(index)
+        # End for t
+
+        label_pred_seq = y_seq
 
         return label_pred_seq
 
-    
+
     def decode_beam(self, seq_len, init_dec_hidden, init_dec_cell, beam_size):
         LABEL_BEGIN_INDEX = 1
         # init_label's shape => (batch size, 1),
@@ -246,9 +274,9 @@ class ner(nn.Module):
         # beta_beam.shape => (batch size, beam size),
         # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
         # y_beam, score_beam => same
-        score_beam, indices_beam = torch.topk(score_matrix, beam_size, dim = 1)
-        beta_beam = torch.floor(indices_beam.float() / self.label_size).long()
-        y_beam = torch.remainder(indices_beam, self.label_size)
+        score_beam, index_beam = torch.topk(score_matrix, beam_size, dim = 1)
+        beta_beam = torch.floor(index_beam.float() / self.label_size).long()
+        y_beam = torch.remainder(index_beam, self.label_size)
         beta_seq.append(beta_beam)
         y_seq.append(y_beam)
 
@@ -292,11 +320,11 @@ class ner(nn.Module):
             # score_matrix.shape => (batch size, |V^y| * beam_size)
             score_matrix = torch.cat(score_out_list, dim = 1)
 
-            score_beam, indices_beam = \
+            score_beam, index_beam = \
                 torch.topk(score_matrix, beam_size, dim = 1)
             beta_beam = torch.floor(
-                indices_beam.float() / self.label_size).long()
-            y_beam = torch.remainder(indices_beam, self.label_size)
+                index_beam.float() / self.label_size).long()
+            y_beam = torch.remainder(index_beam, self.label_size)
             beta_seq.append(beta_beam)
             y_seq.append(y_beam)
         # End for t
@@ -342,8 +370,10 @@ class ner(nn.Module):
             init_dec_hidden = enc_hidden_out[0]
             init_dec_cell = enc_cell_out[0]
 
-            beam_size = 3
-            label_pred_seq = self.decode_beam(current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+            #beam_size = 3
+            #label_pred_seq = self.decode_beam(current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+
+            label_pred_seq = self.decode_greedy(current_sen_len, init_dec_hidden, init_dec_cell)
 
             # write results to file
             # each element in label_pred_seq is pytorch.Variable, thus convert to list first
@@ -402,8 +432,10 @@ class ner(nn.Module):
             init_dec_hidden = enc_hidden_out[0]
             init_dec_cell = enc_cell_out[0]
 
-            beam_size = 3
-            label_pred_seq = self.decode_beam(current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+            #beam_size = 3
+            #label_pred_seq = self.decode_beam(current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+
+            label_pred_seq = self.decode_greedy(current_sen_len, init_dec_hidden, init_dec_cell)
 
             label_pred_seq = [seq.data.numpy().squeeze() for seq in label_pred_seq]
             label_pred_seq = np.asarray(label_pred_seq).transpose().tolist()
