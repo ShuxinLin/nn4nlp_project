@@ -14,14 +14,8 @@ __pycache__
 
 *.pyc
 
-dataset/CoNLL-2003/indexed_ENTITY_eng.testa
-dataset/CoNLL-2003/indexed_ENTITY_eng.train
-dataset/CoNLL-2003/indexed_SENTENCE_eng.testa
-dataset/CoNLL-2003/indexed_SENTENCE_eng.train
-dataset/CoNLL-2003/processed_ENTITY_eng.testa
-dataset/CoNLL-2003/processed_ENTITY_eng.train
-dataset/CoNLL-2003/processed_SENTENCE_eng.testa
-dataset/CoNLL-2003/processed_SENTENCE_eng.train
+dataset/CoNLL-2003/indexed_*
+dataset/CoNLL-2003/processed_*
 dataset/CoNLL-2003/vocab_dict
 
 gitignore
