@@ -124,7 +124,7 @@ class Preprocessor(object):
     def _add_paddings_eos(self, sentence):
         words = sentence.split()
         length = len(words)
-        num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
+        num_of_paddings = (self.LENGTH_UNIT - length % self.LENGTH_UNIT) if (length % self.LENGTH_UNIT > 0) else 0
         words.extend([self.PAD_TOKEN] * num_of_paddings)
         words.append(self.EOS_TOKEN)
         sentence = ' '.join(words)
