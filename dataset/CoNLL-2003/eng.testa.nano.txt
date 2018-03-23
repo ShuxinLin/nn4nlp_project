@@ -62,6 +62,7 @@ reached VBN I-VP O
 108 CD I-NP O
 for IN I-PP O
 three CD I-NP O
+ha CD I-NP O
 . . O O
 
 -DOCSTART- -X- O O
