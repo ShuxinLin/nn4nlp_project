@@ -1,0 +1,11 @@
+SENTENCE
+cricket - leicestershire take over at top after innings victory . <PAD> <PAD> <PAD> <PAD> <EOS>
+london reg_digitzreg_digitz <PAD> <PAD> <PAD> <EOS>
+after bowling somerset out for reg_digitz on the opening morning at grace road , leicestershire extended their first innings by reg_digitz runs before being bowled out for reg_digitz with england discard andy caddick taking three for reg_digitz . <PAD> <PAD> <EOS>
+by stumps kent had reached reg_digitz for three . <PAD> <EOS>
+cricket - english county championship scores . <PAD> <PAD> <PAD> <EOS>
+london reg_digitzreg_digitz <PAD> <PAD> <PAD> <EOS>
+result and close of play scores in english county championship matches on friday : <PAD> <EOS>
+leicester : leicestershire beat somerset by an innings and reg_digitz runs . <PAD> <PAD> <PAD> <EOS>
+somerset reg_digitz and reg_digitz ( p. simmons reg_digitz ) , leicestershire reg_digitz . <PAD> <PAD> <EOS>
+leicestershire reg_digitz points , somerset reg_digitz . <PAD> <PAD> <PAD> <EOS>

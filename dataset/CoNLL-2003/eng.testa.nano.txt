@@ -1,0 +1,130 @@
+-DOCSTART- -X- O O
+
+CRICKET NNP I-NP O
+- : O O
+LEICESTERSHIRE NNP I-NP I-ORG
+TAKE NNP I-NP O
+OVER IN I-PP O
+AT NNP I-NP O
+TOP NNP I-NP O
+AFTER NNP I-NP O
+INNINGS NNP I-NP O
+VICTORY NN I-NP O
+. . O O
+
+LONDON NNP I-NP I-LOC
+1996-08-30 CD I-NP O
+
+After IN I-PP O
+bowling VBG I-NP O
+Somerset NNP I-NP I-ORG
+out RP I-PRT O
+for IN I-PP O
+83 CD I-NP O
+on IN I-PP O
+the DT I-NP O
+opening NN I-NP O
+morning NN I-NP O
+at IN I-PP O
+Grace NNP I-NP I-LOC
+Road NNP I-NP I-LOC
+, , O O
+Leicestershire NNP I-NP I-ORG
+extended VBD I-VP O
+their PRP$ I-NP O
+first JJ I-NP O
+innings NN I-NP O
+by IN I-PP O
+94 CD I-NP O
+runs VBZ I-VP O
+before IN I-PP O
+being VBG I-VP O
+bowled VBD I-VP O
+out RP I-PRT O
+for IN I-PP O
+296 CD I-NP O
+with IN I-PP O
+England NNP I-NP I-LOC
+discard VBP I-VP O
+Andy NNP I-NP I-PER
+Caddick NNP I-NP I-PER
+taking VBG I-VP O
+three CD I-NP O
+for IN I-PP O
+83 CD I-NP O
+. . O O
+
+By IN I-PP O
+stumps NNS I-NP O
+Kent NNP B-NP I-ORG
+had VBD I-VP O
+reached VBN I-VP O
+108 CD I-NP O
+for IN I-PP O
+three CD I-NP O
+. . O O
+
+-DOCSTART- -X- O O
+
+CRICKET NNP I-NP O
+- : O O
+ENGLISH JJ I-NP I-MISC
+COUNTY NNS I-NP I-MISC
+CHAMPIONSHIP WDT B-NP I-MISC
+SCORES NNP I-NP O
+. . O O
+
+LONDON NNP I-NP I-LOC
+1996-08-30 CD I-NP O
+
+Result NN I-NP O
+and CC O O
+close VB I-VP O
+of IN I-PP O
+play NN I-NP O
+scores NNS I-NP O
+in IN I-PP O
+English JJ I-NP I-MISC
+county NN I-NP O
+championship NN I-NP O
+matches NNS I-NP O
+on IN I-PP O
+Friday NNP I-NP O
+: : O O
+
+Leicester JJ I-NP I-LOC
+: : O O
+Leicestershire VB I-VP I-ORG
+beat VB I-VP O
+Somerset NNP I-NP I-ORG
+by IN I-PP O
+an DT I-NP O
+innings NN I-NP O
+and CC O O
+39 CD I-NP O
+runs NNS I-NP O
+. . O O
+
+Somerset NNP I-NP I-ORG
+83 CD I-NP O
+and CC I-NP O
+174 CD I-NP O
+( ( O O
+P. NNP I-NP I-PER
+Simmons NNP I-NP I-PER
+4-38 CD I-NP O
+) ) O O
+, , O O
+Leicestershire NNP I-NP I-ORG
+296 CD I-NP O
+. . O O
+
+Leicestershire NNP I-NP I-ORG
+22 CD I-NP O
+points NNS I-NP O
+, , O O
+Somerset NNP I-NP I-ORG
+4 CD I-NP O
+. . O O
+
+
