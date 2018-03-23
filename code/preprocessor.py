@@ -133,7 +133,7 @@ class Preprocessor(object):
     def _preprocess_entities(self, entities):
         entities = entities.split()
         length = len(entities)
-        num_of_paddings = self.LENGTH_UNIT - length % self.LENGTH_UNIT
+        num_of_paddings = (self.LENGTH_UNIT - length % self.LENGTH_UNIT) if (length % self.LENGTH_UNIT > 0) else 0
         entities.extend(['O'] * num_of_paddings)
         entities.append(self.EOS_TOKEN)
         return ' '.join(entities)
