@@ -42,16 +42,16 @@ class Preprocessor(object):
                     # all_entity.append(self._preprocess_entity(entity))
                     all_entity.append(entity)
 
-                elif inside_sentence:
-                    if inside_sentence: # end of sentence
-                        word_in_one_sentence = ' '.join(all_words)
-                        pos_in_one_sentence = ' '.join(all_pos)
-                        chunk_in_one_sentence = ' '.join(all_chunk)
-                        entity_in_one_sentence = ' '.join(all_entity)
+                elif inside_sentence:   # end of sentence
+                    word_in_one_sentence = ' '.join(all_words)
+                    pos_in_one_sentence = ' '.join(all_pos)
+                    chunk_in_one_sentence = ' '.join(all_chunk)
+                    entity_in_one_sentence = ' '.join(all_entity)
 
-                        all_examples.append([word_in_one_sentence, pos_in_one_sentence, chunk_in_one_sentence, entity_in_one_sentence])
-                        all_words, all_pos, all_chunk, all_entity = [], [], [], []
-                    inside_sentence = False # end of processing one sentence
+                    all_examples.append([word_in_one_sentence, pos_in_one_sentence, chunk_in_one_sentence, entity_in_one_sentence])
+                    all_words, all_pos, all_chunk, all_entity = [], [], [], []
+
+                    inside_sentence = False     # end of processing one sentence
             self.data = pd.DataFrame(data=all_examples, columns=['SENTENCE', 'POS', 'CHUNK', 'ENTITY'])
 
     def preprocess(self, columns_to_process=['SENTENCE', 'ENTITY']):
