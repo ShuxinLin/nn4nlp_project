@@ -20,3 +20,7 @@ dataset/CoNLL-2003/vocab_dict
 
 gitignore
 
+result
+
+code/fig_exp1.pdf
+

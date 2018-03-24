@@ -1,82 +1,110 @@
 #!/usr/bin/python3
-from ner import ner
-from preprocess import *
 
 import numpy as np
 import matplotlib.pyplot as plt
+from operator import itemgetter
+import collections
+from ner import ner
+from Preprocessor import Preprocessor
 
-data_path = "../dataset/CoNLL-2003/"
-train_file = "eng.train"
-val_file = "eng.testa"
-test_file = "eng.testb"
-result_path = "../result/"
+def prepocess(data_path, train, val, batch_size):
+    train_preprocessor = Preprocessor(data_path, train)
+    train_preprocessor.read_file()
+    train_preprocessor.preprocess()
+
+    val_preprocessor = Preprocessor(data_path, val)
+    val_preprocessor.read_file()
+    val_preprocessor.preprocess()
+
+    build_vocab(data_path, train_preprocessor, val_preprocessor)
+
+    train_preprocessor.index_preprocess()
+    train_X, train_Y = train_preprocessor.minibatch(batch_size)
+    val_preprocessor.index_preprocess()
+    val_X, val_Y = val_preprocessor.minibatch(batch_size)
+    vocab_size = train_preprocessor.vocabulary_size
+    label_size = train_preprocessor.entity_dict_size
+
+    entity_dict = train_preprocessor.entity_dict
+
+    return train_X, train_Y, val_X, val_Y, vocab_size, label_size, entity_dict
+
+def build_vocab(data_path, train_preprocessor, val_preprocessor):
+    all_text = []
+    for sentence in train_preprocessor.new_data['SENTENCE']:
+        all_text.extend(sentence.split())
+    for sentence in val_preprocessor.new_data['SENTENCE']:
+        all_text.extend(sentence.split())
+    #all_text = filter(lambda a: a not in [train_preprocessor.EOS_TOKEN, train_preprocessor.PAD_TOKEN], all_text)
+    all_text = filter(lambda a: a != train_preprocessor.PAD_TOKEN, all_text)
+    all_words = collections.Counter(all_text).most_common()
+
+    sorted_by_name = sorted(all_words, key=lambda x: x[0])
+    all_words = sorted(sorted_by_name, key=lambda x: x[1], reverse=True)
+    #tokens = [(train_preprocessor.PAD_TOKEN, -1), (train_preprocessor.UNK_TOKEN, -1), (train_preprocessor.EOS_TOKEN, -1)]
+    tokens = [(train_preprocessor.PAD_TOKEN, -1), (train_preprocessor.UNK_TOKEN, -1)]
+    all_words = tokens + all_words
+
+    vocab_dict = dict()
+    for word in all_words:
+        if word[0] not in vocab_dict:
+            vocab_dict[word[0]] = len(vocab_dict)
+    vocabulary_size = len(vocab_dict)
+    train_preprocessor.vocab_dict = val_preprocessor.vocab_dict = vocab_dict
+    train_preprocessor.vocabulary_size = val_preprocessor.vocabulary_size = vocabulary_size
+
+    vocab_file = data_path + "vocab_dict"
+    with open(vocab_file, 'w') as f:
+        for word in all_words:
+            f.write("%s\t%d\n" % (word[0], vocab_dict[word[0]]))
+    print('Saved vocabulary to vocabulary file. vocab_size: ', vocabulary_size)
+
+def get_index2word(dict_file):
+    index2word = dict()
+    with open(dict_file) as f:
+        for line in f:
+            (word, index) = line.split()
+            index2word[int(index)] = word
+
+    return index2word
+
+def get_index2label(entity_dict):
+    index2label = dict()
+    for entity, index in entity_dict.items():
+        index2label[int(index)] = entity
+
+    return index2label
+
 def main():
-    # Temporarily generate data by hand for test purpose
+    data_path = "../dataset/CoNLL-2003/"
+    train_file = "eng.train"
+    #train_file = "eng.testa.nano.txt"
+    val_file = "eng.testa"
+    #test_file = "eng.testb"
+    result_path = "../result/"
 
-    # train_X_raw = [
-    #     ["The dog ate the apple".split(" "), "Everybody read that book <p>".split(" ")],
-    #     ["The dog ate the apple".split(" "), "Everybody read that book <p>".split(" ")],
-    #     ["The dog ate the apple".split(" "), "Everybody read that book <p>".split(" ")],
-    #     ["The dog ate the apple and banana".split(" "), "Everybody read that book and book <p>".split(" ")]]
-    #
-    #
-    # train_Y_raw = [
-    #     [["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]],
-    #     [["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]],
-    #     [["DET", "NN", "V", "DET", "NN"], ["NN", "V", "DET", "NN", "<p>"]],
-    #     [["DET", "NN", "V", "DET", "NN", "DET", "NN"], ["NN", "V", "DET", "NN", "DET", "NN", "<p>"]]]
-    #
-    #
-    # word_to_idx = {"<p>": 0}
-    # cur_idx = 1
-    # for batch in train_X_raw:
-    #     for sen in batch:
-    #         for word in sen:
-    #             if word not in word_to_idx:
-    #                 word_to_idx[word] = cur_idx
-    #                 cur_idx += 1
-    #
-    # label_to_idx = {"<p>": 0, "<s>": 1, "DET": 2, "NN": 3, "V": 4}
-    #
-    # train_X = [[[word_to_idx[w] for w in sen] for sen in batch] for batch in train_X_raw]
-    # train_Y = [[[label_to_idx[t] for t in label] for label in batch] for batch in train_Y_raw]
-    #
-    # """
-    # print(word_to_idx)
-    # print(label_to_idx)
-    #
-    # for b_idx, batch in enumerate(train_X):
-    #     print("batch index", b_idx)
-    #     for idx, sen in enumerate(batch):
-    #         print("instance index", idx)
-    #         print("sen", sen)
-    #
-    # for b_idx, batch in enumerate(train_Y):
-    #     print("batch index", b_idx)
-    #     for idx, label in enumerate(batch):
-    #         print("instance index", idx)
-    #         print("label", label)
-    # """
-    # print train_X
-    train_X, train_Y, val_X, val_Y, vocab_size, label_size = prepocess(train_file, val_file)
-    ######################################
+    batch_size = 32
+
+    train_X, train_Y, val_X, val_Y, vocab_size, label_size, entity_dict = prepocess(data_path, train_file, val_file, batch_size)
+
+    dict_file = "../dataset/CoNLL-2003/vocab_dict"
+    index2word = get_index2word(dict_file)
+    index2label = get_index2label(entity_dict)
+
     word_embedding_dim = 200
     hidden_dim = 64
-    label_embedding_dim = 10
+    label_embedding_dim = 8
 
-    max_epoch = 300
+    max_epoch = 10
 
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size,
-                  learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X,
-                  test_Y=val_Y)
+    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y)
 
     train_loss_list = machine.train()
-    machine.eval_on_train()
-    machine.test()
+    machine.evaluate(train_X, train_Y, index2word, index2label, "train")
+    machine.evaluate(val_X, val_Y, index2word, index2label, "val")
 
-    print(train_loss_list)
+    #print(train_loss_list)
 
-    # Plot training loss
     plt.figure(1)
     plt.plot(list(range(len(train_loss_list))) , train_loss_list, "k-")
     #plt.xlim([0, 11])
@@ -84,8 +112,6 @@ def main():
     plt.xlabel("Epoch")
     plt.ylabel("Cross-entropy loss")
     plt.savefig("fig_exp1.pdf")
-
-
 
 if __name__ == "__main__":
     main()

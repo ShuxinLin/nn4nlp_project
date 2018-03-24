@@ -5,24 +5,26 @@ import json
 import csv
 from operator import itemgetter
 
-class Preprocessor(object):
+class Preprocessor():
     def __init__(self, data_path, filename):
         self.path = data_path
         self.filename = filename
         self.UNK_TOKEN = '<UNK>'
         self.PAD_TOKEN = '<PAD>'
-        self.EOS_TOKEN = '<EOS>'
+        # self.EOS_TOKEN = '<EOS>'
         self.SEP = '\t'
         self.data = None
-        self.max_sentence_length = 300
+        # self.max_sentence_length = 300
+        self.max_sentence_length = 500
         self._remove_digits = re.compile(r"""[.+-\/\\]?\d+([.,-:]\d+)?([.:]\d+)?(\.)?""")
         self.LENGTH_UNIT = 5
         self.new_data = None
         self.data_size = 0
         self.vocab_dict = dict()
         self.vocabulary_size = 0
-        self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<EOS>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
-        self.entity_dict_size = 10
+        # self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<EOS>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
+        self.entity_dict = {'I-LOC': 5, 'B-ORG': 8, 'O': 2, '<PAD>': 0, 'I-PER': 4, 'I-MISC': 3, 'B-MISC': 7, 'I-ORG': 1, 'B-LOC': 6}
+        self.entity_dict_size = 9
         self.indexed_data = None
 
     def read_file(self):
@@ -88,6 +90,7 @@ class Preprocessor(object):
         indexes = [str(self.entity_dict[e]) for e in entities]
         return ' '.join(indexes)
 
+    """
     def _build_vocab(self, data):
         all_text = []
         for sentence in data['SENTENCE']:
@@ -110,10 +113,12 @@ class Preprocessor(object):
             for word in all_words:
                 f.write("%s\t%d\n" % (word[0], self.vocab_dict[word[0]]))
         print('Saved vocabulary to vocabulary file. vocab_size: ', self.vocabulary_size)
+    """
 
     def _preprocess_sentence(self, sentence):
         sentence = self._regex_preprocess(sentence)
-        sentence = self._add_paddings_eos(sentence)
+        #sentence = self._add_paddings_eos(sentence)
+        sentence = self._add_paddings(sentence)
         return sentence
 
     def _regex_preprocess(self, sentence):
@@ -121,6 +126,7 @@ class Preprocessor(object):
         sentence = sentence.replace('"', 'reg_quotes')
         return sentence
 
+    """
     def _add_paddings_eos(self, sentence):
         words = sentence.split()
         length = len(words)
@@ -129,7 +135,17 @@ class Preprocessor(object):
         words.append(self.EOS_TOKEN)
         sentence = ' '.join(words)
         return sentence
+    """
 
+    def _add_paddings(self, sentence):
+        words = sentence.split()
+        length = len(words)
+        num_of_paddings = (self.LENGTH_UNIT - length % self.LENGTH_UNIT) if (length % self.LENGTH_UNIT > 0) else 0
+        words.extend([self.PAD_TOKEN] * num_of_paddings)
+        sentence = ' '.join(words)
+        return sentence
+
+    """
     def _preprocess_entities(self, entities):
         entities = entities.split()
         length = len(entities)
@@ -137,7 +153,14 @@ class Preprocessor(object):
         entities.extend(['O'] * num_of_paddings)
         entities.append(self.EOS_TOKEN)
         return ' '.join(entities)
+    """
 
+    def _preprocess_entities(self, entities):
+        entities = entities.split()
+        length = len(entities)
+        num_of_paddings = (self.LENGTH_UNIT - length % self.LENGTH_UNIT) if (length % self.LENGTH_UNIT > 0) else 0
+        entities.extend(['O'] * num_of_paddings)
+        return ' '.join(entities)
 
     def _preprocess_word(self, word):
         return word.lower()
@@ -158,7 +181,6 @@ class Preprocessor(object):
             result = 'OTHER'
 
         return result
-
 
     def _preprocess_chunk(self, chunk):
         result = None
@@ -191,7 +213,7 @@ class Preprocessor(object):
 
         return True
 
-    def minibatch(self, batch_size=32, columns_to_batch=[['SENTENCE', 'ENTITY']]):
+    def minibatch(self, batch_size):
         print("generate mini batches.")
         X_batch = []
         Y_batch = []
@@ -226,7 +248,7 @@ class Preprocessor(object):
         Y_batch.extend(Y_minibatch)
         assert len(X_batch) == len(Y_batch)
 
-        X_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, X_batch)
-        Y_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, Y_batch)
+        # X_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, X_batch)
+        # Y_batch = filter(lambda mini_batch: len(mini_batch) == batch_size, Y_batch)
 
         return list(X_batch), list(Y_batch)
