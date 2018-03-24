@@ -9,7 +9,6 @@ import torch.optim as optim
 
 import numpy as np
 import time
-#from preprocess import *
 import itertools
 
 class ner(nn.Module):
@@ -361,8 +360,6 @@ class ner(nn.Module):
             label = eval_data_Y[batch_idx]
             current_batch_size = len(sen)
             current_sen_len = len(sen[0])
-            ###print("sentence len =", current_sen_len)
-            ###time.sleep(2)
 
             # Always clear the gradients before use
             self.zero_grad()
@@ -383,24 +380,15 @@ class ner(nn.Module):
             #label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
 
             label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell)
-            ###print("len(label_pred_seq) =", len(label_pred_seq))
-            ###print("current_batch_size =", current_batch_size)
 
             # label_pred_seq = [ Variable of shape (batch size, 1), ... ]
-
-            ###print("label_pred_seq =", label_pred_seq)
-            ###time.sleep(2)
 
             # Write results to file
             # Each element in label_pred_seq is pytorch.Variable, thus convert to list first
             # numpy array of shape (batch size, )
             label_pred_seq = [seq.data.numpy().reshape((current_batch_size, )) for seq in label_pred_seq]
-            ###print("first label_pred_seq =", label_pred_seq)
-            ###time.sleep(1)
             # list of "batch size of lists", each list has length "sen len"
             label_pred_seq = np.asarray(label_pred_seq).transpose().tolist()
-            ###print("second label_pred_seq =", label_pred_seq)
-            ###time.sleep(1)
 
             # sen, label, label_pred_seq are list of lists,
             # thus I would like to flatten them for iterating easier
@@ -409,17 +397,7 @@ class ner(nn.Module):
             label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
             assert len(sen) == len(label) and len(label) == len(label_pred_seq)
 
-            #index2word = get_index2word()
-            #index2label = get_index2label()
-
-            ###print("start...")
-            ###print(len(sen))
-
             for i in range(len(sen)):
-                ###print("===here===")
-                ###print("sen[i] =", sen[i])
-                ###print("str(sen[i]) =", str(sen[i]))
-                ###time.sleep(1)
                 f_sen.write(str(sen[i]) + '\n')
                 f_label.write(str(label[i]) + '\n')
                 f_pred.write(str(label_pred_seq[i]) + '\n')
@@ -441,71 +419,3 @@ class ner(nn.Module):
         f_pred.close()
         f_label.close()
         f_result_processed.close()
-
-    """
-    # just a copy of test() but use train data
-    def eval_on_train(self, index2word, index2label):
-        batch_num = len(self.train_X)
-        result_path = "../result/"
-
-        f_sen_train = open(result_path + "sen_train.txt", 'w')
-        f_pred_train = open(result_path + "pred_train.txt", 'w')
-        f_label_train = open(result_path + "label_train.txt", 'w')
-        f_result_processed_train = open(result_path + "result_processed_train.txt", 'w')
-
-        for batch_idx in range(batch_num):
-            sen = self.train_X[batch_idx]
-            label = self.train_Y[batch_idx]
-            current_batch_size = len(sen)
-            current_sen_len = len(sen[0])
-
-            # Always clear the gradients before use
-            self.zero_grad()
-            sen_var = Variable(torch.LongTensor(sen))
-            label_var = Variable(torch.LongTensor(label))
-
-            init_enc_hidden = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
-            init_enc_cell = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
-
-            enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
-
-            init_dec_hidden = enc_hidden_out[0]
-            init_dec_cell = enc_cell_out[0]
-
-            #beam_size = 3
-            #label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
-
-            label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell)
-
-            label_pred_seq = [seq.data.numpy().squeeze() for seq in label_pred_seq]
-            label_pred_seq = np.asarray(label_pred_seq).transpose().tolist()
-
-            sen = list(itertools.chain.from_iterable(sen))
-            label = list(itertools.chain.from_iterable(label))
-            label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
-            assert len(sen) == len(label) and len(label) == len(label_pred_seq)
-
-            index2word = get_index2word()
-            index2label = get_index2label()
-
-            for i in range(len(sen)):
-                f_sen_train.write(str(sen[i]) + '\n')
-                f_label_train.write(str(label[i]) + '\n')
-                f_pred_train.write(str(label_pred_seq[i]) + '\n')
-
-                # clean version
-                if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
-                    result_sen = index2word[sen[i]]
-                    result_label = index2label[label[i]]
-                    result_pred = index2label[label_pred_seq[i]]
-                    f_result_processed_train.write("%s %s %s\n" % (result_sen, result_label, result_pred))
-
-                elif sen[i] == 2:   # <EOS>
-                    f_result_processed_train.write('\n')
-        # End for batch_idx
-
-        f_sen_train.close()
-        f_pred_train.close()
-        f_label_train.close()
-        f_result_processed_train.close()
-    """
