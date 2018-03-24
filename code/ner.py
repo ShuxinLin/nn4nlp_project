@@ -194,7 +194,7 @@ class ner(nn.Module):
 
         # Each y is (batch size, beam size = 1) matrix,
         # and there will be T_y of them in the sequence
-        y_seq = []
+        ##y_seq = []
 
         # dec_hidden_out has shape (batch size, hidden dim)
         dec_hidden_out, dec_cell_out = \
@@ -218,11 +218,13 @@ class ner(nn.Module):
         #
         ##score, index = torch.max(score_out, 1, keepdim = True)
         _, index = torch.max(score_out, 1, keepdim = True)
-        y_seq.append(index)
+        # index.shape = (batch size, 1)
+        label_pred_seq = index
 
         # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
         for t in range(1, seq_len):
-            prev_pred_label_emb = self.label_embedding(y_seq[t - 1]) \
+            prev_pred_label_emb = \
+                self.label_embedding(label_pred_seq[:, t - 1]) \
                 .view(batch_size, self.label_embedding_dim)
             dec_hidden_out, dec_cell_out = self.decoder_cell(
                 prev_pred_label_emb,
@@ -233,10 +235,10 @@ class ner(nn.Module):
             score_out = self.hidden2score(dec_hidden_out)
 
             _, index = torch.max(score_out, 1, keepdim = True)
-            y_seq.append(index)
+            # Note that here, unlike in beam search (backtracking),
+            # we simply append next predicted label
+            label_pred_seq = torch.cat([label_pred_seq, index], dim = 1)
         # End for t
-
-        label_pred_seq = y_seq
 
         return label_pred_seq
 
@@ -345,7 +347,9 @@ class ner(nn.Module):
 
         return label_pred_seq
 
-    def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix):
+    # "beam_size = 0" will use greedy
+    # "beam_size = 1" will still use beam search, just with beam size = 1
+    def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, beam_size = 0):
         batch_num = len(eval_data_X)
         result_path = "../result/"
 
@@ -375,19 +379,13 @@ class ner(nn.Module):
             init_dec_hidden = enc_hidden_out[0]
             init_dec_cell = enc_cell_out[0]
 
-            #beam_size = 3
-            #label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+            if beam_size > 0:
+                label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+            else:
+                label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell)
 
-            label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell)
-
-            # label_pred_seq = [ Variable of shape (batch size, 1), ... ]
-
-            # Write results to file
-            # Each element in label_pred_seq is pytorch.Variable, thus convert to list first
-            # numpy array of shape (batch size, )
-            label_pred_seq = [seq.data.numpy().reshape((current_batch_size, )) for seq in label_pred_seq]
-            # list of "batch size of lists", each list has length "sen len"
-            label_pred_seq = np.asarray(label_pred_seq).transpose().tolist()
+            # Here label_pred_seq.shape = (batch size, sen len)
+            label_pred_seq = label_pred_seq.data.numpy().tolist()
 
             # sen, label, label_pred_seq are list of lists,
             # thus I would like to flatten them for iterating easier

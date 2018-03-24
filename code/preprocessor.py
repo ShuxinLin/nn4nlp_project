@@ -27,7 +27,7 @@ class Preprocessor():
         self.vocab_dict = dict()
         self.vocabulary_size = 0
         # self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<EOS>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
-        self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<BEG>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
+        self.entity_dict = {'<PAD>': 0, '<BEG>': 1, 'O': 2, 'I-LOC': 3, 'I-ORG': 4, 'I-PER': 5, 'I-MISC': 6, 'B-LOC': 7, 'B-ORG': 8, 'B-MISC': 9}
         self.entity_dict_size = len(self.entity_dict)
         self.indexed_data = None
 
