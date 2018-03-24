@@ -33,6 +33,9 @@ class ner(nn.Module):
         self.test_X = test_X
         self.test_Y = test_Y
 
+        # For now we hard code the index of "<BEG>"
+        self.BEG_INDEX = 1
+
         self.word_embedding = nn.Embedding(self.vocab_size,
                                            self.word_embedding_dim)
         self.label_embedding = nn.Embedding(self.label_size,
@@ -70,11 +73,10 @@ class ner(nn.Module):
         score_seq = []
         label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
 
-        LABEL_BEGIN_INDEX = 1
         init_label_emb = \
             self.label_embedding(
             Variable(torch.LongTensor(current_batch_size, 1).zero_() \
-            + LABEL_BEGIN_INDEX)) \
+            + self.BEG_INDEX)) \
             .view(current_batch_size, self.label_embedding_dim)
         dec_hidden_out, dec_cell_out = \
             self.decoder_cell(init_label_emb,
@@ -177,14 +179,12 @@ class ner(nn.Module):
         # Current version is as parallel to beam as possible
         # for debugging purpose.
 
-        # Sentence beginning
-        LABEL_BEGIN_INDEX = 1
         # init_label's shape => (batch size, 1),
-        # with all elements LABEL_BEGIN_INDEX
+        # with all elements self.BEG_INDEX
         init_label_emb = \
             self.label_embedding(
             Variable(torch.LongTensor(batch_size, 1).zero_()) \
-            + LABEL_BEGIN_INDEX) \
+            + self.BEG_INDEX) \
             .view(batch_size, self.label_embedding_dim)
         # init_score's shape => (batch size, 1),
         # with all elements 0
@@ -241,13 +241,12 @@ class ner(nn.Module):
         return label_pred_seq
 
     def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, beam_size):
-        LABEL_BEGIN_INDEX = 1
         # init_label's shape => (batch size, 1),
-        # with all elements LABEL_BEGIN_INDEX
+        # with all elements self.BEG_INDEX
         init_label_emb = \
             self.label_embedding(
             Variable(torch.LongTensor(batch_size, 1).zero_()) \
-            + LABEL_BEGIN_INDEX) \
+            + self.BEG_INDEX) \
             .view(batch_size, self.label_embedding_dim)
         # init_score's shape => (batch size, 1),
         # with all elements 0

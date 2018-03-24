@@ -12,6 +12,10 @@ class Preprocessor():
         self.UNK_TOKEN = '<UNK>'
         self.PAD_TOKEN = '<PAD>'
         # self.EOS_TOKEN = '<EOS>'
+
+        # Token '<BEG>' is not used during preprocessing,
+        # but will be used during decoding.
+        self.BEG_TOKEN = '<BEG>'
         self.SEP = '\t'
         self.data = None
         # self.max_sentence_length = 300
@@ -23,8 +27,8 @@ class Preprocessor():
         self.vocab_dict = dict()
         self.vocabulary_size = 0
         # self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<EOS>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
-        self.entity_dict = {'I-LOC': 5, 'B-ORG': 8, 'O': 2, '<PAD>': 0, 'I-PER': 4, 'I-MISC': 3, 'B-MISC': 7, 'I-ORG': 1, 'B-LOC': 6}
-        self.entity_dict_size = 9
+        self.entity_dict = {'I-LOC': 6, 'B-ORG': 9, 'O': 3, '<PAD>': 0, '<BEG>': 1, 'I-PER': 5, 'I-MISC': 4, 'B-MISC': 8, 'I-ORG': 2, 'B-LOC': 7}
+        self.entity_dict_size = len(self.entity_dict)
         self.indexed_data = None
 
     def read_file(self):
