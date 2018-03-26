@@ -227,7 +227,7 @@ class ner(nn.Module):
       time_end = time.time()
 
       print("epoch", epoch, ", loss =", avg_loss,
-          ", time =", time_end - time_begin)
+            ", time =", time_end - time_begin)
 
     return train_loss_list
 
