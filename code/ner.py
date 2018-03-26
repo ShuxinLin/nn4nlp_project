@@ -11,14 +11,18 @@ import numpy as np
 import time
 import itertools
 
+from attention import Attention
+from preprocessor import *
+
 class ner(nn.Module):
   def __init__(self,
-         word_embedding_dim, hidden_dim, label_embedding_dim,
-         vocab_size, label_size,
-         learning_rate=0.1, minibatch_size=1,
-         max_epoch=300,
-         train_X=None, train_Y=None,
-         test_X=None, test_Y=None):
+               word_embedding_dim, hidden_dim, label_embedding_dim,
+               vocab_size, label_size,
+               learning_rate=0.1, minibatch_size=1,
+               max_epoch=300,
+               train_X=None, train_Y=None,
+               test_X=None, test_Y=None,
+               attention="bahdanau"):
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
     self.hidden_dim = hidden_dim
@@ -36,17 +40,23 @@ class ner(nn.Module):
     # For now we hard code the index of "<BEG>"
     self.BEG_INDEX = 1
 
+    # Attention
+    if attention:
+      self.attention = Attention(attention)
+    # Otherwise no attention
+    else:
+      self.attention = None
+
     self.word_embedding = nn.Embedding(self.vocab_size,
-                       self.word_embedding_dim)
+                                       self.word_embedding_dim)
     self.label_embedding = nn.Embedding(self.label_size,
-                      self.label_embedding_dim)
+                                        self.label_embedding_dim)
 
     self.encoder = nn.LSTM(self.word_embedding_dim, self.hidden_dim)
     # Temporarily use same hidden dim for decoder
     self.decoder_cell = nn.LSTMCell(self.label_embedding_dim, self.hidden_dim)
 
     # Transform from hidden state to scores of all possible labels
-    # Is this a good model?
     self.hidden2score = nn.Linear(self.hidden_dim, self.label_size)
 
   def encode(self, sentence, init_enc_hidden, init_enc_cell):
@@ -81,6 +91,32 @@ class ner(nn.Module):
     dec_hidden_out, dec_cell_out = \
       self.decoder_cell(init_label_emb,
       (init_dec_hidden, init_dec_cell))
+
+    # Attention
+    attention_seq = []
+
+    if self.attention:
+      dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+      # This is the attention between (one time step of) decoder hidden vector
+      # and the whole sequence of the encoder hidden vectors.
+      # dec_hidden_out has shape (1, batch size, hidden dim)
+      # attention has shape (batch size, 1, input sen len)
+      # 1 means that here we only treat one hidden vector of decoder
+      dec_hidden_out, attention = \
+        self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+
+      dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+
+      # Remove the single dimension (in dim=1) that was from the fact that
+      # here we only treat one hidden vector of decoder,
+      # then append the resulting (batch size, input sen len) matrix
+      # to attention_seq, expecting that after treating all words in the
+      # output sequence, we will have attention_seq that is ready to be
+      # transformed into shape (output sen len, batch size, input sen len)
+      attention = attention.squeeze()
+      attention_seq.append(attention)
+    # End if self.attention
+
     dec_hidden_seq.append(dec_hidden_out)
     score = self.hidden2score(dec_hidden_out)
     score_seq.append(score)
@@ -89,19 +125,38 @@ class ner(nn.Module):
     for i in range(label_seq_len - 1):
       dec_hidden_out, dec_cell_out = self.decoder_cell(
         label_emb_seq[i], (dec_hidden_out, dec_cell_out))
+
+      # Attention
+      if self.attention:
+        dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+        dec_hidden_out, attention = \
+          self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+
+        dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+
+        attention = attention.squeeze()
+        attention_seq.append(attention)
+      # End if self.attention
+
       dec_hidden_seq.append(dec_hidden_out)
       score = self.hidden2score(dec_hidden_out)
       score_seq.append(score)
 
     # It could make sense to reshape decoder hidden output
     # But currently we don't use this output in later stage
-    dec_hidden_seq = torch.cat(dec_hidden_seq, dim=0).view(label_seq_len, current_batch_size, self.hidden_dim)
+    dec_hidden_seq = torch.cat(dec_hidden_seq, dim=0) \
+                     .view(label_seq_len, current_batch_size, self.hidden_dim)
+
+    # Concatenate into shape (output sen len, batch size, input sen len)
+    attention_seq = torch.cat(attention_seq, dim=0)
 
     # For score_seq, actually don't need to reshape!
-    # It happens that directly concatenate along dim = 0 gives you a convenient shape (batch_size * seq_len, label_size) for later cross entropy loss
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
     score_seq = torch.cat(score_seq, dim=0)
 
-    return dec_hidden_seq, score_seq
+    return dec_hidden_seq, score_seq, attention_seq
 
   def train(self):
     # Will manually average over (sentence_len * instance_num)
@@ -146,12 +201,16 @@ class ner(nn.Module):
         enc_hidden_seq, (enc_hidden_out, enc_cell_out) = \
           self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
+        # The semantics of enc_hidden_out is (num_layers * num_directions,
+        # batch, hidden_size), and it is "tensor containing the hidden state
+        # for t = seq_len".
         init_dec_hidden = enc_hidden_out[0]
         init_dec_cell = enc_cell_out[0]
 
-        dec_hidden_seq, score_seq = \
-          self.decode_train(label_var,
-          init_dec_hidden, init_dec_cell)
+        # Attention added
+        dec_hidden_seq, score_seq, attention_seq = \
+          self.decode_train(label_var, init_dec_hidden,
+                            init_dec_cell, enc_hidden_seq)
 
         label_var_for_loss = label_var.permute(1, 0) \
           .contiguous().view(-1)

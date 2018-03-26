@@ -72,7 +72,7 @@ class Attention(nn.Module):
       attended_dec_output = None
 
     # Return attended_dec_output, attention_energies
-    # Reshape back into Ly x B x H
+    # Reshape back into Ly x B x H, Ly x B x Lx
     return attended_dec_output.transpose(1, 0), \
            attention_energies.transpose(1, 0)
 
