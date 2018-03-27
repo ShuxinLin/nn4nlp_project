@@ -96,13 +96,13 @@ def main():
     hidden_dim = 64
     label_embedding_dim = 8
 
-    max_epoch = 100
+    max_epoch = 2
 
     machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y)
 
     # "beam_size = 0" will use greedy
     # "beam_size = 1" will still use beam search, just with beam size = 1
-    beam_size = 3
+    beam_size = 0
 
     train_loss_list = machine.train()
     machine.evaluate(train_X, train_Y, index2word, index2label, "train", beam_size)

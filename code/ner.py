@@ -260,6 +260,20 @@ class ner(nn.Module):
       self.decoder_cell(init_label_emb,
       (init_dec_hidden, init_dec_cell))
 
+    # Attention
+    attention_seq = []
+
+    if self.attention:
+      dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+      dec_hidden_out, attention = \
+        self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+
+      dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+
+      attention = attention.squeeze()
+      attention_seq.append(attention)
+    # End if self.attention
+
     # score_out.shape => (batch size, |V^y|)
     ##score_out = self.hidden2score(dec_hidden_out) + init_score
     score_out = self.hidden2score(dec_hidden_out)
@@ -289,6 +303,18 @@ class ner(nn.Module):
         prev_pred_label_emb,
         (dec_hidden_out, dec_cell_out))
 
+      # Attention
+      if self.attention:
+        dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+        dec_hidden_out, attention = \
+          self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+
+        dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+
+        attention = attention.squeeze()
+        attention_seq.append(attention)
+      # End if self.attention
+
       # For greedy, no need to add (previous) score
       ##score_out = self.hidden2score(dec_hidden_out) + score
       score_out = self.hidden2score(dec_hidden_out)
@@ -298,6 +324,8 @@ class ner(nn.Module):
       # we simply append next predicted label
       label_pred_seq = torch.cat([label_pred_seq, index], dim = 1)
     # End for t
+
+    attention_seq = torch.cat(attention_seq, dim=0)
 
     return label_pred_seq
 
