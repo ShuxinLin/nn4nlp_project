@@ -75,7 +75,7 @@ class ner(nn.Module):
 
     return enc_hidden_seq, (enc_hidden_out, enc_cell_out)
 
-  def decode_train(self, label_seq, init_dec_hidden, init_dec_cell):
+  def decode_train(self, label_seq, init_dec_hidden, init_dec_cell, enc_hidden_seq):
     # label_seq shape is (batch_size, label_seq_len)
     current_batch_size, label_seq_len = label_seq.size()
 
@@ -118,7 +118,8 @@ class ner(nn.Module):
     # End if self.attention
 
     dec_hidden_seq.append(dec_hidden_out)
-    score = self.hidden2score(dec_hidden_out)
+    score = self.hidden2score(dec_hidden_out) \
+      .view(current_batch_size, self.label_size)
     score_seq.append(score)
 
     # The rest parts of the sentence
@@ -139,7 +140,8 @@ class ner(nn.Module):
       # End if self.attention
 
       dec_hidden_seq.append(dec_hidden_out)
-      score = self.hidden2score(dec_hidden_out)
+      score = self.hidden2score(dec_hidden_out) \
+        .view(current_batch_size, self.label_size)
       score_seq.append(score)
 
     # It could make sense to reshape decoder hidden output
@@ -234,7 +236,7 @@ class ner(nn.Module):
   def write_log(self):
     pass
 
-  def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell):
+  def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq):
     # Current version is as parallel to beam as possible
     # for debugging purpose.
 
@@ -276,7 +278,8 @@ class ner(nn.Module):
 
     # score_out.shape => (batch size, |V^y|)
     ##score_out = self.hidden2score(dec_hidden_out) + init_score
-    score_out = self.hidden2score(dec_hidden_out)
+    score_out = self.hidden2score(dec_hidden_out) \
+      .view(batch_size, self.label_size)
 
     # index.shape => (batch size, 1)
     # score => same
@@ -290,6 +293,7 @@ class ner(nn.Module):
     # to each possible words in vocab)".
     #
     ##score, index = torch.max(score_out, 1, keepdim = True)
+
     _, index = torch.max(score_out, 1, keepdim = True)
     # index.shape = (batch size, 1)
     label_pred_seq = index
@@ -317,7 +321,8 @@ class ner(nn.Module):
 
       # For greedy, no need to add (previous) score
       ##score_out = self.hidden2score(dec_hidden_out) + score
-      score_out = self.hidden2score(dec_hidden_out)
+      score_out = self.hidden2score(dec_hidden_out) \
+        .view(batch_size, self.label_size)
 
       _, index = torch.max(score_out, 1, keepdim = True)
       # Note that here, unlike in beam search (backtracking),
@@ -329,7 +334,7 @@ class ner(nn.Module):
 
     return label_pred_seq
 
-  def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, beam_size):
+  def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
     init_label_emb = \
@@ -467,9 +472,9 @@ class ner(nn.Module):
       init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, beam_size)
+        label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell)
+        label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       # Here label_pred_seq.shape = (batch size, sen len)
       label_pred_seq = label_pred_seq.data.numpy().tolist()
