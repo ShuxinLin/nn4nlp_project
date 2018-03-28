@@ -45,7 +45,7 @@ class Attention(nn.Module):
     # Compute score
     attention = torch.bmm(dec_output,
                           enc_output.transpose(1,2))  # B x Ly x Lx
-    attention = attention.view(-1, Lx)  # process the whole batch at once
+    attention = attention.view(B * Ly, Lx)  # process the whole batch at once
 
     # The alpha_{ij} coefficients
     attention_energies = F.softmax(attention, dim=1)  # along 2nd dimension (Lx)
@@ -58,7 +58,7 @@ class Attention(nn.Module):
     # learn the linear transformation (W and b is combined and co-learned)
     concat_matrix = torch.cat((activated_dec_output, dec_output), dim=2)
     # Process the whole batch at once
-    concat_matrix = concat_matrix.view(-1, 2*H)
+    concat_matrix = concat_matrix.view(B * Ly, 2*H)
 
     # Activate it with tanh after multiplying with a learnable matrix
     if self.__type == 'bahdanau':

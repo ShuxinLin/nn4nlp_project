@@ -79,6 +79,8 @@ class ner(nn.Module):
     # label_seq shape is (batch_size, label_seq_len)
     current_batch_size, label_seq_len = label_seq.size()
 
+    source_seq_len = enc_hidden_seq.size()[0]
+
     dec_hidden_seq = []
     score_seq = []
     label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
@@ -93,9 +95,8 @@ class ner(nn.Module):
       (init_dec_hidden, init_dec_cell))
 
     # Attention
-    attention_seq = []
-
     if self.attention:
+      attention_seq = []
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       # This is the attention between (one time step of) decoder hidden vector
       # and the whole sequence of the encoder hidden vectors.
@@ -103,9 +104,10 @@ class ner(nn.Module):
       # attention has shape (batch size, 1, input sen len)
       # 1 means that here we only treat one hidden vector of decoder
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+        self.attention(dec_hidden_out, enc_hidden_seq)
 
-      dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+      # remove the added dim
+      dec_hidden_out = dec_hidden_out.view(current_batch_size, self.hidden_dim)
 
       # Remove the single dimension (in dim=1) that was from the fact that
       # here we only treat one hidden vector of decoder,
@@ -113,7 +115,7 @@ class ner(nn.Module):
       # to attention_seq, expecting that after treating all words in the
       # output sequence, we will have attention_seq that is ready to be
       # transformed into shape (output sen len, batch size, input sen len)
-      attention = attention.squeeze()
+      attention = attention.view(current_batch_size, source_seq_len)
       attention_seq.append(attention)
     # End if self.attention
 
@@ -131,11 +133,12 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+          self.attention(dec_hidden_out, enc_hidden_seq)
 
-        dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+        # remove the added dim
+        dec_hidden_out = dec_hidden_out.view(current_batch_size, self.hidden_dim)
 
-        attention = attention.squeeze()
+        attention = attention.view(current_batch_size, source_seq_len)
         attention_seq.append(attention)
       # End if self.attention
 
@@ -149,8 +152,12 @@ class ner(nn.Module):
     dec_hidden_seq = torch.cat(dec_hidden_seq, dim=0) \
                      .view(label_seq_len, current_batch_size, self.hidden_dim)
 
-    # Concatenate into shape (output sen len, batch size, input sen len)
-    attention_seq = torch.cat(attention_seq, dim=0)
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, input seq len)
+      attention_seq = torch.cat(attention_seq, dim=0)
+    else:
+      attention_seq = None
 
     # For score_seq, actually don't need to reshape!
     # It happens that directly concatenate along dim = 0 gives you
@@ -263,17 +270,15 @@ class ner(nn.Module):
       (init_dec_hidden, init_dec_cell))
 
     # Attention
-    attention_seq = []
-
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+        self.attention(dec_hidden_out, enc_hidden_seq)
 
-      dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+      # remove the added dim
+      dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)  
 
-      attention = attention.squeeze()
-      attention_seq.append(attention)
+      attention = attention.view(batch_size, seq_len)
     # End if self.attention
 
     # score_out.shape => (batch size, |V^y|)
@@ -298,6 +303,9 @@ class ner(nn.Module):
     # index.shape = (batch size, 1)
     label_pred_seq = index
 
+    if self.attention:
+      attention_pred_seq = [attention]
+
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       prev_pred_label_emb = \
@@ -311,12 +319,12 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq)  # 32 x 6 x 64
+          self.attention(dec_hidden_out, enc_hidden_seq)
 
-        dec_hidden_out = dec_hidden_out.squeeze()  # remove the added dim
+        # remove the added dim
+        dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
 
-        attention = attention.squeeze()
-        attention_seq.append(attention)
+        attention = attention.view(batch_size, seq_len)
       # End if self.attention
 
       # For greedy, no need to add (previous) score
@@ -328,11 +336,19 @@ class ner(nn.Module):
       # Note that here, unlike in beam search (backtracking),
       # we simply append next predicted label
       label_pred_seq = torch.cat([label_pred_seq, index], dim = 1)
+
+      if self.attention:
+        attention_pred_seq.append(attention)
     # End for t
 
-    attention_seq = torch.cat(attention_seq, dim=0)
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, input seq len)
+      attention_pred_seq = torch.stack(attention_pred_seq, dim=0)
+    else:
+      attention_pred_seq = None
 
-    return label_pred_seq
+    return label_pred_seq, attention_pred_seq
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
     # init_label's shape => (batch size, 1),
@@ -352,16 +368,46 @@ class ner(nn.Module):
     beta_seq = []
     y_seq = []
 
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      attention_seq = []
+
     # t = 0, only one input beam from init (t = -1)
     # Only one dec_hidden_out, dec_cell_out
     # => dec_hidden_out has shape (batch size, hidden dim)
     dec_hidden_out, dec_cell_out = \
       self.decoder_cell(init_label_emb,
       (init_dec_hidden, init_dec_cell))
+
+    # Attention
+    if self.attention:
+      dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+      dec_hidden_out, attention = \
+        self.attention(dec_hidden_out, enc_hidden_seq)
+
+      # remove the added dim
+      dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
+      attention = attention.view(batch_size, seq_len)
+
     # dec_hidden_beam shape => (1, batch size, hidden dim),
     # 1 because there is only 1 input beam
     dec_hidden_beam = torch.stack([dec_hidden_out], dim = 0)
     dec_cell_beam = torch.stack([dec_cell_out], dim = 0)
+
+    if self.attention:
+      # For better explanation, see in the "for t" loop below
+      #
+      # Originally attention has shape (batch size, input seq len)
+      #
+      # At t = 0, there is only 1 beam, so formally attention is actually
+      # in shape (1, batch size, input seq len), where 1 is beam size.
+      attention_beam = torch.stack([attention], dim = 0)
+
+      # We need to permute (swap) the dimensions into
+      # the shape (batch size, 1, input seq len)
+      attention_beam = attention_beam.permute(1, 0, 2)
+
     # score_out.shape => (batch size, |V^y|)
     score_out = self.hidden2score(dec_hidden_out) + init_score
     # score_matrix.shape => (batch size, |V^y| * 1)
@@ -377,6 +423,9 @@ class ner(nn.Module):
     beta_seq.append(beta_beam)
     y_seq.append(y_beam)
 
+    if self.attention:
+      attention_seq.append(attention_beam)
+
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       # We loop through beam because we expect that
@@ -384,6 +433,10 @@ class ner(nn.Module):
       dec_hidden_out_list = []
       dec_cell_out_list = []
       score_out_list = []
+
+      if self.attention:
+        attention_list =[]
+
       for b in range(beam_size):
         # Extract the b-th column of y_beam
         prev_pred_label_emb = self.label_embedding(
@@ -401,8 +454,23 @@ class ner(nn.Module):
         dec_hidden_out, dec_cell_out = self.decoder_cell(
           prev_pred_label_emb,
           (prev_dec_hidden_out, prev_dec_cell_out))
+
+        # Attention
+        if self.attention:
+          dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+          dec_hidden_out, attention = \
+            self.attention(dec_hidden_out, enc_hidden_seq)
+
+          # remove the added dim
+          dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
+          attention = attention.view(batch_size, seq_len)
+        # End if self.attention
+
         dec_hidden_out_list.append(dec_hidden_out)
         dec_cell_out_list.append(dec_cell_out)
+
+        if self.attention:
+          attention_list.append(attention)
 
         prev_score = score_beam[:, b].contiguous() \
           .view(batch_size, 1)
@@ -414,6 +482,13 @@ class ner(nn.Module):
       dec_hidden_beam = torch.stack(dec_hidden_out_list, dim = 0)
       dec_cell_beam = torch.stack(dec_cell_out_list, dim = 0)
 
+      if self.attention:
+        attention_beam = torch.stack(attention_list, dim = 0)
+        # Now attention_beam has shape (beam size, batch size, input seq len)
+        # We need to permute (swap) the dimensions into
+        # the shape (batch size, beam size, input seq len)
+        attention_beam = attention_beam.permute(1, 0, 2)
+
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
 
@@ -424,20 +499,44 @@ class ner(nn.Module):
       y_beam = torch.remainder(index_beam, self.label_size)
       beta_seq.append(beta_beam)
       y_seq.append(y_beam)
+
+      if self.attention:
+        attention_seq.append(attention_beam)
     # End for t
 
     # Only output the highest-scored beam (for each instance in the batch)
     label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
       .view(batch_size, 1)
     input_beam = beta_seq[seq_len - 1][:, 0]
+
+    if self.attention:
+      # Now attention_seq is
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      #
+      # attention_pred_seq would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, input seq len)
+      #
+      # Here we initialize the first element
+      attention_pred_seq = (attention_seq[t][range(batch_size), input_beam, :])[None, :, :]
+
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
         [y_seq[t][range(batch_size), input_beam] \
         .contiguous().view(batch_size, 1),
         label_pred_seq], dim = 1)
+
       input_beam = beta_seq[t][range(batch_size), input_beam]
 
-    return label_pred_seq
+      if self.attention:
+        attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+    # End for t
+
+    if self.attention:
+      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+    else:
+      attention_pred_seq = None
+
+    return label_pred_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
@@ -472,9 +571,9 @@ class ner(nn.Module):
       init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        label_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       # Here label_pred_seq.shape = (batch size, sen len)
       label_pred_seq = label_pred_seq.data.numpy().tolist()
