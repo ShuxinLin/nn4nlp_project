@@ -107,7 +107,9 @@ def main():
     # "beam_size = 1" will still use beam search, just with beam size = 1
     beam_size = 3
 
-    train_loss_list = machine.train()
+    shuffle = True
+
+    train_loss_list = machine.train(shuffle)
     machine.evaluate(train_X, train_Y, index2word, index2label, "train", beam_size)
     machine.evaluate(val_X, val_Y, index2word, index2label, "val", beam_size)
 

@@ -167,7 +167,7 @@ class ner(nn.Module):
 
     return dec_hidden_seq, score_seq, attention_seq
 
-  def train(self):
+  def train(self, shuffle):
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
     # Note that here we called nn.Module.parameters()
@@ -187,7 +187,11 @@ class ner(nn.Module):
       loss_sum = 0
       batch_num = len(self.train_X)
 
-      for batch_idx in range(batch_num):
+      batch_idx_list = range(batch_num)
+      if shuffle:
+        batch_idx_list = np.random.permutation(batch_idx_list)
+
+      for batch_idx in batch_idx_list:
         sen = self.train_X[batch_idx]
         label = self.train_Y[batch_idx]
 
