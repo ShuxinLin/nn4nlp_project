@@ -316,6 +316,8 @@ class ner(nn.Module):
     # Current version is as parallel to beam as possible
     # for debugging purpose.
 
+    score_seq = []
+
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
     if self.gpu:
@@ -362,6 +364,10 @@ class ner(nn.Module):
     ##score_out = self.hidden2score(dec_hidden_out) + init_score
     score_out = self.hidden2score(dec_hidden_out) \
       .view(batch_size, self.label_size)
+
+    # To output the score_seq for calculating loss function value
+    # during evaluation
+    score_seq.append(score_out)
 
     # index.shape => (batch size, 1)
     # score => same
@@ -410,6 +416,8 @@ class ner(nn.Module):
       score_out = self.hidden2score(dec_hidden_out) \
         .view(batch_size, self.label_size)
 
+      score_seq.append(score_out)
+
       _, index = torch.max(score_out, 1, keepdim = True)
       # Note that here, unlike in beam search (backtracking),
       # we simply append next predicted label
@@ -426,9 +434,18 @@ class ner(nn.Module):
     else:
       attention_pred_seq = None
 
-    return label_pred_seq, attention_pred_seq
+    # For score_seq, actually don't need to reshape!
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
+    score_seq = torch.cat(score_seq, dim=0)
+
+    return label_pred_seq, score_seq, attention_pred_seq
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
+    score_seq = []
+    # TODO: beam search part would take some effort...
+
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
     if self.gpu:
@@ -625,7 +642,7 @@ class ner(nn.Module):
     else:
       attention_pred_seq = None
 
-    return label_pred_seq, attention_pred_seq
+    return label_pred_seq, score_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
@@ -680,9 +697,11 @@ class ner(nn.Module):
       #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, score_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        label_pred_seq, score_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+
+      # TODO: Need to compute loss function value here...
 
       # Here label_pred_seq.shape = (batch size, sen len)
       if self.gpu:
