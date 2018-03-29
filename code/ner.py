@@ -22,7 +22,7 @@ class ner(nn.Module):
                max_epoch=300,
                train_X=None, train_Y=None,
                test_X=None, test_Y=None,
-               attention="bahdanau",
+               attention="fixed",
                gpu=False,
                pretrained='glove'):
 
@@ -43,14 +43,14 @@ class ner(nn.Module):
     # For now we hard code the index of "<BEG>"
     self.BEG_INDEX = 1
 
+    self.gpu = gpu
+
     # Attention
     if attention:
-      self.attention = Attention(attention)
+      self.attention = Attention(attention, self.hidden_dim, self.gpu)
     # Otherwise no attention
     else:
       self.attention = None
-
-    self.gpu = gpu
 
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
@@ -61,9 +61,21 @@ class ner(nn.Module):
     self.label_embedding = nn.Embedding(self.label_size,
                                         self.label_embedding_dim)
 
-    self.encoder = nn.LSTM(self.word_embedding_dim, self.hidden_dim)
+    self.encoder = nn.LSTM(input_size=self.word_embedding_dim,
+                           hidden_size=self.hidden_dim,
+                           bidirectional=True)
+
+    # The semantics of enc_hidden_out is (num_layers * num_directions,
+    # batch, hidden_size), and it is "tensor containing the hidden state
+    # for t = seq_len".
+    #
+    # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+    self.enc2dec_hidden = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
+    self.enc2dec_cell = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
+
     # Temporarily use same hidden dim for decoder
-    self.decoder_cell = nn.LSTMCell(self.label_embedding_dim, self.hidden_dim)
+    self.decoder_cell = nn.LSTMCell(self.label_embedding_dim,
+                                    self.hidden_dim)
 
     # Transform from hidden state to scores of all possible labels
     self.hidden2score = nn.Linear(self.hidden_dim, self.label_size)
@@ -73,17 +85,31 @@ class ner(nn.Module):
     sentence_emb = self.word_embedding(sentence)
     current_batch_size, sentence_len = sentence.size()
 
+    # Input:
+    # init_enc_hidden, init_enc_cell shape are both
+    # (num_layers * num_directions, batch_size, hidden_size)
+    #
+    # Output:
     # enc_hidden_seq shape is (seq_len, batch_size, hidden_dim * num_directions)
     # num_directions = 2 for bi-directional LSTM
+    # So assume that the 2 hidden vectors coming from the 2 directions
+    # are already concatenated.
     #
     # enc_hidden_out shape is (num_layers * num_directions, batch_size, hidden_dim)
     # We use 1-layer here
+    # Assume the 0-th dimension is: [forward, backward] final hidden states
     enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encoder(
       sentence_emb.view((sentence_len, current_batch_size, self.word_embedding_dim)),
       (init_enc_hidden, init_enc_cell))
 
     return enc_hidden_seq, (enc_hidden_out, enc_cell_out)
 
+  # enc_hidden_seq shape is (seq_len, batch_size, hidden_dim * num_directions)
+  # num_directions = 2 for bi-directional LSTM
+  # So assume that the 2 hidden vectors coming from the 2 directions
+  # are already concatenated.
+  #
+  # init_dec_hidden, init_dec_cell are both (batch_size, hidden_dim)
   def decode_train(self, label_seq, init_dec_hidden, init_dec_cell, enc_hidden_seq):
     # label_seq shape is (batch_size, label_seq_len)
     current_batch_size, label_seq_len = label_seq.size()
@@ -121,7 +147,8 @@ class ner(nn.Module):
       # attention has shape (batch size, 1, input sen len)
       # 1 means that here we only treat one hidden vector of decoder
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0)
+      # 0 because we are now at "t=0"
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(current_batch_size, self.hidden_dim)
@@ -150,7 +177,8 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq)
+          self.attention(dec_hidden_out, enc_hidden_seq, i + 1)
+        # i + 1 because now i is actually "t-1", and we need to input "t"
 
         # remove the added dim
         dec_hidden_out = dec_hidden_out.view(current_batch_size, self.hidden_dim)
@@ -226,11 +254,14 @@ class ner(nn.Module):
           label_var = label_var.cuda()
 
         # Initialize the hidden and cell states
-        # The axes semantics are (num_layers, minibatch_size, hidden_dim)
+        # The axes semantics are
+        # (num_layers * num_directions, batch_size, hidden_size)
+        # So 1 for single-directional LSTM encoder,
+        # 2 for bi-directional LSTM encoder.
         init_enc_hidden = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim))
+          torch.zeros(2, current_batch_size, self.hidden_dim))
         init_enc_cell = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim))
+          torch.zeros(2, current_batch_size, self.hidden_dim))
 
         if self.gpu:
           init_enc_hidden = init_enc_hidden.cuda()
@@ -242,8 +273,13 @@ class ner(nn.Module):
         # The semantics of enc_hidden_out is (num_layers * num_directions,
         # batch, hidden_size), and it is "tensor containing the hidden state
         # for t = seq_len".
-        init_dec_hidden = enc_hidden_out[0]
-        init_dec_cell = enc_cell_out[0]
+        #
+        # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+        init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
+        init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
+
+        #init_dec_hidden = enc_hidden_out[0]
+        #init_dec_cell = enc_cell_out[0]
 
         # Attention added
         dec_hidden_seq, score_seq, attention_seq = \
@@ -314,7 +350,7 @@ class ner(nn.Module):
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0)
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)  
@@ -360,7 +396,8 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq)
+          self.attention(dec_hidden_out, enc_hidden_seq, t)
+        # Here we use t because it is the correct time step
 
         # remove the added dim
         dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -436,7 +473,7 @@ class ner(nn.Module):
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0)
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -511,7 +548,7 @@ class ner(nn.Module):
         if self.attention:
           dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
           dec_hidden_out, attention = \
-            self.attention(dec_hidden_out, enc_hidden_seq)
+            self.attention(dec_hidden_out, enc_hidden_seq, t)
 
           # remove the added dim
           dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -618,9 +655,12 @@ class ner(nn.Module):
         label_var = label_var.cuda()
 
       # Initialize the hidden and cell states
-      # The axes semantics are (num_layers, minibatch_size, hidden_dim)
-      init_enc_hidden = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
-      init_enc_cell = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
+      # The axes semantics are
+      # (num_layers * num_directions, batch_size, hidden_size)
+      # So 1 for single-directional LSTM encoder,
+      # 2 for bi-directional LSTM encoder.
+      init_enc_hidden = Variable(torch.zeros((2, current_batch_size, self.hidden_dim)))
+      init_enc_cell = Variable(torch.zeros((2, current_batch_size, self.hidden_dim)))
 
       if self.gpu:
         init_enc_hidden = init_enc_hidden.cuda()
@@ -628,8 +668,16 @@ class ner(nn.Module):
 
       enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
-      init_dec_hidden = enc_hidden_out[0]
-      init_dec_cell = enc_cell_out[0]
+      # The semantics of enc_hidden_out is (num_layers * num_directions,
+      # batch, hidden_size), and it is "tensor containing the hidden state
+      # for t = seq_len".
+      #
+      # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+      init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
+      init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
+
+      #init_dec_hidden = enc_hidden_out[0]
+      #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
         label_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)

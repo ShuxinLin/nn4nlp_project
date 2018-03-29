@@ -117,16 +117,17 @@ def main():
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
 
-  hidden_dim = 64
+  #hidden_dim = 64
+  hidden_dim = 6
   label_embedding_dim = 8
 
-  max_epoch = 1000
+  max_epoch = 2
 
   # 0.001 is a good value
   learning_rate = 0.001
 
-  #attention = "bahdanau"
-  attention = None
+  attention = "fixed"
+  #attention = None
 
   pretrained = 'glove'
 
@@ -138,7 +139,7 @@ def main():
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  beam_size = 0
+  beam_size = 3
 
   shuffle = True
 
