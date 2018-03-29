@@ -245,11 +245,14 @@ class ner(nn.Module):
           label_var = label_var.cuda()
 
         # Initialize the hidden and cell states
-        # The axes semantics are (num_layers, minibatch_size, hidden_dim)
+        # The axes semantics are
+        # (num_layers * num_directions, batch_size, hidden_size)
+        # So 1 for single-directional LSTM encoder,
+        # 2 for bi-directional LSTM encoder.
         init_enc_hidden = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim))
+          torch.zeros(2, current_batch_size, self.hidden_dim))
         init_enc_cell = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim))
+          torch.zeros(2, current_batch_size, self.hidden_dim))
 
         if self.gpu:
           init_enc_hidden = init_enc_hidden.cuda()
@@ -263,10 +266,7 @@ class ner(nn.Module):
         # for t = seq_len".
         #
         # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
-        init_dec_hidden = self.enc2dec_layer(torch.cat(enc_hidden_out, dim=1))
-        print("enc_hidden_out=",enc_hidden_out)
-        print("init_dec_hidden=",init_dec_hidden)
-        time.sleep(2)
+        init_dec_hidden = self.enc2dec_layer(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
 
         init_dec_hidden = enc_hidden_out[0]
         init_dec_cell = enc_cell_out[0]
@@ -644,9 +644,12 @@ class ner(nn.Module):
         label_var = label_var.cuda()
 
       # Initialize the hidden and cell states
-      # The axes semantics are (num_layers, minibatch_size, hidden_dim)
-      init_enc_hidden = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
-      init_enc_cell = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
+      # The axes semantics are
+      # (num_layers * num_directions, batch_size, hidden_size)
+      # So 1 for single-directional LSTM encoder,
+      # 2 for bi-directional LSTM encoder.
+      init_enc_hidden = Variable(torch.zeros((2, current_batch_size, self.hidden_dim)))
+      init_enc_cell = Variable(torch.zeros((2, current_batch_size, self.hidden_dim)))
 
       if self.gpu:
         init_enc_hidden = init_enc_hidden.cuda()
