@@ -6,9 +6,11 @@ import torch.nn.functional as F
 
 from torch import nn
 
+from torch.autograd import Variable
+
 
 class Attention(nn.Module):
-  def __init__(self, type='bahdanau', hidden_dim):
+  def __init__(self, type, hidden_dim, gpu):
     super(Attention, self).__init__()
 
     if type.lower() == 'bahdanau':
@@ -24,6 +26,8 @@ class Attention(nn.Module):
       self.fixed_layer = nn.Linear(3 * hidden_dim, hidden_dim)
     else:
       raise ValueError("Not supported attention type!")
+
+    self.gpu = gpu
 
   def forward(self, dec_output, enc_output, index):
     """
@@ -73,6 +77,12 @@ class Attention(nn.Module):
       # Actually Ly = 1
       # In fixed attention, concatenate the (B x 1 x 2H) context vector with the original decoder output (B x 1 x H) together
       activated_dec_output = enc_output
+
+      attention_energies = Variable(torch.zeros(B, Ly, Lx))
+      if self.gpu:
+        attention_energies = attention_energies.cuda()
+
+      attention_energies[:, :, index] = 1
 
     # WA + b is same as concat this activated_out and the original one and
     # learn the linear transformation (W and b is combined and co-learned)

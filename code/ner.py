@@ -43,14 +43,14 @@ class ner(nn.Module):
     # For now we hard code the index of "<BEG>"
     self.BEG_INDEX = 1
 
+    self.gpu = gpu
+
     # Attention
     if attention:
-      self.attention = Attention(attention, self.hidden_dim)
+      self.attention = Attention(attention, self.hidden_dim, self.gpu)
     # Otherwise no attention
     else:
       self.attention = None
-
-    self.gpu = gpu
 
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
