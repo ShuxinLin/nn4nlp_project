@@ -1,7 +1,12 @@
 #!/usr/bin/python3
 
 import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
+
 from operator import itemgetter
 import collections
 from ner import ner
