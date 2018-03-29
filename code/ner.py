@@ -629,9 +629,9 @@ class ner(nn.Module):
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, beam_size = 0):
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, beam_size, result_path):
     batch_num = len(eval_data_X)
-    result_path = "../result/"
+    #result_path = "../result/"
 
     f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
     f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
