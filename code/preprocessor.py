@@ -60,7 +60,7 @@ class Preprocessor():
           inside_sentence = False     # end of processing one sentence
       self.data = pd.DataFrame(data=all_examples, columns=['SENTENCE', 'POS', 'CHUNK', 'ENTITY'])
 
-  def preprocess(self, columns_to_process=['SENTENCE', 'ENTITY']):
+  def preprocess(self, columns_to_process=['SENTENCE', 'ENTITY'], save_file=True):
     new_data = self.data.loc[self.data['SENTENCE'].str.len() <= self.max_sentence_length].copy()
     if 'SENTENCE' in columns_to_process:
       new_data['SENTENCE'] = new_data['SENTENCE'].apply(lambda x: self._preprocess_sentence(x))
@@ -69,20 +69,26 @@ class Preprocessor():
 
     self.new_data = new_data.loc[:, columns_to_process]
     self.data_size = self.new_data.shape[0]
-    for column in columns_to_process:
-      preprocessed_file = self.path + 'processed_' + column + '_' + self.filename
-      self.new_data.loc[:, [column]].to_csv(preprocessed_file, sep=self.SEP, index=False, quoting=csv.QUOTE_NONE)
-    print('Successfully saved preprocessed file')
 
-  def index_preprocess(self, columns_to_process=['SENTENCE', 'ENTITY']):
+    if save_file:
+      for column in columns_to_process:
+        preprocessed_file = self.path + 'processed_' + column + '_' + self.filename
+        self.new_data.loc[:, [column]].to_csv(preprocessed_file, sep=self.SEP, index=False, quoting=csv.QUOTE_NONE)
+      print('Successfully saved preprocessed file')
+    print("Preprocessed file")
+
+  def index_preprocess(self, columns_to_process=['SENTENCE', 'ENTITY'], save_file=True):
     indexed_data = self.new_data.copy()
     indexed_data['SENTENCE'] = indexed_data['SENTENCE'].apply(lambda x: self._index_sentence(x))
     indexed_data['ENTITY'] = indexed_data['ENTITY'].apply(lambda x: self._index_entity(x))
     self.indexed_data = indexed_data
-    for column in columns_to_process:
-      indexed_file = self.path + 'indexed_' + column + '_' + self.filename
-      self.indexed_data.loc[:, [column]].to_csv(indexed_file, sep=self.SEP, index=False, quoting=csv.QUOTE_NONE)
-    print('Successfully saved indexed_file file')
+
+    if save_file:
+      for column in columns_to_process:
+        indexed_file = self.path + 'indexed_' + column + '_' + self.filename
+        self.indexed_data.loc[:, [column]].to_csv(indexed_file, sep=self.SEP, index=False, quoting=csv.QUOTE_NONE)
+      print('Successfully saved indexed_file file')
+    print("Preprocessed indexed_file file")
 
   def _index_sentence(self, sentence):
     words = sentence.split()
