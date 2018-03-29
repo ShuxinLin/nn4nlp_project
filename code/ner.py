@@ -276,14 +276,18 @@ class ner(nn.Module):
 
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(batch_size, 1).zero_()) \
-      + self.BEG_INDEX) \
-      .view(batch_size, self.label_embedding_dim)
-
     if self.gpu:
-      init_label_emb = init_label_emb.cuda()
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
+    else:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()) \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
 
     # init_score's shape => (batch size, 1),
     # with all elements 0
@@ -384,14 +388,18 @@ class ner(nn.Module):
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(batch_size, 1).zero_()) \
-      + self.BEG_INDEX) \
-      .view(batch_size, self.label_embedding_dim)
-
     if self.gpu:
-      init_label_emb = init_label_emb.cuda()
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
+    else:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()) \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
 
     # init_score's shape => (batch size, 1),
     # with all elements 0
