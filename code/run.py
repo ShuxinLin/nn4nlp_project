@@ -78,10 +78,13 @@ def get_index2label(entity_dict):
 def main():
     data_path = "../dataset/CoNLL-2003/"
     train_file = "eng.train"
-    #train_file = "eng.testa.nano.txt"
     val_file = "eng.testa"
+
+    #train_file = "eng.testa.nano.txt"
     #val_file = "eng.testa.nano.txt"
+
     #test_file = "eng.testb"
+
     result_path = "../result/"
 
     batch_size = 32
@@ -96,16 +99,19 @@ def main():
     hidden_dim = 64
     label_embedding_dim = 8
 
-    max_epoch = 4
+    max_epoch = 100
 
-    attention = "bahdanau"
-    #attention = None
+    #attention = "bahdanau"
+    attention = None
 
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention)
+    #machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention)
+
+    # For GPU
+    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=0.01, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention).cuda()
 
     # "beam_size = 0" will use greedy
     # "beam_size = 1" will still use beam search, just with beam size = 1
-    beam_size = 3
+    beam_size = 0
 
     shuffle = True
 
@@ -121,7 +127,7 @@ def main():
     #plt.ylim([0, 0.5])
     plt.xlabel("Epoch")
     plt.ylabel("Cross-entropy loss")
-    plt.savefig("fig_exp1.pdf")
+    plt.savefig(result_path + "fig_exp1.pdf")
 
 if __name__ == "__main__":
     main()
