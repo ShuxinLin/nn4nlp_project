@@ -22,7 +22,7 @@ class ner(nn.Module):
                max_epoch=300,
                train_X=None, train_Y=None,
                test_X=None, test_Y=None,
-               attention="bahdanau",
+               attention="fixed",
                gpu=False,
                pretrained='glove'):
 
@@ -45,7 +45,7 @@ class ner(nn.Module):
 
     # Attention
     if attention:
-      self.attention = Attention(attention)
+      self.attention = Attention(attention, self.hidden_dim)
     # Otherwise no attention
     else:
       self.attention = None
@@ -70,7 +70,8 @@ class ner(nn.Module):
     # for t = seq_len".
     #
     # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
-    self.enc2dec_layer = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
+    self.enc2dec_hidden = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
+    self.enc2dec_cell = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
 
     # Temporarily use same hidden dim for decoder
     self.decoder_cell = nn.LSTMCell(self.label_embedding_dim,
@@ -103,6 +104,12 @@ class ner(nn.Module):
 
     return enc_hidden_seq, (enc_hidden_out, enc_cell_out)
 
+  # enc_hidden_seq shape is (seq_len, batch_size, hidden_dim * num_directions)
+  # num_directions = 2 for bi-directional LSTM
+  # So assume that the 2 hidden vectors coming from the 2 directions
+  # are already concatenated.
+  #
+  # init_dec_hidden, init_dec_cell are both (batch_size, hidden_dim)
   def decode_train(self, label_seq, init_dec_hidden, init_dec_cell, enc_hidden_seq):
     # label_seq shape is (batch_size, label_seq_len)
     current_batch_size, label_seq_len = label_seq.size()
@@ -140,7 +147,8 @@ class ner(nn.Module):
       # attention has shape (batch size, 1, input sen len)
       # 1 means that here we only treat one hidden vector of decoder
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0)
+      # 0 because we are now at "t=0"
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(current_batch_size, self.hidden_dim)
@@ -169,7 +177,8 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq)
+          self.attention(dec_hidden_out, enc_hidden_seq, i + 1)
+        # i + 1 because now i is actually "t-1", and we need to input "t"
 
         # remove the added dim
         dec_hidden_out = dec_hidden_out.view(current_batch_size, self.hidden_dim)
@@ -266,10 +275,11 @@ class ner(nn.Module):
         # for t = seq_len".
         #
         # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
-        init_dec_hidden = self.enc2dec_layer(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
+        init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
+        init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
 
-        init_dec_hidden = enc_hidden_out[0]
-        init_dec_cell = enc_cell_out[0]
+        #init_dec_hidden = enc_hidden_out[0]
+        #init_dec_cell = enc_cell_out[0]
 
         # Attention added
         dec_hidden_seq, score_seq, attention_seq = \
@@ -340,7 +350,7 @@ class ner(nn.Module):
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0)
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)  
@@ -386,7 +396,8 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq)
+          self.attention(dec_hidden_out, enc_hidden_seq, t)
+        # Here we use t because it is the correct time step
 
         # remove the added dim
         dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -462,7 +473,7 @@ class ner(nn.Module):
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0)
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -537,7 +548,7 @@ class ner(nn.Module):
         if self.attention:
           dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
           dec_hidden_out, attention = \
-            self.attention(dec_hidden_out, enc_hidden_seq)
+            self.attention(dec_hidden_out, enc_hidden_seq, t)
 
           # remove the added dim
           dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -657,8 +668,16 @@ class ner(nn.Module):
 
       enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
-      init_dec_hidden = enc_hidden_out[0]
-      init_dec_cell = enc_cell_out[0]
+      # The semantics of enc_hidden_out is (num_layers * num_directions,
+      # batch, hidden_size), and it is "tensor containing the hidden state
+      # for t = seq_len".
+      #
+      # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+      init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
+      init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
+
+      #init_dec_hidden = enc_hidden_out[0]
+      #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
         label_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)

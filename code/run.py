@@ -126,7 +126,7 @@ def main():
   # 0.001 is a good value
   learning_rate = 0.001
 
-  #attention = "bahdanau"
+  #attention = "fixed"
   attention = None
 
   pretrained = 'glove'
