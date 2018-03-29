@@ -22,7 +22,8 @@ class ner(nn.Module):
                max_epoch=300,
                train_X=None, train_Y=None,
                test_X=None, test_Y=None,
-               attention="bahdanau"):
+               attention="bahdanau",
+               pretrained='glove'):
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
     self.hidden_dim = hidden_dim
@@ -50,7 +51,7 @@ class ner(nn.Module):
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
 
-    word_embedding_np = np.loadtxt('../dataset/word2vec_embed.txt', dtype=float)    # load pretrained word2vec
+    word_embedding_np = np.loadtxt('../dataset/CoNLL-2003/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
     self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
 
     self.label_embedding = nn.Embedding(self.label_size,
