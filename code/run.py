@@ -124,6 +124,7 @@ def main():
 
   #attention = "bahdanau"
   attention = None
+
   pretrained = 'glove'
 
   gpu = True
