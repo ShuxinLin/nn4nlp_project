@@ -249,7 +249,13 @@ class ner(nn.Module):
           .contiguous().view(-1)
 
         loss = loss_function(score_seq, label_var_for_loss)
+        
+        #loss_sum += loss.data.numpy()[0] / current_sen_len
+
+        # For GPU
+        loss = loss.cpu()
         loss_sum += loss.data.numpy()[0] / current_sen_len
+        
         loss.backward()
         optimizer.step()
       # for batch_idx
