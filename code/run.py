@@ -12,6 +12,8 @@ import collections
 from ner import ner
 from preprocessor import Preprocessor
 
+import os
+
 def prepocess(data_path, train, val, batch_size):
   train_preprocessor = Preprocessor(data_path, train)
   train_preprocessor.read_file()
