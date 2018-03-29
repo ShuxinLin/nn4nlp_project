@@ -22,7 +22,8 @@ class ner(nn.Module):
                max_epoch=300,
                train_X=None, train_Y=None,
                test_X=None, test_Y=None,
-               attention="bahdanau"):
+               attention="bahdanau",
+               gpu=False):
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
     self.hidden_dim = hidden_dim
@@ -46,6 +47,8 @@ class ner(nn.Module):
     # Otherwise no attention
     else:
       self.attention = None
+
+    self.gpu = gpu
 
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
@@ -85,20 +88,18 @@ class ner(nn.Module):
     score_seq = []
     label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
 
-    """
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(current_batch_size, 1).zero_() \
-      + self.BEG_INDEX)) \
-      .view(current_batch_size, self.label_embedding_dim)
-    """
-
-    # For GPU
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(current_batch_size, 1).zero_() \
-      + self.BEG_INDEX).cuda()) \
-      .view(current_batch_size, self.label_embedding_dim)
+    if self.gpu:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(current_batch_size, 1).zero_() \
+        + self.BEG_INDEX).cuda()) \
+        .view(current_batch_size, self.label_embedding_dim)
+    else:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(current_batch_size, 1).zero_() \
+        + self.BEG_INDEX)) \
+        .view(current_batch_size, self.label_embedding_dim)
 
     dec_hidden_out, dec_cell_out = \
       self.decoder_cell(init_label_emb,
@@ -211,25 +212,25 @@ class ner(nn.Module):
         # Always clear the gradients before use
         self.zero_grad()
 
-        #sen_var = Variable(torch.LongTensor(sen))
-        #label_var = Variable(torch.LongTensor(label))
-        # For GPU
-        sen_var = Variable(torch.LongTensor(sen)).cuda()
-        label_var = Variable(torch.LongTensor(label)).cuda()
+        if self.gpu:
+          sen_var = Variable(torch.LongTensor(sen)).cuda()
+          label_var = Variable(torch.LongTensor(label)).cuda()
+        else:
+          sen_var = Variable(torch.LongTensor(sen))
+          label_var = Variable(torch.LongTensor(label))
 
         # Initialize the hidden and cell states
         # The axes semantics are (num_layers, minibatch_size, hidden_dim)
-        """
-        init_enc_hidden = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim))
-        init_enc_cell = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim))
-        """
-        # For GPU
-        init_enc_hidden = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim)).cuda()
-        init_enc_cell = Variable(
-          torch.zeros(1, current_batch_size, self.hidden_dim)).cuda()
+        if self.gpu:
+          init_enc_hidden = Variable(
+            torch.zeros(1, current_batch_size, self.hidden_dim)).cuda()
+          init_enc_cell = Variable(
+            torch.zeros(1, current_batch_size, self.hidden_dim)).cuda()
+        else:
+          init_enc_hidden = Variable(
+            torch.zeros(1, current_batch_size, self.hidden_dim))
+          init_enc_cell = Variable(
+            torch.zeros(1, current_batch_size, self.hidden_dim))
 
         enc_hidden_seq, (enc_hidden_out, enc_cell_out) = \
           self.encode(sen_var, init_enc_hidden, init_enc_cell)
@@ -250,10 +251,9 @@ class ner(nn.Module):
 
         loss = loss_function(score_seq, label_var_for_loss)
         
-        #loss_sum += loss.data.numpy()[0] / current_sen_len
+        if self.gpu:
+          loss = loss.cpu()
 
-        # For GPU
-        loss = loss.cpu()
         loss_sum += loss.data.numpy()[0] / current_sen_len
         
         loss.backward()
@@ -279,19 +279,18 @@ class ner(nn.Module):
 
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
-    """
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(batch_size, 1).zero_()) \
-      + self.BEG_INDEX) \
-      .view(batch_size, self.label_embedding_dim)
-    """
-    # For GPU
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
-      + self.BEG_INDEX) \
-      .view(batch_size, self.label_embedding_dim)
+    if self.gpu:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
+    else:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()) \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
 
     # init_score's shape => (batch size, 1),
     # with all elements 0
@@ -392,27 +391,21 @@ class ner(nn.Module):
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
-    """
     init_label_emb = \
       self.label_embedding(
       Variable(torch.LongTensor(batch_size, 1).zero_()) \
       + self.BEG_INDEX) \
       .view(batch_size, self.label_embedding_dim)
-    """
 
-    # For GPU
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
-      + self.BEG_INDEX) \
-      .view(batch_size, self.label_embedding_dim)
+    if self.gpu:
+      init_label_emb = init_label_emb.cuda()
 
     # init_score's shape => (batch size, 1),
     # with all elements 0
-    #init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
+    init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
 
-    # For GPU
-    init_score = Variable(torch.FloatTensor(batch_size, 1).zero_()).cuda()
+    if self.gpu:
+      init_score = init_score.cuda()
 
     # Each beta is (batch size, beam size) matrix,
     # and there will be T_y of them in the sequence
@@ -610,21 +603,21 @@ class ner(nn.Module):
       # Always clear the gradients before use
       self.zero_grad()
 
-      #sen_var = Variable(torch.LongTensor(sen))
-      #label_var = Variable(torch.LongTensor(label))
+      sen_var = Variable(torch.LongTensor(sen))
+      label_var = Variable(torch.LongTensor(label))
 
-      # For GPU
-      sen_var = Variable(torch.LongTensor(sen)).cuda()
-      label_var = Variable(torch.LongTensor(label)).cuda()
+      if self.gpu:
+        sen_var = sen_var.cuda()
+        label_var = label_var.cuda()
 
       # Initialize the hidden and cell states
       # The axes semantics are (num_layers, minibatch_size, hidden_dim)
-      #init_enc_hidden = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
-      #init_enc_cell = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
+      init_enc_hidden = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
+      init_enc_cell = Variable(torch.zeros((1, current_batch_size, self.hidden_dim)))
 
-      # For GPU
-      init_enc_hidden = Variable(torch.zeros((1, current_batch_size, self.hidden_dim))).cuda()
-      init_enc_cell = Variable(torch.zeros((1, current_batch_size, self.hidden_dim))).cuda()
+      if self.gpu:
+        init_enc_hidden = init_enc_hidden.cuda()
+        init_enc_cell = init_enc_cell.cuda()
 
       enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
@@ -637,10 +630,9 @@ class ner(nn.Module):
         label_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       # Here label_pred_seq.shape = (batch size, sen len)
-      #label_pred_seq = label_pred_seq.data.numpy().tolist()
+      if self.gpu:
+        label_pred_seq = label_pred_seq.cpu()
 
-      # For GPU
-      label_pred_seq = label_pred_seq.cpu()
       label_pred_seq = label_pred_seq.data.numpy().tolist()
 
       # sen, label, label_pred_seq are list of lists,
