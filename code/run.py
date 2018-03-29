@@ -106,6 +106,9 @@ def main():
 
   result_path = "../result/"
 
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
+
   batch_size = 32
 
   train_X, train_Y, val_X, val_Y, vocab_size, label_size, entity_dict = prepocess(data_path, train_file, val_file, batch_size)
