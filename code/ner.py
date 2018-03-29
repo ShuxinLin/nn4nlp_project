@@ -88,14 +88,18 @@ class ner(nn.Module):
     score_seq = []
     label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
 
-    init_label_emb = \
-      self.label_embedding(
-      Variable(torch.LongTensor(current_batch_size, 1).zero_() \
-      + self.BEG_INDEX)) \
-      .view(current_batch_size, self.label_embedding_dim)
-
     if self.gpu:
-      init_label_emb = init_label_emb.cuda()
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(current_batch_size, 1).zero_() \
+        + self.BEG_INDEX).cuda()) \
+        .view(current_batch_size, self.label_embedding_dim)
+    else:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(current_batch_size, 1).zero_() \
+        + self.BEG_INDEX)) \
+        .view(current_batch_size, self.label_embedding_dim)
 
     dec_hidden_out, dec_cell_out = \
       self.decoder_cell(init_label_emb,
