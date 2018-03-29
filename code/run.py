@@ -117,7 +117,8 @@ def main():
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
 
-  hidden_dim = 64
+  #hidden_dim = 64
+  hidden_dim = 6
   label_embedding_dim = 8
 
   max_epoch = 500
@@ -130,7 +131,7 @@ def main():
 
   pretrained = 'glove'
 
-  gpu = True
+  gpu = False
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:

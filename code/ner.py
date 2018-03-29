@@ -61,9 +61,20 @@ class ner(nn.Module):
     self.label_embedding = nn.Embedding(self.label_size,
                                         self.label_embedding_dim)
 
-    self.encoder = nn.LSTM(self.word_embedding_dim, self.hidden_dim)
+    self.encoder = nn.LSTM(input_size=self.word_embedding_dim,
+                           hidden_size=self.hidden_dim,
+                           bidirectional=True)
+
+    # The semantics of enc_hidden_out is (num_layers * num_directions,
+    # batch, hidden_size), and it is "tensor containing the hidden state
+    # for t = seq_len".
+    #
+    # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+    self.enc2dec_layer = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
+
     # Temporarily use same hidden dim for decoder
-    self.decoder_cell = nn.LSTMCell(self.label_embedding_dim, self.hidden_dim)
+    self.decoder_cell = nn.LSTMCell(self.label_embedding_dim,
+                                    self.hidden_dim)
 
     # Transform from hidden state to scores of all possible labels
     self.hidden2score = nn.Linear(self.hidden_dim, self.label_size)
@@ -73,11 +84,19 @@ class ner(nn.Module):
     sentence_emb = self.word_embedding(sentence)
     current_batch_size, sentence_len = sentence.size()
 
+    # Input:
+    # init_enc_hidden, init_enc_cell shape are both
+    # (num_layers * num_directions, batch_size, hidden_size)
+    #
+    # Output:
     # enc_hidden_seq shape is (seq_len, batch_size, hidden_dim * num_directions)
     # num_directions = 2 for bi-directional LSTM
+    # So assume that the 2 hidden vectors coming from the 2 directions
+    # are already concatenated.
     #
     # enc_hidden_out shape is (num_layers * num_directions, batch_size, hidden_dim)
     # We use 1-layer here
+    # Assume the 0-th dimension is: [forward, backward] final hidden states
     enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encoder(
       sentence_emb.view((sentence_len, current_batch_size, self.word_embedding_dim)),
       (init_enc_hidden, init_enc_cell))
@@ -242,6 +261,13 @@ class ner(nn.Module):
         # The semantics of enc_hidden_out is (num_layers * num_directions,
         # batch, hidden_size), and it is "tensor containing the hidden state
         # for t = seq_len".
+        #
+        # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+        init_dec_hidden = self.enc2dec_layer(torch.cat(enc_hidden_out, dim=1))
+        print("enc_hidden_out=",enc_hidden_out)
+        print("init_dec_hidden=",init_dec_hidden)
+        time.sleep(2)
+
         init_dec_hidden = enc_hidden_out[0]
         init_dec_cell = enc_cell_out[0]
 
