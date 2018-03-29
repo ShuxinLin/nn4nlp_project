@@ -637,6 +637,10 @@ class ner(nn.Module):
         label_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       # Here label_pred_seq.shape = (batch size, sen len)
+      #label_pred_seq = label_pred_seq.data.numpy().tolist()
+
+      # For GPU
+      label_pred_seq = label_pred_seq.cpu()
       label_pred_seq = label_pred_seq.data.numpy().tolist()
 
       # sen, label, label_pred_seq are list of lists,

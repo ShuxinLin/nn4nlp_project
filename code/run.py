@@ -99,7 +99,7 @@ def main():
     hidden_dim = 64
     label_embedding_dim = 8
 
-    max_epoch = 100
+    max_epoch = 10
 
     #attention = "bahdanau"
     attention = None
