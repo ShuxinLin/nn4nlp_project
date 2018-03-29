@@ -21,7 +21,8 @@ def prepocess(data_path, train, val, batch_size):
   val_preprocessor.read_file()
   val_preprocessor.preprocess()
 
-  build_vocab(data_path, train_preprocessor, val_preprocessor)
+  load_vocab(data_path + "vocab_dict", train_preprocessor, val_preprocessor)
+  # build_vocab(data_path, train_preprocessor, val_preprocessor)
 
   train_preprocessor.index_preprocess()
   train_X, train_Y = train_preprocessor.minibatch(batch_size)
@@ -33,6 +34,19 @@ def prepocess(data_path, train, val, batch_size):
   entity_dict = train_preprocessor.entity_dict
 
   return train_X, train_Y, val_X, val_Y, vocab_size, label_size, entity_dict
+
+
+def load_vocab(vocab_path, train_preprocessor, val_preprocessor):
+    vocab_dict = dict()
+    with open(vocab_path) as f:
+        for line in f:
+            splitted = line.split('\t')
+            vocab_dict[splitted[0]] = int(splitted[1])
+
+    train_preprocessor.vocab_dict = val_preprocessor.vocab_dict = vocab_dict
+    train_preprocessor.vocabulary_size = val_preprocessor.vocabulary_size = len(vocab_dict)
+    print("Loaded the existing vocabulary dictionary. vocab_size: ", len(vocab_dict))
+
 
 def build_vocab(data_path, train_preprocessor, val_preprocessor):
   all_text = []
@@ -100,7 +114,9 @@ def main():
   index2word = get_index2word(dict_file)
   index2label = get_index2label(entity_dict)
 
-  word_embedding_dim = 200
+  # Using word2vec pre-trained embedding
+  word_embedding_dim = 300
+
   hidden_dim = 64
   label_embedding_dim = 8
 

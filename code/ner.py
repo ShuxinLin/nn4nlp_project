@@ -52,6 +52,10 @@ class ner(nn.Module):
 
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
+
+    word_embedding_np = np.loadtxt('../dataset/word2vec_embed.txt', dtype=float)    # load pretrained word2vec
+    self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
+
     self.label_embedding = nn.Embedding(self.label_size,
                                         self.label_embedding_dim)
 
