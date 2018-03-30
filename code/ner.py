@@ -703,6 +703,7 @@ class ner(nn.Module):
       f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
 
     instance_num = 0
+    correctness = 0
     for batch in eval_data_X:
       instance_num += len(batch)
 
@@ -789,9 +790,9 @@ class ner(nn.Module):
           result_pred = index2label[label_pred_seq[i]]
           f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
       else:
-        correctness = np.sum(np.array(label) == np.array(label_pred_seq))
-        accuracy = correctness / len(label)
-        print(" accuracy for ", suffix, " = ", accuracy)
+        correctness += np.sum(np.array(label) == np.array(label_pred_seq))
+    accuracy = correctness / instance_num
+    print(" accuracy for ", suffix, " = ", accuracy)
 
 
           #elif sen[i] == 2:   # <EOS>
