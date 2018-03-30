@@ -212,7 +212,7 @@ class ner(nn.Module):
 
     return dec_hidden_seq, score_seq, attention_seq
 
-  def train(self, shuffle):
+  def train(self, shuffle, beam_size):
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
     # Note that here we called nn.Module.parameters()
@@ -307,7 +307,16 @@ class ner(nn.Module):
 
       time_end = time.time()
 
-      print("epoch", epoch, ", loss =", avg_loss,
+      # Do evaluation on training set using model at this point
+      # using decode_greedy or decode_beam
+      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, None, None, beam_size)
+      # Do evaluation on validation set as well
+      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, None, None, beam_size)
+
+      print("epoch", epoch,
+            ", accumulated loss during training =", avg_loss, "\n",
+            "  training loss =", train_loss,
+            ", validation loss =", val_loss,
             ", time =", time_end - time_begin)
 
     return train_loss_list
