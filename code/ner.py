@@ -77,8 +77,8 @@ class ner(nn.Module):
     # for t = seq_len".
     #
     # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
-    self.enc2dec_hidden = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
-    self.enc2dec_cell = nn.Linear(2 * self.hidden_dim, self.hidden_dim)
+    self.enc2dec_hidden = nn.Linear(2 * self.hidden_dim, self.hidden_dim, bias=False)
+    self.enc2dec_cell = nn.Linear(2 * self.hidden_dim, self.hidden_dim, bias=False)
 
     # Temporarily use same hidden dim for decoder
     self.decoder_cell = nn.LSTMCell(self.label_embedding_dim,
