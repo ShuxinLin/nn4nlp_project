@@ -23,13 +23,13 @@ class Attention(nn.Module):
       pass
     elif type.lower() == 'fixed':
       self.__type = 'fixed'
-      self.fixed_layer = nn.Linear(3 * hidden_dim, hidden_dim)
+      self.fixed_layer = nn.Linear(2 * hidden_dim, hidden_dim)
     else:
       raise ValueError("Not supported attention type!")
 
     self.gpu = gpu
 
-  def forward(self, dec_output, enc_output, index):
+  def forward(self, dec_output, enc_output, index, combiner):
     """
     Args:
       dec_output: Ly x B x H
@@ -53,9 +53,14 @@ class Attention(nn.Module):
 
     if self.__type == "fixed":
       # For fixed attention, pick out the index-th hidden vector in the encoder sequence
+      enc_output = enc_output[index]
+      # Now enc_output has shape B x 2H
+      # Then we use combiner (expect same as ner.enc2dec_hidden) to combine the 2 directional hidden vectors into one
+      enc_output = combiner(enc_output)
+      # Now enc_output has shape B x H
       # Now Lx = 1
-      # Then reshape it shape 1 x B x 2H into B x 1 x 2H
-      enc_output = enc_output[index][None, :, :]
+      # Then reshape it from 1 x B x H into B x 1 x H
+      enc_output = enc_output[None, :, :]
       enc_output = enc_output.transpose(1, 0)
 
     """
@@ -75,7 +80,7 @@ class Attention(nn.Module):
 
     if self.__type == "fixed":
       # Actually Ly = 1
-      # In fixed attention, concatenate the (B x 1 x 2H) context vector with the original decoder output (B x 1 x H) together
+      # In fixed attention, concatenate the (B x 1 x H) context vector with the original decoder output (B x 1 x H) together
       activated_dec_output = enc_output
 
       attention_energies = Variable(torch.zeros(B, Ly, Lx))
@@ -94,9 +99,9 @@ class Attention(nn.Module):
       #concat_matrix = concat_matrix.view(B * Ly, 2 * H)
     """
 
-    # For fixed attention it's 3H
+    # For fixed attention it's 2H
     if self.__type == "fixed":
-      concat_matrix = concat_matrix.view(B * Ly, 3 * H)
+      concat_matrix = concat_matrix.view(B * Ly, 2 * H)
 
     """
     # Activate it with tanh after multiplying with a learnable matrix
