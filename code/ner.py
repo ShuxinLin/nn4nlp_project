@@ -797,22 +797,25 @@ class ner(nn.Module):
         loss = loss.cpu()
       loss_sum += loss.data.numpy()[0] / current_sen_len
 
-      #print("label_var=", label_var)
+      O_INDEX = 4
+      assert self.label_size == 12
+      for label_index in range(O_INDEX, self.label_size):
+        #print("label_var=", label_var)
+        true_pos = (label_var == label_index)
+        #print("true_pos=", true_pos)
+        #time.sleep(1)
+        true_pos_count += true_pos.float().sum()
+        #print("true_pos.sum()=",true_pos.sum())
 
-      true_pos = (label_var > 4)
-      #print("true_pos=", true_pos)
-      #time.sleep(1)
-      true_pos_count += true_pos.float().sum()
-      #print("true_pos.sum()=",true_pos.sum())
+        pred_pos = (label_pred_seq == label_index)
+        #print("pred_pos=", pred_pos)
+        pred_pos_count += pred_pos.float().sum()
 
-      pred_pos = (label_pred_seq > 4)
-      #print("pred_pos=", pred_pos)
-      pred_pos_count += pred_pos.float().sum()
+        true_pred_pos = true_pos & pred_pos
+        #print("true_pred_pos=",true_pred_pos)
+        true_pred_pos_count += true_pred_pos.float().sum()
 
-      true_pred_pos = true_pos & pred_pos
-      #print("true_pred_pos=",true_pred_pos)
-      true_pred_pos_count += true_pred_pos.float().sum()
-
+      # Write result into file
       if result_path:
         if self.gpu:
           label_pred_seq = label_pred_seq.cpu()
