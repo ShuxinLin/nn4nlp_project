@@ -133,8 +133,9 @@ def main():
   shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
-  #train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  #val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  # Write out files
+  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
 
   #print("train_eval_loss =", train_eval_loss)
   #print("val_eval_loss =", val_eval_loss)
