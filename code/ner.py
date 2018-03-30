@@ -225,12 +225,13 @@ class ner(nn.Module):
     for batch in self.train_X:
       instance_num += len(batch)
 
+    batch_num = len(self.train_X)
+
     train_loss_list = []
 
     for epoch in range(self.max_epoch):
       time_begin = time.time()
       loss_sum = 0
-      batch_num = len(self.train_X)
 
       batch_idx_list = range(batch_num)
       if shuffle:
@@ -289,6 +290,8 @@ class ner(nn.Module):
         label_var_for_loss = label_var.permute(1, 0) \
           .contiguous().view(-1)
 
+        # Input: (N,C) where C = number of classes
+        # Target: (N) where each value is 0 <= targets[i] <= C−1
         loss = loss_function(score_seq, label_var_for_loss)
 
         if self.gpu:
@@ -663,25 +666,34 @@ class ner(nn.Module):
     else:
       attention_pred_seq = None
 
-    score_pred_seq = torch.stack(score_pred_seq, dim = 0)
     # For score_seq, actually don't need to reshape!
     # It happens that directly concatenate along dim = 0 gives you
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
-    score_pred_seq = torch.cat(score_pred_seq, dim = 0)
+    score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
 
     return label_pred_seq, score_pred_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, beam_size = 0):
-    batch_num = len(eval_data_X)
-    result_path = "../result/"
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, beam_size):
+    # To compute loss function value during evaluation time
+    # Will manually average over (sentence_len * instance_num)
+    loss_function = nn.CrossEntropyLoss(size_average=False)
 
-    f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
-    f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
-    f_label = open(result_path + "label_" + suffix + ".txt", 'w')
-    f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
+    batch_num = len(eval_data_X)
+
+    if result_path:
+      f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
+      f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
+      f_label = open(result_path + "label_" + suffix + ".txt", 'w')
+      f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
+
+    instance_num = 0
+    for batch in eval_data_X:
+      instance_num += len(batch)
+
+    loss_sum = 0
 
     for batch_idx in range(batch_num):
       sen = eval_data_X[batch_idx]
@@ -725,44 +737,57 @@ class ner(nn.Module):
       #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq, score_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq, score_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
-      # TODO: Need to compute loss function value here...
-
-      # Here label_pred_seq.shape = (batch size, sen len)
+      # Compute loss function value
+      label_var_for_loss = label_var.permute(1, 0) \
+        .contiguous().view(-1)
+      loss = loss_function(score_pred_seq, label_var_for_loss)
       if self.gpu:
-        label_pred_seq = label_pred_seq.cpu()
+        loss = loss.cpu()
+      loss_sum += loss.data.numpy()[0] / current_sen_len
 
-      label_pred_seq = label_pred_seq.data.numpy().tolist()
+      if result_path:
+        # Here label_pred_seq.shape = (batch size, sen len)
+        if self.gpu:
+          label_pred_seq = label_pred_seq.cpu()
 
-      # sen, label, label_pred_seq are list of lists,
-      # thus I would like to flatten them for iterating easier
-      sen = list(itertools.chain.from_iterable(sen))
-      label = list(itertools.chain.from_iterable(label))
-      label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
-      assert len(sen) == len(label) and len(label) == len(label_pred_seq)
+        label_pred_seq = label_pred_seq.data.numpy().tolist()
 
-      for i in range(len(sen)):
-        f_sen.write(str(sen[i]) + '\n')
-        f_label.write(str(label[i]) + '\n')
-        f_pred.write(str(label_pred_seq[i]) + '\n')
+        # sen, label, label_pred_seq are list of lists,
+        # thus I would like to flatten them for iterating easier
+        sen = list(itertools.chain.from_iterable(sen))
+        label = list(itertools.chain.from_iterable(label))
+        label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
+        assert len(sen) == len(label) and len(label) == len(label_pred_seq)
 
-        # clean version (does not print <PAD>, print a newline instead of <EOS>)
-        #if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
-        #if sen[i] != 0: # not <PAD>
+        for i in range(len(sen)):
+          f_sen.write(str(sen[i]) + '\n')
+          f_label.write(str(label[i]) + '\n')
+          f_pred.write(str(label_pred_seq[i]) + '\n')
 
-        result_sen = index2word[sen[i]]
-        result_label = index2label[label[i]]
-        result_pred = index2label[label_pred_seq[i]]
-        f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+          # clean version (does not print <PAD>, print a newline instead of <EOS>)
+          #if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
+          #if sen[i] != 0: # not <PAD>
 
-        #elif sen[i] == 2:   # <EOS>
-        #    f_result_processed.write('\n')
+          result_sen = index2word[sen[i]]
+          result_label = index2label[label[i]]
+          result_pred = index2label[label_pred_seq[i]]
+          f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+
+          #elif sen[i] == 2:   # <EOS>
+          #    f_result_processed.write('\n')
+        # End if result_path
     # End for batch_idx
 
-    f_sen.close()
-    f_pred.close()
-    f_label.close()
-    f_result_processed.close()
+    if result_path:
+      f_sen.close()
+      f_pred.close()
+      f_label.close()
+      f_result_processed.close()
+
+    avg_loss = loss_sum / instance_num
+
+    return avg_loss

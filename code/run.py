@@ -99,11 +99,11 @@ def get_index2label(entity_dict):
 
 def main():
   data_path = "../dataset/CoNLL-2003/"
-  #train_file = "eng.train"
-  #val_file = "eng.testa"
+  train_file = "eng.train"
+  val_file = "eng.testa"
 
-  train_file = "eng.testa.nano.txt"
-  val_file = "eng.testa.nano.txt"
+  #train_file = "eng.testa.nano.txt"
+  #val_file = "eng.testa.nano.txt"
 
   #test_file = "eng.testb"
 
@@ -149,8 +149,11 @@ def main():
   shuffle = True
 
   train_loss_list = machine.train(shuffle)
-  machine.evaluate(train_X, train_Y, index2word, index2label, "train", beam_size)
-  machine.evaluate(val_X, val_Y, index2word, index2label, "val", beam_size)
+  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+
+  print("train_eval_loss =", train_eval_loss)
+  print("val_eval_loss =", val_eval_loss)
 
   #print(train_loss_list)
 
