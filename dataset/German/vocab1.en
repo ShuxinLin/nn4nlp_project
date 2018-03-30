@@ -1,12 +1,12 @@
-_PAD
-_GO
-_EOS
-_UNK
-O
-I-LOC
-I-PER
-I-ORG
-I-MISC
-B-MISC
-B-LOC
-B-ORG
+_PAD    0
+_GO 1
+_EOS    2
+_UNK    3
+O   4
+I-LOC   5
+I-PER   6
+I-ORG   7
+I-MISC  8
+B-MISC  9
+B-LOC   10
+B-ORG   11
