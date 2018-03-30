@@ -16,6 +16,7 @@ from preprocessor import *
 
 class ner(nn.Module):
   def __init__(self,
+               index2word, index2label,
                word_embedding_dim, hidden_dim, label_embedding_dim,
                vocab_size, label_size,
                learning_rate=0.1, minibatch_size=1,
@@ -27,6 +28,8 @@ class ner(nn.Module):
                pretrained=None):
 
     super(ner, self).__init__()
+    self.index2word = index2word
+    self.index2label = index2label
     self.word_embedding_dim = word_embedding_dim
     self.hidden_dim = hidden_dim
     self.label_embedding_dim = label_embedding_dim
@@ -789,9 +792,9 @@ class ner(nn.Module):
           #if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
           #if sen[i] != 0: # not <PAD>
 
-          result_sen = index2word[sen[i]]
-          result_label = index2label[label[i]]
-          result_pred = index2label[label_pred_seq[i]]
+          result_sen = self.index2word[sen[i]]
+          result_label = self.index2label[label[i]]
+          result_pred = self.index2label[label_pred_seq[i]]
           f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
     #   else:
     #     correctness += np.sum(np.array(label) == np.array(label_pred_seq))
