@@ -861,13 +861,11 @@ class ner(nn.Module):
     pred_pos_count = pred_pos_count.data.numpy()[0]
     true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
 
-    print("true_pred_pos_count=",true_pred_pos_count)
-    print("pred_pos_count=",pred_pos_count)
     precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
-    print("precision=",precision)
 
     recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
     fscore = 2 / ( 1/precision + 1/recall ) if (precision > 0 and recall > 0) else 0
+    fscore = fscore * 100
 
     if result_path:
       f_sen.close()
