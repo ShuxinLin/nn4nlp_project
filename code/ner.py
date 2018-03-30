@@ -799,7 +799,7 @@ class ner(nn.Module):
 
       O_INDEX = 4
       assert self.label_size == 12
-      for label_index in range(O_INDEX, self.label_size):
+      for label_index in range(O_INDEX + 1, self.label_size):
         #print("label_var=", label_var)
         true_pos = (label_var == label_index)
         #print("true_pos=", true_pos)
