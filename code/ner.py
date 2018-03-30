@@ -218,6 +218,7 @@ class ner(nn.Module):
 
     return dec_hidden_seq, score_seq, attention_seq
 
+
   def train(self, shuffle, beam_size, result_path):
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
@@ -235,7 +236,7 @@ class ner(nn.Module):
 
     train_loss_list = []
 
-    output_file = open(result_path + "log.txt", "w+")
+    output_file = open(os.path.join(result_path, "log.txt"), "w+")
 
     for epoch in range(self.max_epoch):
       time_begin = time.time()

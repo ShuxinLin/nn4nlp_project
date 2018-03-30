@@ -85,7 +85,7 @@ def minibatch_de(data, batch_size):
 def main():
   data_path = "../dataset/German/"
 
-  result_path = "../result_lrn_0p0005/"
+  result_path = "../result_lrn_0p001/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -132,7 +132,7 @@ def main():
 
   shuffle = True
 
-  train_loss_list = machine.train(shuffle, beam_size)
+  train_loss_list = machine.train(shuffle, beam_size, result_path)
   train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
   val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
 
