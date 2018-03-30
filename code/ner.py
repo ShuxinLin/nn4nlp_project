@@ -338,12 +338,12 @@ class ner(nn.Module):
       val_loss, val_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "val", None, beam_size)
 
       print("epoch", epoch,
-            ", accumulated loss during training =", avg_loss, "\n",
-            "  training loss =", train_loss,
+            ", accumulated loss during training =", avg_loss,
+            "\n training loss =", train_loss,
             ", validation loss =", val_loss,
-            ", training F score =", train_fscore,
+            "\n training F score =", train_fscore,
             ", validation F score =", val_fscore,
-            ", time =", time_end - time_begin)
+            "\n time =", time_end - time_begin)
 
       output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, train_fscore, val_fscore, time_end - time_begin))
 
