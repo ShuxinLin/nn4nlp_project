@@ -97,6 +97,7 @@ def main():
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
+  #print("label_size=",label_size)
 
   train_X, train_Y = minibatch_de('train', batch_size)
   val_X, val_Y = minibatch_de('valid', batch_size)
@@ -120,7 +121,7 @@ def main():
   if pretrained == 'de64':
     word_embedding_dim = 64
 
-  gpu = True
+  gpu = False
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
@@ -133,11 +134,11 @@ def main():
   shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
-  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  #train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  #val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
 
-  print("train_eval_loss =", train_eval_loss)
-  print("val_eval_loss =", val_eval_loss)
+  #print("train_eval_loss =", train_eval_loss)
+  #print("val_eval_loss =", val_eval_loss)
 
   #print(train_loss_list)
 

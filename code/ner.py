@@ -16,6 +16,7 @@ from preprocessor import *
 
 import os
 
+
 class ner(nn.Module):
   def __init__(self,
                word_embedding_dim, hidden_dim, label_embedding_dim,
@@ -220,10 +221,6 @@ class ner(nn.Module):
 
 
   def train(self, shuffle, beam_size, result_path):
-    # Double penalize for the cases in which the true label is not
-    # <PAD>:0, <BEG>:1, O:2
-    #weight = torch.tensor([1, 1, 1, 2, 2, 2, 2, 2, 2, 2])
-
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
     # Note that here we called nn.Module.parameters()
@@ -254,7 +251,7 @@ class ner(nn.Module):
         sen = self.train_X[batch_idx]
         label = self.train_Y[batch_idx]
 
-        print("label=",label)
+        #print("label=",label)
 
         current_batch_size = len(sen)
         current_sen_len = len(sen[0])
@@ -304,6 +301,18 @@ class ner(nn.Module):
 
         label_var_for_loss = label_var.permute(1, 0) \
           .contiguous().view(-1)
+
+        O_INDEX = 4
+        gold_not_O_mask = (label_var_for_loss > O_INDEX).float()
+        #print("label_var_for_loss=",label_var_for_loss)
+        #print("gold_not_O_mask=",gold_not_O_mask[:10])
+        #time.sleep(1)
+        PENALTY = 1.5
+        gold_not_O_mask = gold_not_O_mask * PENALTY
+        #print("before: score_seq=",score_seq[:10, 3:6])
+        score_seq[:, O_INDEX] = score_seq[:, O_INDEX] + gold_not_O_mask
+        #print("after: score_seq=",score_seq[:10, 3:6])
+        #time.sleep(1)
 
         # Input: (N,C) where C = number of classes
         # Target: (N) where each value is 0 <= targets[i] <= C−1
