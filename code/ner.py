@@ -787,16 +787,16 @@ class ner(nn.Module):
         loss = loss.cpu()
       loss_sum += loss.data.numpy()[0] / current_sen_len
 
-        # Here label_pred_seq.shape = (batch size, sen len)
       if result_path:
-
         if self.gpu:
           label_pred_seq = label_pred_seq.cpu()
 
         label_pred_seq = label_pred_seq.data.numpy().tolist()
 
-      # sen, label, label_pred_seq are list of lists,
-      # thus I would like to flatten them for iterating easier
+        # Here label_pred_seq.shape = (batch size, sen len)
+
+        # sen, label, label_pred_seq are list of lists,
+        # thus I would like to flatten them for iterating easier
 
         sen = list(itertools.chain.from_iterable(sen))
         label = list(itertools.chain.from_iterable(label))

@@ -85,7 +85,7 @@ def minibatch_de(data, batch_size):
 def main():
   data_path = "../dataset/German/"
 
-  result_path = "../result_lrn_0p001_doub/"
+  result_path = "../result_lrn_0p0005/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -110,7 +110,7 @@ def main():
   max_epoch = 50
 
   # 0.001 is a good value
-  learning_rate = 0.001
+  learning_rate = 0.0005
 
   #attention = "fixed"
   attention = None
