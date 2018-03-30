@@ -12,6 +12,9 @@ import collections
 from ner import ner
 from preprocessor import Preprocessor
 
+import os
+
+
 def prepocess(data_path, train, val, batch_size):
   train_preprocessor = Preprocessor(data_path, train)
   train_preprocessor.read_file()
@@ -105,6 +108,8 @@ def main():
   #test_file = "eng.testb"
 
   result_path = "../result/"
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
 
   batch_size = 32
 
@@ -117,10 +122,11 @@ def main():
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
 
-  hidden_dim = 64
+  #hidden_dim = 64
+  hidden_dim = 6
   label_embedding_dim = 8
 
-  max_epoch = 300
+  max_epoch = 1
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -130,7 +136,7 @@ def main():
 
   pretrained = 'glove'
 
-  gpu = True
+  gpu = False
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
@@ -138,13 +144,16 @@ def main():
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  beam_size = 0
+  beam_size = 3
 
   shuffle = True
 
-  train_loss_list = machine.train(shuffle)
-  machine.evaluate(train_X, train_Y, index2word, index2label, "train", beam_size)
-  machine.evaluate(val_X, val_Y, index2word, index2label, "val", beam_size)
+  train_loss_list = machine.train(shuffle, beam_size)
+  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+
+  print("train_eval_loss =", train_eval_loss)
+  print("val_eval_loss =", val_eval_loss)
 
   #print(train_loss_list)
 
