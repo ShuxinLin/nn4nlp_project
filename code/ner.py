@@ -14,6 +14,8 @@ import itertools
 from attention import Attention
 from preprocessor import *
 
+import os
+
 class ner(nn.Module):
   def __init__(self,
                word_embedding_dim, hidden_dim, label_embedding_dim,
@@ -216,7 +218,7 @@ class ner(nn.Module):
 
     return dec_hidden_seq, score_seq, attention_seq
 
-  def train(self, shuffle, beam_size):
+  def train(self, shuffle, beam_size, result_path):
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
     # Note that here we called nn.Module.parameters()
@@ -232,6 +234,8 @@ class ner(nn.Module):
     batch_num = len(self.train_X)
 
     train_loss_list = []
+
+    output_file = open(result_path + "log.txt", "w+")
 
     for epoch in range(self.max_epoch):
       time_begin = time.time()
@@ -304,7 +308,7 @@ class ner(nn.Module):
         
         loss.backward()
         optimizer.step()
-      # for batch_idx
+      # End for batch_idx
 
       avg_loss = loss_sum / instance_num
       train_loss_list.append(avg_loss)
@@ -323,10 +327,14 @@ class ner(nn.Module):
             ", validation loss =", val_loss,
             ", time =", time_end - time_begin)
 
+      output_file.write("%d\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, time_end - time_begin))
+
+    # End for epoch
+
+    output_file.close()
+
     return train_loss_list
 
-  def write_log(self):
-    pass
 
   def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq):
     # Current version is as parallel to beam as possible
