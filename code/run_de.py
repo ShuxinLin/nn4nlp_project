@@ -85,6 +85,8 @@ def main():
   data_path = "../dataset/German/"
 
   result_path = "../result/"
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
 
   batch_size = 32
 
