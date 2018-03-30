@@ -439,13 +439,11 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_seq = torch.cat(score_seq, dim=0)
+    score_pred_seq = score_seq
 
-    return label_pred_seq, score_seq, attention_pred_seq
+    return label_pred_seq, score_pred_seq, attention_pred_seq
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
-    score_seq = []
-    # TODO: beam search part would take some effort...
-
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
     if self.gpu:
@@ -473,6 +471,8 @@ class ner(nn.Module):
     # y => same
     beta_seq = []
     y_seq = []
+
+    score_seq = []
 
     if self.attention:
       # This would be the attention alpha_{ij} coefficients
@@ -516,6 +516,12 @@ class ner(nn.Module):
 
     # score_out.shape => (batch size, |V^y|)
     score_out = self.hidden2score(dec_hidden_out) + init_score
+
+    # For output: (1, batch size, label dim)
+    score_output_beam = torch.stack([score_out], dim = 0)
+    # Swap into shape (batch size, 1, label dim)
+    score_output_beam = score_output_beam.permute(1, 0, 2)
+
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
     score_matrix = torch.cat([score_out], dim = 1)
@@ -532,6 +538,8 @@ class ner(nn.Module):
     if self.attention:
       attention_seq.append(attention_beam)
 
+    score_seq.append(score_output_beam)
+
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       # We loop through beam because we expect that
@@ -542,6 +550,8 @@ class ner(nn.Module):
 
       if self.attention:
         attention_list =[]
+
+      score_output_beam_list = []
 
       for b in range(beam_size):
         # Extract the b-th column of y_beam
@@ -582,6 +592,8 @@ class ner(nn.Module):
           .view(batch_size, 1)
         score_out = self.hidden2score(dec_hidden_out) + prev_score
         score_out_list.append(score_out)
+
+        score_output_beam_list.append(score_out)
       # End for b
 
       # dec_hidden_beam shape => (beam size, batch size, hidden dim)
@@ -594,6 +606,9 @@ class ner(nn.Module):
         # We need to permute (swap) the dimensions into
         # the shape (batch size, beam size, input seq len)
         attention_beam = attention_beam.permute(1, 0, 2)
+
+      score_output_beam = torch.stack(score_output_beam_list, dim = 0)
+      score_output_beam = score_output_beam.permute(1, 0, 2)
 
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
@@ -608,6 +623,8 @@ class ner(nn.Module):
 
       if self.attention:
         attention_seq.append(attention_beam)
+
+      score_seq.append(score_output_beam)
     # End for t
 
     # Only output the highest-scored beam (for each instance in the batch)
@@ -623,7 +640,9 @@ class ner(nn.Module):
       # in the shape of (output seq len, batch size, input seq len)
       #
       # Here we initialize the first element
-      attention_pred_seq = (attention_seq[t][range(batch_size), input_beam, :])[None, :, :]
+      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
@@ -635,6 +654,8 @@ class ner(nn.Module):
 
       if self.attention:
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+
+      score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
     # End for t
 
     if self.attention:
@@ -642,7 +663,14 @@ class ner(nn.Module):
     else:
       attention_pred_seq = None
 
-    return label_pred_seq, score_seq, attention_pred_seq
+    score_pred_seq = torch.stack(score_pred_seq, dim = 0)
+    # For score_seq, actually don't need to reshape!
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
+    score_pred_seq = torch.cat(score_pred_seq, dim = 0)
+
+    return label_pred_seq, score_pred_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
