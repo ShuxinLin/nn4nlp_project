@@ -122,11 +122,11 @@ def main():
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
 
-  #hidden_dim = 64
-  hidden_dim = 6
+  hidden_dim = 64
+  # hidden_dim = 6
   label_embedding_dim = 8
 
-  max_epoch = 2
+  max_epoch = 200
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -136,9 +136,9 @@ def main():
 
   pretrained = 'glove'
 
-  gpu = False
+  gpu = True
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
+  machine = ner(index2word, index2label, word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
     machine = machine.cuda()
 
@@ -149,8 +149,8 @@ def main():
   shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size)
-  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  train_eval_loss = machine.evaluate(train_X, train_Y, "train", result_path, beam_size)
+  val_eval_loss = machine.evaluate(val_X, val_Y, "val", result_path, beam_size)
 
   print("train_eval_loss =", train_eval_loss)
   print("val_eval_loss =", val_eval_loss)

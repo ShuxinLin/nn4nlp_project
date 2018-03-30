@@ -122,7 +122,7 @@ class Preprocessor():
   def _preprocess_sentence(self, sentence):
     sentence = self._regex_preprocess(sentence)
     #sentence = self._add_paddings_eos(sentence)
-    sentence = self._add_paddings(sentence)
+    # sentence = self._add_paddings(sentence)
     return sentence
 
   def _regex_preprocess(self, sentence):
@@ -160,11 +160,12 @@ class Preprocessor():
   """
 
   def _preprocess_entities(self, entities):
-    entities = entities.split()
-    length = len(entities)
-    num_of_paddings = (self.LENGTH_UNIT - length % self.LENGTH_UNIT) if (length % self.LENGTH_UNIT > 0) else 0
-    entities.extend(['O'] * num_of_paddings)
-    return ' '.join(entities)
+    # entities = entities.split()
+    # length = len(entities)
+    # num_of_paddings = (self.LENGTH_UNIT - length % self.LENGTH_UNIT) if (length % self.LENGTH_UNIT > 0) else 0
+    # entities.extend(['O'] * num_of_paddings)
+    # return ' '.join(entities)
+    return entities
 
   def _preprocess_word(self, word):
     return word.lower()
