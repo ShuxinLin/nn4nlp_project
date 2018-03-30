@@ -333,17 +333,19 @@ class ner(nn.Module):
 
       # Do evaluation on training set using model at this point
       # using decode_greedy or decode_beam
-      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
+      train_loss, train_fscore = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
       # Do evaluation on validation set as well
-      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, "val", None, beam_size)
+      val_loss, val_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "val", None, beam_size)
 
       print("epoch", epoch,
             ", accumulated loss during training =", avg_loss, "\n",
             "  training loss =", train_loss,
             ", validation loss =", val_loss,
+            ", training F score =", train_fscore,
+            ", validation F score =", val_fscore,
             ", time =", time_end - time_begin)
 
-      output_file.write("%d\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, time_end - time_begin))
+      output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, train_fscore, val_fscore, time_end - time_begin))
 
     # End for epoch
 
@@ -733,11 +735,19 @@ class ner(nn.Module):
 
     loss_sum = 0
 
+    true_pos_count = 0
+    pred_pos_count = 0
+    true_pred_pos_count = 0
+
     for batch_idx in range(batch_num):
       sen = eval_data_X[batch_idx]
       label = eval_data_Y[batch_idx]
       current_batch_size = len(sen)
       current_sen_len = len(sen[0])
+
+      #print("label=",label)
+      #time.sleep(1)
+
 
       # Always clear the gradients before use
       self.zero_grad()
@@ -787,16 +797,32 @@ class ner(nn.Module):
         loss = loss.cpu()
       loss_sum += loss.data.numpy()[0] / current_sen_len
 
-        # Here label_pred_seq.shape = (batch size, sen len)
-      if result_path:
+      #print("label_var=", label_var)
 
+      true_pos = (label_var > 4)
+      #print("true_pos=", true_pos)
+      #time.sleep(1)
+      true_pos_count += true_pos.float().sum()
+      #print("true_pos.sum()=",true_pos.sum())
+
+      pred_pos = (label_pred_seq > 4)
+      #print("pred_pos=", pred_pos)
+      pred_pos_count += pred_pos.float().sum()
+
+      true_pred_pos = true_pos & pred_pos
+      #print("true_pred_pos=",true_pred_pos)
+      true_pred_pos_count += true_pred_pos.float().sum()
+
+      if result_path:
         if self.gpu:
           label_pred_seq = label_pred_seq.cpu()
 
         label_pred_seq = label_pred_seq.data.numpy().tolist()
 
-      # sen, label, label_pred_seq are list of lists,
-      # thus I would like to flatten them for iterating easier
+        # Here label_pred_seq.shape = (batch size, sen len)
+
+        # sen, label, label_pred_seq are list of lists,
+        # thus I would like to flatten them for iterating easier
 
         sen = list(itertools.chain.from_iterable(sen))
         label = list(itertools.chain.from_iterable(label))
@@ -826,6 +852,23 @@ class ner(nn.Module):
         # End if result_path
     # End for batch_idx
 
+    if self.gpu:
+      true_pos_count = true_pos_count.cpu()
+      pred_pos_count = pred_pos_count.cpu()
+      true_pred_pos_count = true_pred_pos_count.cpu()
+
+    true_pos_count = true_pos_count.data.numpy()[0]
+    pred_pos_count = pred_pos_count.data.numpy()[0]
+    true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
+
+    print("true_pred_pos_count=",true_pred_pos_count)
+    print("pred_pos_count=",pred_pos_count)
+    precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
+    print("precision=",precision)
+
+    recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
+    fscore = 2 / ( 1/precision + 1/recall ) if (precision > 0 and recall > 0) else 0
+
     if result_path:
       f_sen.close()
       f_pred.close()
@@ -834,4 +877,4 @@ class ner(nn.Module):
 
     avg_loss = loss_sum / instance_num
 
-    return avg_loss
+    return avg_loss, fscore
