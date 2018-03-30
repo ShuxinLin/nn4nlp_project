@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 from operator import itemgetter
 import collections
 from ner import ner
-from preprocessor import Preprocessor
-
 
 
 def get_index2word(dict_file):
@@ -87,6 +85,8 @@ def main():
   data_path = "../dataset/German/"
 
   result_path = "../result/"
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
 
   batch_size = 32
 
