@@ -154,7 +154,7 @@ class ner(nn.Module):
       # attention has shape (batch size, 1, input sen len)
       # 1 means that here we only treat one hidden vector of decoder
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq, 0)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0, self.enc2dec_hidden)
       # 0 because we are now at "t=0"
 
       # remove the added dim
@@ -184,7 +184,7 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq, i + 1)
+          self.attention(dec_hidden_out, enc_hidden_seq, i + 1, self.enc2dec_hidden)
         # i + 1 because now i is actually "t-1", and we need to input "t"
 
         # remove the added dim
@@ -394,7 +394,7 @@ class ner(nn.Module):
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq, 0)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0, self.enc2dec_hidden)
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)  
@@ -444,7 +444,7 @@ class ner(nn.Module):
       if self.attention:
         dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
         dec_hidden_out, attention = \
-          self.attention(dec_hidden_out, enc_hidden_seq, t)
+          self.attention(dec_hidden_out, enc_hidden_seq, t, self.enc2dec_hidden)
         # Here we use t because it is the correct time step
 
         # remove the added dim
@@ -532,7 +532,7 @@ class ner(nn.Module):
     if self.attention:
       dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
       dec_hidden_out, attention = \
-        self.attention(dec_hidden_out, enc_hidden_seq, 0)
+        self.attention(dec_hidden_out, enc_hidden_seq, 0, self.enc2dec_hidden)
 
       # remove the added dim
       dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
@@ -617,7 +617,7 @@ class ner(nn.Module):
         if self.attention:
           dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
           dec_hidden_out, attention = \
-            self.attention(dec_hidden_out, enc_hidden_seq, t)
+            self.attention(dec_hidden_out, enc_hidden_seq, t, self.enc2dec_hidden)
 
           # remove the added dim
           dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
