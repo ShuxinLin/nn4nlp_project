@@ -104,7 +104,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 2
+  max_epoch = 200
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -117,7 +117,7 @@ def main():
   if pretrained == 'de64':
     word_embedding_dim = 64
 
-  gpu = False
+  gpu = True
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:

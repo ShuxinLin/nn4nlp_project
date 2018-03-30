@@ -57,6 +57,9 @@ class ner(nn.Module):
     if pretrained:  # not None
       print("Using pretrained word embedding: ", pretrained)
       word_embedding_np = np.loadtxt('../dataset/WordEmbed/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
+      assert self.vocab_size == word_embedding_np.shape[0]
+      assert self.word_embedding_dim == word_embedding_np.shape[1]
+
       self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
 
     self.label_embedding = nn.Embedding(self.label_size,
@@ -310,9 +313,9 @@ class ner(nn.Module):
 
       # Do evaluation on training set using model at this point
       # using decode_greedy or decode_beam
-      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, None, None, beam_size)
+      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
       # Do evaluation on validation set as well
-      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, None, None, beam_size)
+      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, "val", None, beam_size)
 
       print("epoch", epoch,
             ", accumulated loss during training =", avg_loss, "\n",
@@ -700,6 +703,7 @@ class ner(nn.Module):
       f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
 
     instance_num = 0
+    correctness = 0
     for batch in eval_data_X:
       instance_num += len(batch)
 
@@ -759,20 +763,19 @@ class ner(nn.Module):
         loss = loss.cpu()
       loss_sum += loss.data.numpy()[0] / current_sen_len
 
-      if result_path:
         # Here label_pred_seq.shape = (batch size, sen len)
-        if self.gpu:
-          label_pred_seq = label_pred_seq.cpu()
+      if self.gpu:
+        label_pred_seq = label_pred_seq.cpu()
 
-        label_pred_seq = label_pred_seq.data.numpy().tolist()
+      label_pred_seq = label_pred_seq.data.numpy().tolist()
 
-        # sen, label, label_pred_seq are list of lists,
-        # thus I would like to flatten them for iterating easier
-        sen = list(itertools.chain.from_iterable(sen))
-        label = list(itertools.chain.from_iterable(label))
-        label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
-        assert len(sen) == len(label) and len(label) == len(label_pred_seq)
-
+      # sen, label, label_pred_seq are list of lists,
+      # thus I would like to flatten them for iterating easier
+      sen = list(itertools.chain.from_iterable(sen))
+      label = list(itertools.chain.from_iterable(label))
+      label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
+      assert len(sen) == len(label) and len(label) == len(label_pred_seq)
+      if result_path:
         for i in range(len(sen)):
           f_sen.write(str(sen[i]) + '\n')
           f_label.write(str(label[i]) + '\n')
@@ -786,6 +789,11 @@ class ner(nn.Module):
           result_label = index2label[label[i]]
           result_pred = index2label[label_pred_seq[i]]
           f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+      else:
+        correctness += np.sum(np.array(label) == np.array(label_pred_seq))
+    accuracy = correctness / instance_num
+    print(" accuracy for ", suffix, " = ", accuracy)
+
 
           #elif sen[i] == 2:   # <EOS>
           #    f_result_processed.write('\n')
