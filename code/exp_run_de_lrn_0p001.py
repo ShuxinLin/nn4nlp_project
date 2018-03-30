@@ -110,7 +110,7 @@ def main():
   max_epoch = 100
 
   # 0.001 is a good value
-  learning_rate = 0.0005
+  learning_rate = 0.001
 
   #attention = "fixed"
   attention = None
