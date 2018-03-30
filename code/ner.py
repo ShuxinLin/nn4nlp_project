@@ -24,7 +24,7 @@ class ner(nn.Module):
                test_X=None, test_Y=None,
                attention="fixed",
                gpu=False,
-               pretrained='glove'):
+               pretrained=None):
 
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
@@ -54,9 +54,10 @@ class ner(nn.Module):
 
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
-
-    word_embedding_np = np.loadtxt('../dataset/CoNLL-2003/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
-    self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
+    if pretrained:  # not None
+      print("Using pretrained word embedding: ", pretrained)
+      word_embedding_np = np.loadtxt('../dataset/WordEmbed/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
+      self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
 
     self.label_embedding = nn.Embedding(self.label_size,
                                         self.label_embedding_dim)
