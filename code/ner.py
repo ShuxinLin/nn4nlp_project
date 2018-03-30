@@ -316,9 +316,9 @@ class ner(nn.Module):
 
       # Do evaluation on training set using model at this point
       # using decode_greedy or decode_beam
-      train_loss = self.evaluate(self.train_X, self.train_Y, "train", '../result_' + str(epoch) + '/', beam_size)
+      train_loss = self.evaluate(self.train_X, self.train_Y, "train", '../result/' + str(epoch) + '/', beam_size)
       # Do evaluation on validation set as well
-      val_loss = self.evaluate(self.test_X, self.test_Y, "val", '../result_' + str(epoch) + '/', beam_size)
+      val_loss = self.evaluate(self.test_X, self.test_Y, "val", '../result/' + str(epoch) + '/', beam_size)
 
       print("epoch", epoch,
             ", accumulated loss during training =", avg_loss, "\n",
