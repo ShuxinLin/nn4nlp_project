@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from operator import itemgetter
 import collections
 from ner import ner
-#from preprocessor import Preprocessor
 
 
 def get_index2word(dict_file):
@@ -108,7 +107,7 @@ def main():
   max_epoch = 100
 
   # 0.001 is a good value
-  learning_rate = 0.001
+  learning_rate = 0.0001
 
   attention = "fixed"
   #attention = None
