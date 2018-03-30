@@ -24,7 +24,7 @@ class ner(nn.Module):
                test_X=None, test_Y=None,
                attention="fixed",
                gpu=False,
-               pretrained='glove'):
+               pretrained=None):
 
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
@@ -54,9 +54,10 @@ class ner(nn.Module):
 
     self.word_embedding = nn.Embedding(self.vocab_size,
                                        self.word_embedding_dim)
-
-    word_embedding_np = np.loadtxt('../dataset/CoNLL-2003/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
-    self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
+    if pretrained:  # not None
+      print("Using pretrained word embedding: ", pretrained)
+      word_embedding_np = np.loadtxt('../dataset/WordEmbed/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
+      self.word_embedding.weight.data.copy_(torch.from_numpy(word_embedding_np))
 
     self.label_embedding = nn.Embedding(self.label_size,
                                         self.label_embedding_dim)
@@ -212,7 +213,7 @@ class ner(nn.Module):
 
     return dec_hidden_seq, score_seq, attention_seq
 
-  def train(self, shuffle):
+  def train(self, shuffle, beam_size):
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
     # Note that here we called nn.Module.parameters()
@@ -225,12 +226,13 @@ class ner(nn.Module):
     for batch in self.train_X:
       instance_num += len(batch)
 
+    batch_num = len(self.train_X)
+
     train_loss_list = []
 
     for epoch in range(self.max_epoch):
       time_begin = time.time()
       loss_sum = 0
-      batch_num = len(self.train_X)
 
       batch_idx_list = range(batch_num)
       if shuffle:
@@ -289,6 +291,8 @@ class ner(nn.Module):
         label_var_for_loss = label_var.permute(1, 0) \
           .contiguous().view(-1)
 
+        # Input: (N,C) where C = number of classes
+        # Target: (N) where each value is 0 <= targets[i] <= C−1
         loss = loss_function(score_seq, label_var_for_loss)
 
         if self.gpu:
@@ -304,7 +308,16 @@ class ner(nn.Module):
 
       time_end = time.time()
 
-      print("epoch", epoch, ", loss =", avg_loss,
+      # Do evaluation on training set using model at this point
+      # using decode_greedy or decode_beam
+      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, None, None, beam_size)
+      # Do evaluation on validation set as well
+      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, None, None, beam_size)
+
+      print("epoch", epoch,
+            ", accumulated loss during training =", avg_loss, "\n",
+            "  training loss =", train_loss,
+            ", validation loss =", val_loss,
             ", time =", time_end - time_begin)
 
     return train_loss_list
@@ -439,13 +452,11 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_seq = torch.cat(score_seq, dim=0)
+    score_pred_seq = score_seq
 
-    return label_pred_seq, score_seq, attention_pred_seq
+    return label_pred_seq, score_pred_seq, attention_pred_seq
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
-    score_seq = []
-    # TODO: beam search part would take some effort...
-
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
     if self.gpu:
@@ -473,6 +484,8 @@ class ner(nn.Module):
     # y => same
     beta_seq = []
     y_seq = []
+
+    score_seq = []
 
     if self.attention:
       # This would be the attention alpha_{ij} coefficients
@@ -516,6 +529,12 @@ class ner(nn.Module):
 
     # score_out.shape => (batch size, |V^y|)
     score_out = self.hidden2score(dec_hidden_out) + init_score
+
+    # For output: (1, batch size, label dim)
+    score_output_beam = torch.stack([score_out], dim = 0)
+    # Swap into shape (batch size, 1, label dim)
+    score_output_beam = score_output_beam.permute(1, 0, 2)
+
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
     score_matrix = torch.cat([score_out], dim = 1)
@@ -532,6 +551,8 @@ class ner(nn.Module):
     if self.attention:
       attention_seq.append(attention_beam)
 
+    score_seq.append(score_output_beam)
+
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       # We loop through beam because we expect that
@@ -542,6 +563,8 @@ class ner(nn.Module):
 
       if self.attention:
         attention_list =[]
+
+      score_output_beam_list = []
 
       for b in range(beam_size):
         # Extract the b-th column of y_beam
@@ -582,6 +605,8 @@ class ner(nn.Module):
           .view(batch_size, 1)
         score_out = self.hidden2score(dec_hidden_out) + prev_score
         score_out_list.append(score_out)
+
+        score_output_beam_list.append(score_out)
       # End for b
 
       # dec_hidden_beam shape => (beam size, batch size, hidden dim)
@@ -594,6 +619,9 @@ class ner(nn.Module):
         # We need to permute (swap) the dimensions into
         # the shape (batch size, beam size, input seq len)
         attention_beam = attention_beam.permute(1, 0, 2)
+
+      score_output_beam = torch.stack(score_output_beam_list, dim = 0)
+      score_output_beam = score_output_beam.permute(1, 0, 2)
 
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
@@ -608,6 +636,8 @@ class ner(nn.Module):
 
       if self.attention:
         attention_seq.append(attention_beam)
+
+      score_seq.append(score_output_beam)
     # End for t
 
     # Only output the highest-scored beam (for each instance in the batch)
@@ -623,7 +653,9 @@ class ner(nn.Module):
       # in the shape of (output seq len, batch size, input seq len)
       #
       # Here we initialize the first element
-      attention_pred_seq = (attention_seq[t][range(batch_size), input_beam, :])[None, :, :]
+      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
@@ -635,6 +667,8 @@ class ner(nn.Module):
 
       if self.attention:
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+
+      score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
     # End for t
 
     if self.attention:
@@ -642,18 +676,34 @@ class ner(nn.Module):
     else:
       attention_pred_seq = None
 
-    return label_pred_seq, score_seq, attention_pred_seq
+    # For score_seq, actually don't need to reshape!
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
+    score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
+
+    return label_pred_seq, score_pred_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, beam_size = 0):
-    batch_num = len(eval_data_X)
-    result_path = "../result/"
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, beam_size):
+    # To compute loss function value during evaluation time
+    # Will manually average over (sentence_len * instance_num)
+    loss_function = nn.CrossEntropyLoss(size_average=False)
 
-    f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
-    f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
-    f_label = open(result_path + "label_" + suffix + ".txt", 'w')
-    f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
+    batch_num = len(eval_data_X)
+
+    if result_path:
+      f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
+      f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
+      f_label = open(result_path + "label_" + suffix + ".txt", 'w')
+      f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
+
+    instance_num = 0
+    for batch in eval_data_X:
+      instance_num += len(batch)
+
+    loss_sum = 0
 
     for batch_idx in range(batch_num):
       sen = eval_data_X[batch_idx]
@@ -697,44 +747,57 @@ class ner(nn.Module):
       #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq, score_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq, score_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
-      # TODO: Need to compute loss function value here...
-
-      # Here label_pred_seq.shape = (batch size, sen len)
+      # Compute loss function value
+      label_var_for_loss = label_var.permute(1, 0) \
+        .contiguous().view(-1)
+      loss = loss_function(score_pred_seq, label_var_for_loss)
       if self.gpu:
-        label_pred_seq = label_pred_seq.cpu()
+        loss = loss.cpu()
+      loss_sum += loss.data.numpy()[0] / current_sen_len
 
-      label_pred_seq = label_pred_seq.data.numpy().tolist()
+      if result_path:
+        # Here label_pred_seq.shape = (batch size, sen len)
+        if self.gpu:
+          label_pred_seq = label_pred_seq.cpu()
 
-      # sen, label, label_pred_seq are list of lists,
-      # thus I would like to flatten them for iterating easier
-      sen = list(itertools.chain.from_iterable(sen))
-      label = list(itertools.chain.from_iterable(label))
-      label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
-      assert len(sen) == len(label) and len(label) == len(label_pred_seq)
+        label_pred_seq = label_pred_seq.data.numpy().tolist()
 
-      for i in range(len(sen)):
-        f_sen.write(str(sen[i]) + '\n')
-        f_label.write(str(label[i]) + '\n')
-        f_pred.write(str(label_pred_seq[i]) + '\n')
+        # sen, label, label_pred_seq are list of lists,
+        # thus I would like to flatten them for iterating easier
+        sen = list(itertools.chain.from_iterable(sen))
+        label = list(itertools.chain.from_iterable(label))
+        label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
+        assert len(sen) == len(label) and len(label) == len(label_pred_seq)
 
-        # clean version (does not print <PAD>, print a newline instead of <EOS>)
-        #if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
-        #if sen[i] != 0: # not <PAD>
+        for i in range(len(sen)):
+          f_sen.write(str(sen[i]) + '\n')
+          f_label.write(str(label[i]) + '\n')
+          f_pred.write(str(label_pred_seq[i]) + '\n')
 
-        result_sen = index2word[sen[i]]
-        result_label = index2label[label[i]]
-        result_pred = index2label[label_pred_seq[i]]
-        f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+          # clean version (does not print <PAD>, print a newline instead of <EOS>)
+          #if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
+          #if sen[i] != 0: # not <PAD>
 
-        #elif sen[i] == 2:   # <EOS>
-        #    f_result_processed.write('\n')
+          result_sen = index2word[sen[i]]
+          result_label = index2label[label[i]]
+          result_pred = index2label[label_pred_seq[i]]
+          f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+
+          #elif sen[i] == 2:   # <EOS>
+          #    f_result_processed.write('\n')
+        # End if result_path
     # End for batch_idx
 
-    f_sen.close()
-    f_pred.close()
-    f_label.close()
-    f_result_processed.close()
+    if result_path:
+      f_sen.close()
+      f_pred.close()
+      f_label.close()
+      f_result_processed.close()
+
+    avg_loss = loss_sum / instance_num
+
+    return avg_loss
