@@ -220,6 +220,10 @@ class ner(nn.Module):
 
 
   def train(self, shuffle, beam_size, result_path):
+    # Double penalize for the cases in which the true label is not
+    # <PAD>:0, <BEG>:1, O:2
+    #weight = torch.tensor([1, 1, 1, 2, 2, 2, 2, 2, 2, 2])
+
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
     # Note that here we called nn.Module.parameters()
@@ -249,6 +253,8 @@ class ner(nn.Module):
       for batch_idx in batch_idx_list:
         sen = self.train_X[batch_idx]
         label = self.train_Y[batch_idx]
+
+        print("label=",label)
 
         current_batch_size = len(sen)
         current_sen_len = len(sen[0])
