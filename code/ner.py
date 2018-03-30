@@ -764,18 +764,20 @@ class ner(nn.Module):
       loss_sum += loss.data.numpy()[0] / current_sen_len
 
         # Here label_pred_seq.shape = (batch size, sen len)
-      if self.gpu:
-        label_pred_seq = label_pred_seq.cpu()
+      if result_path:
 
-      label_pred_seq = label_pred_seq.data.numpy().tolist()
+        if self.gpu:
+          label_pred_seq = label_pred_seq.cpu()
+
+        label_pred_seq = label_pred_seq.data.numpy().tolist()
 
       # sen, label, label_pred_seq are list of lists,
       # thus I would like to flatten them for iterating easier
-      sen = list(itertools.chain.from_iterable(sen))
-      label = list(itertools.chain.from_iterable(label))
-      label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
-      assert len(sen) == len(label) and len(label) == len(label_pred_seq)
-      if result_path:
+
+        sen = list(itertools.chain.from_iterable(sen))
+        label = list(itertools.chain.from_iterable(label))
+        label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
+        assert len(sen) == len(label) and len(label) == len(label_pred_seq)
         for i in range(len(sen)):
           f_sen.write(str(sen[i]) + '\n')
           f_label.write(str(label[i]) + '\n')
@@ -789,10 +791,10 @@ class ner(nn.Module):
           result_label = index2label[label[i]]
           result_pred = index2label[label_pred_seq[i]]
           f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
-      else:
-        correctness += np.sum(np.array(label) == np.array(label_pred_seq))
-    accuracy = correctness / instance_num
-    print(" accuracy for ", suffix, " = ", accuracy)
+    #   else:
+    #     correctness += np.sum(np.array(label) == np.array(label_pred_seq))
+    # accuracy = correctness / instance_num
+    # print(" accuracy for ", suffix, " = ", accuracy)
 
 
           #elif sen[i] == 2:   # <EOS>
