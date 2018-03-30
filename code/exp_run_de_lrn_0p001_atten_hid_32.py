@@ -85,7 +85,7 @@ def minibatch_de(data, batch_size):
 def main():
   data_path = "../dataset/German/"
 
-  result_path = "../result_lrn_0p0005/"
+  result_path = "../result_lrn_0p001_atten_hid_32/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -97,6 +97,7 @@ def main():
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
+  #print("label_size=",label_size)
 
   train_X, train_Y = minibatch_de('train', batch_size)
   val_X, val_Y = minibatch_de('valid', batch_size)
@@ -104,16 +105,16 @@ def main():
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
 
-  hidden_dim = 64
+  hidden_dim = 32
   label_embedding_dim = 8
 
-  max_epoch = 50
+  max_epoch = 100
 
   # 0.001 is a good value
-  learning_rate = 0.0005
+  learning_rate = 0.001
 
-  #attention = "fixed"
-  attention = None
+  attention = "fixed"
+  #attention = None
 
   pretrained = 'de64'
 
@@ -134,8 +135,8 @@ def main():
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
   # Write out files
-  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
 
   #print("train_eval_loss =", train_eval_loss)
   #print("val_eval_loss =", val_eval_loss)
@@ -148,7 +149,7 @@ def main():
   #plt.ylim([0, 0.5])
   plt.xlabel("Epoch")
   plt.ylabel("Cross-entropy loss")
-  plt.savefig(result_path + "fig_exp.pdf")
+  plt.savefig(result_path + "fig_exp1.pdf")
 
 if __name__ == "__main__":
   main()
