@@ -107,7 +107,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 100
+  max_epoch = 50
 
   # 0.001 is a good value
   learning_rate = 0.001
