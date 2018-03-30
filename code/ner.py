@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+import os
 import numpy as np
 import time
 import itertools
@@ -313,9 +313,9 @@ class ner(nn.Module):
 
       # Do evaluation on training set using model at this point
       # using decode_greedy or decode_beam
-      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, "train", '../result/' + str(epoch) + '/', beam_size)
+      train_loss = self.evaluate(self.train_X, self.train_Y, None, None, "train", '../result_' + str(epoch) + '/', beam_size)
       # Do evaluation on validation set as well
-      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, "val", '../result/' + str(epoch) + '/', beam_size)
+      val_loss = self.evaluate(self.test_X, self.test_Y, None, None, "val", '../result_' + str(epoch) + '/', beam_size)
 
       print("epoch", epoch,
             ", accumulated loss during training =", avg_loss, "\n",
@@ -690,6 +690,8 @@ class ner(nn.Module):
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
   def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, beam_size):
+    if not os.path.exists(result_path):
+      os.makedirs(result_path)
     # To compute loss function value during evaluation time
     # Will manually average over (sentence_len * instance_num)
     loss_function = nn.CrossEntropyLoss(size_average=False)
