@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 from operator import itemgetter
 import collections
 from ner import ner
-from preprocessor import Preprocessor
-
 
 
 def get_index2word(dict_file):
