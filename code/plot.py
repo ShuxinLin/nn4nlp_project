@@ -6,7 +6,7 @@ import numpy as np
 import re
 
 
-logfile = open("../gitignore/result_lrn_0p001_atten/log.txt", "r")
+logfile = open("../gitignore/result_lrn_0p001_beam_10/log.txt", "r")
 
 train_loss = []
 val_loss = []
@@ -29,7 +29,7 @@ plt.plot(epoch, train_loss, "r-", epoch, val_loss, "b-")
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('Average cross-entropy error')
-plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_atten_loss.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_beam_10/fig_lrn_0p001_beam_10_loss.pdf')
 
 
 
@@ -39,7 +39,7 @@ plt.plot(epoch, train_f, "r-", epoch, val_f, "b-")
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score')
-plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_atten_f.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_beam_10/fig_lrn_0p001_beam_10_f.pdf')
 
 
 
