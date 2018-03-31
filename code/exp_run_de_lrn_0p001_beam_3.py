@@ -85,7 +85,7 @@ def minibatch_de(data, batch_size):
 def main():
   data_path = "../dataset/German/"
 
-  result_path = "../result_lrn_0p001/"
+  result_path = "../result_lrn_0p001_beam_3/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -128,7 +128,7 @@ def main():
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  beam_size = 0
+  beam_size = 3
 
   shuffle = True
 
