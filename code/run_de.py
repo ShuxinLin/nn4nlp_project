@@ -101,6 +101,7 @@ def main():
 
   train_X, train_Y = minibatch_de('train', batch_size)
   val_X, val_Y = minibatch_de('valid', batch_size)
+  test_X, test_Y = minibatch_de('test', batch_size)
 
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
@@ -108,7 +109,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 100
+  max_epoch = 3
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -123,7 +124,7 @@ def main():
 
   gpu = True
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
     machine = machine.cuda()
 
