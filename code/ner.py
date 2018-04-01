@@ -24,6 +24,7 @@ class ner(nn.Module):
                learning_rate=0.1, minibatch_size=1,
                max_epoch=300,
                train_X=None, train_Y=None,
+               val_X=None, val_Y=None,
                test_X=None, test_Y=None,
                attention="fixed",
                gpu=False,
@@ -40,6 +41,8 @@ class ner(nn.Module):
     self.max_epoch = max_epoch
     self.train_X = train_X
     self.train_Y = train_Y
+    self.val_X = val_X
+    self.val_Y = val_Y
     self.test_X = test_X
     self.test_Y = test_Y
 
@@ -337,17 +340,21 @@ class ner(nn.Module):
       # using decode_greedy or decode_beam
       train_loss, train_fscore = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
       # Do evaluation on validation set as well
-      val_loss, val_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "val", None, beam_size)
+      val_loss, val_fscore = self.evaluate(self.val_X, self.val_Y, None, None, "val", None, beam_size)
+      test_loss, test_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "test", None, beam_size)
 
       print("epoch", epoch,
             ", accumulated loss during training =", avg_loss,
             "\n training loss =", train_loss,
             ", validation loss =", val_loss,
+            ", test loss =", test_loss,
             "\n training F score =", train_fscore,
             ", validation F score =", val_fscore,
+            ", test F score =", test_fscore,
             "\n time =", time_end - time_begin)
 
-      output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, train_fscore, val_fscore, time_end - time_begin))
+      output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
+      output_file.flush()
 
     # End for epoch
 
