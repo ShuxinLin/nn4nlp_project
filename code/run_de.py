@@ -138,12 +138,14 @@ def main():
   # Write out files
   train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
   val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
 
   #print("train_eval_loss =", train_eval_loss)
   #print("val_eval_loss =", val_eval_loss)
 
   #print(train_loss_list)
 
+  """
   plt.figure(1)
   plt.plot(list(range(len(train_loss_list))) , train_loss_list, "k-")
   #plt.xlim([0, 11])
@@ -151,6 +153,7 @@ def main():
   plt.xlabel("Epoch")
   plt.ylabel("Cross-entropy loss")
   plt.savefig(result_path + "fig_exp1.pdf")
+  """
 
 if __name__ == "__main__":
   main()
