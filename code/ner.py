@@ -105,9 +105,11 @@ class ner(nn.Module):
     # enc_hidden_out shape is (num_layers * num_directions, batch_size, hidden_dim)
     # We use 1-layer here
     # Assume the 0-th dimension is: [forward, backward] final hidden states
+
+    sentence_emb = sentence_emb.permute(1, 0, 2)
+
     enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encoder(
-      sentence_emb.view((sentence_len, current_batch_size, self.word_embedding_dim)),
-      (init_enc_hidden, init_enc_cell))
+      sentence_emb, (init_enc_hidden, init_enc_cell))
 
     return enc_hidden_seq, (enc_hidden_out, enc_cell_out)
 
