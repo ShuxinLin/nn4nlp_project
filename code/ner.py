@@ -9,12 +9,11 @@ import torch.optim as optim
 
 import numpy as np
 import time
+import os
 import itertools
 
 from attention import Attention
 from preprocessor import *
-
-import os
 
 
 class ner(nn.Module):
@@ -59,7 +58,9 @@ class ner(nn.Module):
                                        self.word_embedding_dim)
     if pretrained:  # not None
       print("Using pretrained word embedding: ", pretrained)
-      word_embedding_np = np.loadtxt('../dataset/WordEmbed/' + pretrained + '_embed.txt', dtype=float)    # load pretrained model: word2vec/glove
+      word_embedding_np = np.loadtxt(
+      	os.path.join('../dataset/WordEmbed/', pretrained + '_embed.txt'),
+      	dtype=float)    # load pretrained model: word2vec/glove
       assert self.vocab_size == word_embedding_np.shape[0]
       assert self.word_embedding_dim == word_embedding_np.shape[1]
 
@@ -92,6 +93,10 @@ class ner(nn.Module):
     sentence_emb = self.word_embedding(sentence)
     current_batch_size, sentence_len = sentence.size()
 
+    print("sentence_emb=",sentence_emb)
+    print("current_batch_size=",current_batch_size)
+    print("sentence_len=",sentence_len)
+
     # Input:
     # init_enc_hidden, init_enc_cell shape are both
     # (num_layers * num_directions, batch_size, hidden_size)
@@ -105,8 +110,15 @@ class ner(nn.Module):
     # enc_hidden_out shape is (num_layers * num_directions, batch_size, hidden_dim)
     # We use 1-layer here
     # Assume the 0-th dimension is: [forward, backward] final hidden states
+
+    sentence_emb = sentence_emb.permute(1, 0, 2)
+
+    #print("sentence_emb permuted =", sentence_emb)
+    #time.sleep(2)
+
     enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encoder(
-      sentence_emb.view((sentence_len, current_batch_size, self.word_embedding_dim)),
+      #sentence_emb.view((sentence_len, current_batch_size, self.word_embedding_dim)),
+      sentence_emb,
       (init_enc_hidden, init_enc_cell))
 
     return enc_hidden_seq, (enc_hidden_out, enc_cell_out)
@@ -251,10 +263,15 @@ class ner(nn.Module):
         sen = self.train_X[batch_idx]
         label = self.train_Y[batch_idx]
 
-        #print("label=",label)
+        print("==begin==")
+        print("sen=",sen)
+        print("label=",label)
 
         current_batch_size = len(sen)
         current_sen_len = len(sen[0])
+
+        print("current_batch_size=",current_batch_size)
+        print("current_sen_len=",current_sen_len)
 
         # Always clear the gradients before use
         self.zero_grad()
@@ -276,6 +293,8 @@ class ner(nn.Module):
         init_enc_cell = Variable(
           torch.zeros(2, current_batch_size, self.hidden_dim))
 
+        #print("init_enc_hidden=",init_enc_hidden)
+
         if self.gpu:
           init_enc_hidden = init_enc_hidden.cuda()
           init_enc_cell = init_enc_cell.cuda()
@@ -283,14 +302,24 @@ class ner(nn.Module):
         enc_hidden_seq, (enc_hidden_out, enc_cell_out) = \
           self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
+        #print("sen_var=",sen_var)
+        #print("enc_hidden_seq=",enc_hidden_seq)
+        #print("enc_hidden_out=",enc_hidden_out)
+        #print("enc_cell_out=",enc_cell_out)
+        #time.sleep(2)
+
         # The semantics of enc_hidden_out is (num_layers * num_directions,
         # batch, hidden_size), and it is "tensor containing the hidden state
         # for t = seq_len".
         #
         # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+        #
+        # Note that enc_hidden_out[0] is the hidden state at "t=T-1" in forward dir,
+        # enc_hidden_out[1] is the hidden state at "t=0" in backward dir.
         init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
         init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
 
+        # For single-directional LSTM encoder
         #init_dec_hidden = enc_hidden_out[0]
         #init_dec_cell = enc_cell_out[0]
 

@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
-
 import matplotlib.pyplot as plt
 
 from operator import itemgetter
 import collections
 from ner import ner
 import os
+import time
 
 
 def get_index2word(dict_file):
@@ -30,12 +30,17 @@ def get_index2label(entity_file):
       index2label[int(index)] = entity
   return index2label
 
-def construct_df(data):
+def construct_df(subset):
   dataset_path = '../dataset/German/'
 
-  indexed_sentence_file = dataset_path + data + '.de-en.ids1.de'
-  indexed_entity_file = dataset_path + data + '.de-en.ids1.en'
+  #indexed_sentence_file = os.path.join(dataset_path, subset + '.de-en.ids1.de')
+  #indexed_entity_file = os.path.join(dataset_path, subset + '.de-en.ids1.en')
+
+  indexed_sentence_file = os.path.join(dataset_path, subset + '.de-en.ids1.de.nano.txt')
+  indexed_entity_file = os.path.join(dataset_path, subset + '.de-en.ids1.en.nano.txt')
+
   with open(indexed_sentence_file) as f:
+    # [sen1, sen2, ...]
     indexed_sentences = f.readlines()
   with open(indexed_entity_file) as f:
     indexed_entities = f.readlines()
@@ -43,12 +48,12 @@ def construct_df(data):
 
   return df
 
-def minibatch_de(data, batch_size):
+def minibatch_de(subset, batch_size):
   print("Generate mini batches.")
   X_batch = []
   Y_batch = []
   all_data = []
-  indexed_data = construct_df(data)
+  indexed_data = construct_df(subset)
   for index, row in indexed_data.iterrows():
     splitted_sentence = list(map(int, row['SENTENCE'].split()))
     splitted_entities = list(map(int, row['ENTITY'].split()))
@@ -91,21 +96,28 @@ def main():
 
   batch_size = 32
 
-  dict_file = "../dataset/German/vocab1.de"
+  #dict_file = "../dataset/German/vocab1.de"
+  dict_file = "../dataset/German/vocab1.de.nano.txt"
+
   entity_file = "../dataset/German/vocab1.en"
   index2word = get_index2word(dict_file)
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
-  #print("label_size=",label_size)
 
   train_X, train_Y = minibatch_de('train', batch_size)
-  val_X, val_Y = minibatch_de('valid', batch_size)
+
+  #val_X, val_Y = minibatch_de('valid', batch_size)
+  val_X, val_Y = minibatch_de('train', batch_size)
+
+  print("train_X=",train_X)
+  print("train_Y=",train_Y)
 
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
 
-  hidden_dim = 64
+  #hidden_dim = 64
+  hidden_dim = 6
   label_embedding_dim = 8
 
   max_epoch = 100
@@ -116,12 +128,15 @@ def main():
   #attention = "fixed"
   attention = None
 
-  pretrained = 'de64'
+  #pretrained = 'de64'
+  pretrained = "de4nano"
 
   if pretrained == 'de64':
     word_embedding_dim = 64
+  elif pretrained == "de4nano":
+    word_embedding_dim = 4
 
-  gpu = True
+  gpu = False
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
@@ -143,6 +158,7 @@ def main():
 
   #print(train_loss_list)
 
+  """
   plt.figure(1)
   plt.plot(list(range(len(train_loss_list))) , train_loss_list, "k-")
   #plt.xlim([0, 11])
@@ -150,6 +166,7 @@ def main():
   plt.xlabel("Epoch")
   plt.ylabel("Cross-entropy loss")
   plt.savefig(result_path + "fig_exp1.pdf")
+  """
 
 if __name__ == "__main__":
   main()
