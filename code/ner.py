@@ -354,6 +354,7 @@ class ner(nn.Module):
             "\n time =", time_end - time_begin)
 
       output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
+      output_file.flush()
 
     # End for epoch
 
