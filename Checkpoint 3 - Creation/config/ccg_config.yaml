@@ -1,0 +1,54 @@
+generic:
+  task_name: 'ccg'
+
+encoder:
+  n_layers: 1
+  cell_type: 'gru'
+  is_bidirectional: Y
+  hidden_size: 64
+  max_seq_len: 50
+  in_dropout: 0.
+  out_dropout: 0.
+  is_packing: FALSE
+  is_batch_first: Y
+  is_embedding_used: Y
+  out_embedding_dim: 64
+  is_embed_pretrain: FALSE
+  embed_pretrain_path: ''
+
+decoder:
+  n_layers: 1
+  cell_type: 'gru'
+  hidden_size: 64
+  is_bidirectional: FALSE
+  max_seq_len: 50
+  in_dropout: 0.
+  out_dropout: 0.
+  is_batch_first: Y
+  is_embedding_used: Y
+  out_embedding_dim: 10
+  is_embed_pretrain: FALSE
+  is_attended: Y
+  attention_type: 'fixed'
+  is_softmax_output_needed: Y
+  SOS_ID: 0
+  EOS_ID: 1
+
+trainer:
+  is_tensorboard: Y
+  is_checkpoint_retrieved: Y
+  is_tagging: True
+  teacher_forcing_ratio: 0.5
+  optim_type: 'sgd'
+  momentum: 0.8
+  decode_method: 'greedy'
+  batch_style: 'naive_bucket'
+  learning_rate: 0.01
+  print_freq: 100
+  batch_size: 32
+  n_epoch: 30
+  save_freq: 5000
+  ckpt_dir: 'checkpoint_ccg'
+  log_dir: 'logs_ccg'
+  num_saved_versions: 5
+  is_f1_reported: Y
