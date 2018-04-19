@@ -97,9 +97,11 @@ def main():
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
+  #print("label_size=",label_size)
 
   train_X, train_Y = minibatch_de('train', batch_size)
   val_X, val_Y = minibatch_de('valid', batch_size)
+  test_X, test_Y = minibatch_de('test', batch_size)
 
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
@@ -107,7 +109,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 50
+  max_epoch = 300
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -122,7 +124,7 @@ def main():
 
   gpu = True
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, test_X=val_X, test_Y=val_Y, attention=attention, gpu=gpu, pretrained=pretrained)
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
     machine = machine.cuda()
 
@@ -133,21 +135,25 @@ def main():
   shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
-  train_eval_loss = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  val_eval_loss = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  # Write out files
+  train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
 
-  print("train_eval_loss =", train_eval_loss)
-  print("val_eval_loss =", val_eval_loss)
+  #print("train_eval_loss =", train_eval_loss)
+  #print("val_eval_loss =", val_eval_loss)
 
   #print(train_loss_list)
 
+  """
   plt.figure(1)
   plt.plot(list(range(len(train_loss_list))) , train_loss_list, "k-")
   #plt.xlim([0, 11])
   #plt.ylim([0, 0.5])
   plt.xlabel("Epoch")
   plt.ylabel("Cross-entropy loss")
-  plt.savefig(result_path + "fig_exp.pdf")
+  plt.savefig(result_path + "fig_exp1.pdf")
+  """
 
 if __name__ == "__main__":
   main()
