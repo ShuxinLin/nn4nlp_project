@@ -580,6 +580,12 @@ class ner(nn.Module):
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
     # y_beam, score_beam => same
+
+
+    # TESTING: use alternating beam size:
+    # beam_size -> beam_size + 1 -> beam_size -> ...
+    parity = 0
+
     score_beam, index_beam = torch.topk(score_matrix, beam_size, dim = 1)
     beta_beam = torch.floor(index_beam.float() / self.label_size).long()
     y_beam = torch.remainder(index_beam, self.label_size)
@@ -591,10 +597,28 @@ class ner(nn.Module):
 
     score_seq.append(score_output_beam)
 
+    print("t = 0, beam size =", beam_size)
+    print("beta_seq=",beta_seq)
+    print("y_seq=",y_seq)
+    print("score_seq=",score_seq)
+
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       # We loop through beam because we expect that
       # usually batch size > beam size
+      #
+      # DESIGN: This may not be true anymore in adaptive beam search,
+      # since we expect batch size = 1 in this case.
+      # So is beam operations vectorizable?
+
+      # TESTING: Alternatingly adjust beam size
+      if parity:
+        beam_size -= 1
+        parity = 0
+      else:
+        beam_size += 1
+        parity = 1
+
       dec_hidden_out_list = []
       dec_cell_out_list = []
       score_out_list = []
@@ -676,6 +700,11 @@ class ner(nn.Module):
         attention_seq.append(attention_beam)
 
       score_seq.append(score_output_beam)
+
+      print("t=0, beam size=", beam_size)
+      print("beta_seq=",beta_seq)
+      print("y_seq=",y_seq)
+      print("score_seq=",score_seq)
     # End for t
 
     # Only output the highest-scored beam (for each instance in the batch)
@@ -695,6 +724,12 @@ class ner(nn.Module):
 
     score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
+    print("backtracking...")
+    print("t=",seq_len)
+    print("label_pred_seq=",label_pred_seq)
+    print("input_beam=",input_beam)
+    print("score_pred_seq=",score_pred_seq)
+
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
         [y_seq[t][range(batch_size), input_beam] \
@@ -707,6 +742,11 @@ class ner(nn.Module):
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
 
       score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
+
+      print("t=",seq_len)
+      print("label_pred_seq=",label_pred_seq)
+      print("input_beam=",input_beam)
+      print("score_pred_seq=",score_pred_seq)
     # End for t
 
     if self.attention:
@@ -719,6 +759,9 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
+
+    print("beam search ends: score_pred_seq=",score_pred_seq)
+    time.sleep(5)
 
     return label_pred_seq, score_pred_seq, attention_pred_seq
 
