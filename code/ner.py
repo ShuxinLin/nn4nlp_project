@@ -307,6 +307,8 @@ class ner(nn.Module):
         label_var_for_loss = label_var.permute(1, 0) \
           .contiguous().view(-1)
 
+        # Don't do extra penalty for toy_reverse
+        """
         O_INDEX = 4
         gold_not_O_mask = (label_var_for_loss > O_INDEX).float()
         #print("label_var_for_loss=",label_var_for_loss)
@@ -318,6 +320,7 @@ class ner(nn.Module):
         score_seq[:, O_INDEX] = score_seq[:, O_INDEX] + gold_not_O_mask
         #print("after: score_seq=",score_seq[:10, 3:6])
         #time.sleep(1)
+        """
 
         # Input: (N,C) where C = number of classes
         # Target: (N) where each value is 0 <= targets[i] <= C−1
@@ -806,8 +809,10 @@ class ner(nn.Module):
         loss = loss.cpu()
       loss_sum += loss.data.numpy()[0] / current_sen_len
 
-      O_INDEX = 4
-      assert self.label_size == 12
+      #O_INDEX = 4
+      #assert self.label_size == 12
+      # For toy_reverse:
+      O_INDEX = -1
       for label_index in range(O_INDEX + 1, self.label_size):
         #print("label_var=", label_var)
         true_pos = (label_var == label_index)
