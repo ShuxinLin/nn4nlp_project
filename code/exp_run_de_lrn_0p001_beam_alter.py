@@ -106,7 +106,7 @@ def minibatch_of_one_de(data):
 def main():
   data_path = "../dataset/German/"
 
-  result_path = "../result_lrn_0p001_beam_3/"
+  result_path = "../result_lrn_0p001_beam_alter/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -121,8 +121,12 @@ def main():
   #print("label_size=",label_size)
 
   train_X, train_Y = minibatch_de('train', batch_size)
-  val_X, val_Y = minibatch_de('valid', batch_size)
-  test_X, test_Y = minibatch_de('test', batch_size)
+  val_X, val_Y = minibatch_of_one_de('valid')
+  test_X, test_Y = minibatch_of_one_de('test')
+
+  #print("val_X len=",len(val_X))
+  #print("val_X[1000]=",val_X[1000])
+  #print("val_Y[1000]=",val_Y[1000])
 
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
@@ -130,7 +134,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 300
+  max_epoch = 10
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -143,7 +147,7 @@ def main():
   if pretrained == 'de64':
     word_embedding_dim = 64
 
-  gpu = True
+  gpu = False
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained)
   if gpu:
@@ -151,13 +155,13 @@ def main():
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  beam_size = 3
+  beam_size = 0
 
   shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
   # Write out files
-  train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  #train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
   val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
   test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
 
