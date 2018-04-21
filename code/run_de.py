@@ -12,6 +12,8 @@ import collections
 from ner import ner
 import os
 
+import torch
+
 
 def get_index2word(dict_file):
   index2word = dict()
