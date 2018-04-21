@@ -383,7 +383,7 @@ class ner(nn.Module):
       # In our current way of doing experiment, we don't keep is_best
       is_best = False
       checkpoint_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".tar")
-      save_checkpoint({'epoch': epoch,
+      self.save_checkpoint({'epoch': epoch,
                        'state_dict': self.state_dict(),
                        'optimizer' : optimizer.state_dict()},
                       checkpoint_filename,
