@@ -148,7 +148,9 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval.txt"), "w+")
+  eval_output_file_greedy = open(os.path.join(result_path, "eval_greedy.txt"), "w+")
+  eval_output_file_beam_1 = open(os.path.join(result_path, "eval_beam_1.txt"), "w+")
+  eval_output_file_beam_3 = open(os.path.join(result_path, "eval_beam_3.txt"), "w+")
 
   for epoch in range(0, max_epoch):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
@@ -161,27 +163,74 @@ def main():
     # "beam_size = 1" will still use beam search, just with beam size = 1
     beam_size = 0
 
-    train_loss, train_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", None, beam_size)
-    val_loss, val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, beam_size)
+    train_loss_greedy, train_fscore_greedy = machine.evaluate(train_X, train_Y, index2word, index2label, "train", None, beam_size)
+    val_loss_greedy, val_fscore_greedy = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, beam_size)
 
-    time_begin = time.time()
-    test_loss, test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
-    time_end = time.time()
+    time_begin_greedy = time.time()
+    test_loss_greedy, test_fscore_greedy = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
+    time_end_greedy = time.time()
 
-    print("epoch", epoch,
-          "\n training loss = %.6f" % train_loss,
-          ", validation loss = %.6f" % val_loss,
-          ", test loss = %.6f" % test_loss,
-          "\n training F score = %.6f" % train_fscore,
-          ", validation F score = %.6f" % val_fscore,
-          ", test F score = %.6f" % test_fscore,
-          "\n test time = %.6f" % (time_end - time_begin))
+    ###
+    beam_size = 1
 
-    eval_output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
-    eval_output_file.flush()
+    train_loss_beam_1, train_fscore_beam_1 = machine.evaluate(train_X, train_Y, index2word, index2label, "train", None, beam_size)
+    val_loss_beam_1, val_fscore_beam_1 = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, beam_size)
+
+    time_begin_beam_1 = time.time()
+    test_loss_beam_1, test_fscore_beam_1 = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
+    time_end_beam_1 = time.time()
+
+
+    ###
+    beam_size = 3
+
+    train_loss_beam_3, train_fscore_beam_3 = machine.evaluate(train_X, train_Y, index2word, index2label, "train", None, beam_size)
+    val_loss_beam_3, val_fscore_beam_3 = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, beam_size)
+
+    time_begin_beam_3 = time.time()
+    test_loss_beam_3, test_fscore_beam_3 = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
+    time_end_beam_3 = time.time()
+
+
+    print("epoch %d" % epoch)
+    print("Greedy\n"
+          "training loss = %.6f" % train_loss_greedy,
+          ", validation loss = %.6f" % val_loss_greedy,
+          ", test loss = %.6f\n" % test_loss_greedy,
+          "training F score = %.6f" % train_fscore_greedy,
+          ", validation F score = %.6f" % val_fscore_greedy,
+          ", test F score = %.6f\n" % test_fscore_greedy,
+          "test time = %.6f" % (time_end_greedy - time_begin_greedy))
+    print("Beam size 1\n"
+          "training loss = %.6f" % train_loss_beam_1,
+          ", validation loss = %.6f" % val_loss_beam_1,
+          ", test loss = %.6f\n" % test_loss_beam_1,
+          "training F score = %.6f" % train_fscore_beam_1,
+          ", validation F score = %.6f" % val_fscore_beam_1,
+          ", test F score = %.6f\n" % test_fscore_beam_1,
+          "test time = %.6f" % (time_end_beam_1 - time_begin_beam_1))
+    print("Beam size 3\n"
+          "training loss = %.6f" % train_loss_beam_3,
+          ", validation loss = %.6f" % val_loss_beam_3,
+          ", test loss = %.6f\n" % test_loss_beam_3,
+          "training F score = %.6f" % train_fscore_beam_3,
+          ", validation F score = %.6f" % val_fscore_beam_3,
+          ", test F score = %.6f\n" % test_fscore_beam_3,
+          "test time = %.6f" % (time_end_beam_3 - time_begin_beam_3))
+
+    eval_output_file_greedy.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, train_loss_greedy, val_loss_greedy, test_loss_greedy, train_fscore_greedy, val_fscore_greedy, test_fscore_greedy, time_end_greedy - time_begin_greedy))
+    eval_output_file_greedy.flush()
+
+    eval_output_file_beam_1.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, train_loss_beam_1, val_loss_beam_1, test_loss_beam_1, train_fscore_beam_1, val_fscore_beam_1, test_fscore_beam_1, time_end_beam_1 - time_begin_beam_1))
+    eval_output_file_beam_1.flush()
+
+    eval_output_file_beam_3.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, train_loss_beam_3, val_loss_beam_3, test_loss_beam_3, train_fscore_beam_3, val_fscore_beam_3, test_fscore_beam_3, time_end_beam_3 - time_begin_beam_3))
+    eval_output_file_beam_3.flush()
   # End for epoch
 
-  eval_output_file.close()
+  eval_output_file_greedy.close()
+  eval_output_file_beam_1.close()
+  eval_output_file_beam_3.close()
 
 
 
