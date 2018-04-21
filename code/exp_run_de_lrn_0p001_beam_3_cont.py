@@ -143,7 +143,7 @@ def main():
   # "beam_size = 1" will still use beam search, just with beam size = 1
   beam_size = 3
 
-  shuffle = False
+  shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
   # Write out files
