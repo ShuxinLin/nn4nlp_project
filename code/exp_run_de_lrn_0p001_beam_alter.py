@@ -155,7 +155,7 @@ def main():
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
-  beam_size = 0
+  beam_size = 3
 
   shuffle = True
 
