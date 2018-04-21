@@ -396,7 +396,7 @@ class ner(nn.Module):
     return train_loss_list
 
 
-  def save_checkpoint(state, filename, is_best):
+  def save_checkpoint(self, state, filename, is_best):
     torch.save(state, filename)
     if is_best:
       torch.save(state, "best.tar")
