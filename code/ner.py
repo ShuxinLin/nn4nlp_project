@@ -612,14 +612,6 @@ class ner(nn.Module):
       # since we expect batch size = 1 in this case.
       # So is beam operations vectorizable?
 
-      # TESTING: Alternatingly adjust beam size
-      if parity:
-        beam_size -= 1
-        parity = 0
-      else:
-        beam_size += 1
-        parity = 1
-
       dec_hidden_out_list = []
       dec_cell_out_list = []
       score_out_list = []
@@ -689,6 +681,14 @@ class ner(nn.Module):
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
 
+      # TESTING: Alternatingly adjust beam size
+      if parity:
+        beam_size -= 1
+        parity = 0
+      else:
+        beam_size += 1
+        parity = 1
+
       score_beam, index_beam = \
         torch.topk(score_matrix, beam_size, dim = 1)
       beta_beam = torch.floor(
@@ -702,7 +702,7 @@ class ner(nn.Module):
 
       score_seq.append(score_output_beam)
 
-      print("t=0, beam size=", beam_size)
+      print("t=", t, ", beam size=", beam_size)
       print("beta_seq=",beta_seq)
       print("y_seq=",y_seq)
       print("score_seq=",score_seq)
