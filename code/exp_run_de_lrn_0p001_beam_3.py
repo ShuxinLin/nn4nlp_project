@@ -109,7 +109,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 300
+  max_epoch = 10
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -124,7 +124,9 @@ def main():
 
   gpu = True
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained)
+  load_model_filename = None
+
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
   if gpu:
     machine = machine.cuda()
 

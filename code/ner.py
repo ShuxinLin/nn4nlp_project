@@ -28,7 +28,8 @@ class ner(nn.Module):
                test_X=None, test_Y=None,
                attention="fixed",
                gpu=False,
-               pretrained=None):
+               pretrained=None,
+               load_model_filename=None):
 
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
@@ -45,6 +46,7 @@ class ner(nn.Module):
     self.val_Y = val_Y
     self.test_X = test_X
     self.test_Y = test_Y
+    self.load_model_filename = load_model_filename
 
     # For now we hard code the index of "<BEG>"
     self.BEG_INDEX = 1
@@ -92,6 +94,10 @@ class ner(nn.Module):
 
     # From score to log probability
     self.score2logP = nn.LogSoftmax(dim=1)
+
+    if self.load_model_filename:
+      self.checkpoint = torch.load(self.load_model_filename)
+      self.load_state_dict(self.checkpoint["state_dict"])
 
   def encode(self, sentence, init_enc_hidden, init_enc_cell):
     # sentence shape is (batch_size, sentence_length)
@@ -244,6 +250,8 @@ class ner(nn.Module):
 
     # Note that here we called nn.Module.parameters()
     optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+    if self.load_model_filename:
+      optimizer.load_state_dict(self.checkpoint["optimizer"])
 
     # self.train_X = [batch_1, batch_2, ...]
     # batch_i = [ [idx_1, idx_2, ...], ...]
@@ -258,7 +266,9 @@ class ner(nn.Module):
 
     output_file = open(os.path.join(result_path, "log.txt"), "w+")
 
-    for epoch in range(self.max_epoch):
+    initial_epoch = (self.checkpoint["epoch"] + 1) if self.load_model_filename else 0
+
+    for epoch in range(initial_epoch, initial_epoch + self.max_epoch):
       time_begin = time.time()
       loss_sum = 0
 
@@ -382,7 +392,7 @@ class ner(nn.Module):
       # Save model
       # In our current way of doing experiment, we don't keep is_best
       is_best = False
-      checkpoint_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".tar")
+      checkpoint_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
       self.save_checkpoint({'epoch': epoch,
                        'state_dict': self.state_dict(),
                        'optimizer' : optimizer.state_dict()},
@@ -399,7 +409,7 @@ class ner(nn.Module):
   def save_checkpoint(self, state, filename, is_best):
     torch.save(state, filename)
     if is_best:
-      torch.save(state, "best.tar")
+      torch.save(state, "best.pth")
 
 
   def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq):
