@@ -13,8 +13,6 @@ from ner import ner
 import os
 import time
 
-from data.toy_reverse_data_feeder import ToyDataFeeder
-from data.toy_reverse_data import parse_data
 
 def get_index2word(dict_file):
   index2word = dict()
@@ -55,7 +53,6 @@ def construct_df(set_name):
   return df
 """
 
-"""
 def minibatch_de(set_name, batch_size):
   print("Generate mini batches.")
 
@@ -95,66 +92,28 @@ def minibatch_de(set_name, batch_size):
   assert len(X_batch) == len(Y_batch)
 
   return list(X_batch), list(Y_batch)
-"""
 
 
 def main():
   #data_path = "../dataset/German/"
 
-  result_path = "../result/"
+  result_path = "../result_4/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
   batch_size = 32
 
-  test = '../dataset/toy_reverse/test/'
-  valid = '../dataset/toy_reverse/valid/'
-  train = '../dataset/toy_reverse/train/'
-
-  X_test, y_test = parse_data(test)
-  X_valid, y_valid = parse_data(valid)
-  X_train, y_train = parse_data(train)
-
-  train_ner_data = ToyDataFeeder(X_train, y_train)
-  train_X, train_Y, _ \
-    = train_ner_data.naive_batch_buckets(batch_size)
-
-  val_ner_data = ToyDataFeeder(X_valid, y_valid, word_to_idx=train_ner_data._word_to_idx, idx_to_word=train_ner_data._idx_to_word,
-               label_to_idx=train_ner_data._label_to_idx,
-               idx_to_label=train_ner_data._idx_to_label)
-  val_X, val_Y, _ \
-    = val_ner_data.naive_batch_buckets(batch_size)
-
-  test_ner_data = ToyDataFeeder(X_test, y_test, word_to_idx=train_ner_data._word_to_idx, idx_to_word=train_ner_data._idx_to_word,
-               label_to_idx=train_ner_data._label_to_idx,
-               idx_to_label=train_ner_data._idx_to_label)
-  test_X, test_Y, _ \
-    = test_ner_data.naive_batch_buckets(batch_size)
-
-  #print("train_ner_data._idx_to_word=",train_ner_data._idx_to_word)
-  #print("val_ner_data._idx_to_word=",val_ner_data._idx_to_word)
-
-  """
-  print("len(test_X)=",len(test_X))
-  print("test_X[0]=",test_X[0])
-  print("test_Y[0]=",test_Y[0])
-  """
-
-  #dict_file = "../dataset/toy_reverse/vocab.src"
-  #entity_file = "../dataset/toy_reverse/vocab.tgt"
-
-  index2word = train_ner_data._idx_to_word
-  index2label = train_ner_data._idx_to_label
-
-  #index2word = get_index2word(dict_file)
-  #index2label = get_index2label(entity_file)
+  dict_file = "../dataset/toy_reverse/vocab.src"
+  entity_file = "../dataset/toy_reverse/vocab.tgt"
+  index2word = get_index2word(dict_file)
+  index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
   #print("label_size=",label_size)
 
-  #train_X, train_Y = minibatch_de('train', batch_size)
-  #val_X, val_Y = minibatch_de('valid', batch_size)
-  #test_X, test_Y = minibatch_de('test', batch_size)
+  train_X, train_Y = minibatch_de('train', batch_size)
+  val_X, val_Y = minibatch_de('valid', batch_size)
+  test_X, test_Y = minibatch_de('test', batch_size)
 
   # Using word2vec pre-trained embedding
   # word_embedding_dim = 300
@@ -168,8 +127,7 @@ def main():
   # 0.001 is a good value
   learning_rate = 0.001
 
-  #attention = "fixed"
-  attention = None
+  attention = "fixed"
 
   #pretrained = 'de64'
   pretrained = None

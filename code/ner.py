@@ -347,14 +347,14 @@ class ner(nn.Module):
       test_loss, test_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "test", None, beam_size)
 
       print("epoch", epoch,
-            ", accumulated loss during training =", avg_loss,
-            "\n training loss =", train_loss,
-            ", validation loss =", val_loss,
-            ", test loss =", test_loss,
-            "\n training F score =", train_fscore,
-            ", validation F score =", val_fscore,
-            ", test F score =", test_fscore,
-            "\n time =", time_end - time_begin)
+            ", accumulated loss during training = %.6f" % avg_loss,
+            "\n training loss = %.6f" % train_loss,
+            ", validation loss = %.6f" % val_loss,
+            ", test loss = %.6f" % test_loss,
+            "\n training F score = %.6f" % train_fscore,
+            ", validation F score = %.6f" % val_fscore,
+            ", test F score = %.6f" % test_fscore,
+            "\n time = %.6f" % (time_end - time_begin))
 
       output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
       output_file.flush()
@@ -812,7 +812,7 @@ class ner(nn.Module):
       #O_INDEX = 4
       #assert self.label_size == 12
       # For toy_reverse:
-      O_INDEX = -1
+      O_INDEX = 3
       for label_index in range(O_INDEX + 1, self.label_size):
         #print("label_var=", label_var)
         true_pos = (label_var == label_index)

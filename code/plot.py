@@ -6,7 +6,7 @@ import numpy as np
 import re
 
 
-logfile = open("../gitignore/result_lrn_0p001_beam_10/log.txt", "r")
+logfile = open("../result/log.txt", "r")
 
 train_loss = []
 val_loss = []
@@ -27,7 +27,7 @@ for line in logfile:
 
 epoch = list(range(len(train_loss)))
 
-epochToPlot = 42
+epochToPlot = 50
 
 plt.figure(1)
 plt.plot(epoch[:epochToPlot], train_loss[:epochToPlot], "r-", epoch[:epochToPlot], val_loss[:epochToPlot], "g-", epoch[:epochToPlot], test_loss[:epochToPlot], "b-")
@@ -35,7 +35,7 @@ plt.plot(epoch[:epochToPlot], train_loss[:epochToPlot], "r-", epoch[:epochToPlot
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('Average cross-entropy error')
-plt.savefig('../gitignore/result_lrn_0p001_beam_10/fig_lrn_0p001_beam_10_loss.pdf')
+plt.savefig('../result/fig_loss.pdf')
 
 
 
@@ -45,7 +45,7 @@ plt.plot(epoch[:epochToPlot], train_f[:epochToPlot], "r-", epoch[:epochToPlot], 
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score')
-plt.savefig('../gitignore/result_lrn_0p001_beam_10/fig_lrn_0p001_beam_10_f.pdf')
+plt.savefig('../result/fig_f.pdf')
 
 
 
