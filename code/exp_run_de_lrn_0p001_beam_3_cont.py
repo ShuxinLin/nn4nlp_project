@@ -83,6 +83,11 @@ def minibatch_de(data, batch_size):
 
 
 def main():
+  rnd_seed = 20
+  if rnd_seed:
+    torch.manual_seed(rnd_seed)
+    np.random.seed(rnd_seed)
+
   data_path = "../dataset/German/"
 
   result_path = "../result_lrn_0p001_beam_3_cont/"
@@ -123,6 +128,8 @@ def main():
     word_embedding_dim = 64
 
   gpu = True
+  if gpu and rnd_seed:
+    torch.cuda.manual_seed(rnd_seed)
 
   load_model_filename = "../result_lrn_0p001_beam_3/ckpt_2.pth"
 
