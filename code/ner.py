@@ -241,7 +241,7 @@ class ner(nn.Module):
     return dec_hidden_seq, score_seq, logP_seq, attention_seq
 
 
-  def train(self, shuffle, beam_size, result_path, do_evaluation):
+  def train(self, shuffle, result_path, do_evaluation, beam_size):
     # Will manually average over (sentence_len * instance_num)
     #loss_function = nn.CrossEntropyLoss(size_average=False)
 

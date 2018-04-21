@@ -141,7 +141,8 @@ def main():
 
   shuffle = True
 
-  train_loss_list = machine.train(shuffle, beam_size, result_path)
+  # Pure training, no evaluation
+  train_loss_list = machine.train(shuffle, result_path, False, None)
 
 
   ##################
