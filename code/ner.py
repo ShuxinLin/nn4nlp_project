@@ -645,6 +645,7 @@ class ner(nn.Module):
       dec_hidden_out_list = []
       dec_cell_out_list = []
       score_out_list = []
+      logP_out_list = []
 
       if self.attention:
         attention_list =[]
