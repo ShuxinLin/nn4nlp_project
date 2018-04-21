@@ -598,10 +598,10 @@ class ner(nn.Module):
 
     score_seq.append(score_output_beam)
 
-    print("t = 0, beam size =", beam_size)
-    print("beta_seq=",beta_seq)
-    print("y_seq=",y_seq)
-    print("score_seq=",score_seq)
+    #print("t = 0, beam size =", beam_size)
+    #print("beta_seq=",beta_seq)
+    #print("y_seq=",y_seq)
+    #print("score_seq=",score_seq)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -702,10 +702,10 @@ class ner(nn.Module):
 
       score_seq.append(score_output_beam)
 
-      print("t=", t, ", beam size=", beam_size)
-      print("beta_seq=",beta_seq)
-      print("y_seq=",y_seq)
-      print("score_seq=",score_seq)
+      #print("t=", t, ", beam size=", beam_size)
+      #print("beta_seq=",beta_seq)
+      #print("y_seq=",y_seq)
+      #print("score_seq=",score_seq)
     # End for t
 
     # Only output the highest-scored beam (for each instance in the batch)
@@ -725,11 +725,11 @@ class ner(nn.Module):
 
     score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
-    print("backtracking...")
-    print("t=",seq_len)
-    print("label_pred_seq=",label_pred_seq)
-    print("input_beam=",input_beam)
-    print("score_pred_seq=",score_pred_seq)
+    #print("backtracking...")
+    #print("t=",seq_len)
+    #print("label_pred_seq=",label_pred_seq)
+    #print("input_beam=",input_beam)
+    #print("score_pred_seq=",score_pred_seq)
 
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
@@ -744,10 +744,10 @@ class ner(nn.Module):
 
       score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
 
-      print("t=",seq_len)
-      print("label_pred_seq=",label_pred_seq)
-      print("input_beam=",input_beam)
-      print("score_pred_seq=",score_pred_seq)
+      #print("t=",seq_len)
+      #print("label_pred_seq=",label_pred_seq)
+      #print("input_beam=",input_beam)
+      #print("score_pred_seq=",score_pred_seq)
     # End for t
 
     if self.attention:
@@ -761,8 +761,8 @@ class ner(nn.Module):
     # for later cross entropy loss
     score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    print("beam search ends: score_pred_seq=",score_pred_seq)
-    time.sleep(5)
+    #print("beam search ends: score_pred_seq=",score_pred_seq)
+    #time.sleep(5)
 
     return label_pred_seq, score_pred_seq, attention_pred_seq
 
