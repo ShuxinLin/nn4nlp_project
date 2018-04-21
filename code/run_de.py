@@ -133,36 +133,66 @@ def main():
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=32, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained)
+  load_model_filename = None
+
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
   if gpu:
     machine = machine.cuda()
-
-  # "beam_size = 0" will use greedy
-  # "beam_size = 1" will still use beam search, just with beam size = 1
-  beam_size = 0
 
   shuffle = True
 
   train_loss_list = machine.train(shuffle, beam_size, result_path)
+
+
+  ##################
+
+  eval_output_file = open(os.path.join(result_path, "eval.txt"), "w+")
+
+  for epoch in range(0, max_epoch):
+    load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
+
+    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
+    if gpu:
+      machine = machine.cuda()
+
+    # "beam_size = 0" will use greedy
+    # "beam_size = 1" will still use beam search, just with beam size = 1
+    beam_size = 0
+
+    train_loss, train_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", None, beam_size)
+    val_loss, val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, beam_size)
+
+    time_begin = time.time()
+    test_loss, test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
+    time_end = time.time()
+
+    print("epoch", epoch,
+          "\n training loss = %.6f" % train_loss,
+          ", validation loss = %.6f" % val_loss,
+          ", test loss = %.6f" % test_loss,
+          "\n training F score = %.6f" % train_fscore,
+          ", validation F score = %.6f" % val_fscore,
+          ", test F score = %.6f" % test_fscore,
+          "\n test time = %.6f" % (time_end - time_begin))
+
+    eval_output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
+    eval_output_file.flush()
+  # End for epoch
+
+  eval_output_file.close()
+
+
+
+
+
+
+
+
   # Write out files
-  train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
-  test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
+  #train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
+  #val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
+  #test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
 
-  #print("train_eval_loss =", train_eval_loss)
-  #print("val_eval_loss =", val_eval_loss)
-
-  #print(train_loss_list)
-
-  """
-  plt.figure(1)
-  plt.plot(list(range(len(train_loss_list))) , train_loss_list, "k-")
-  #plt.xlim([0, 11])
-  #plt.ylim([0, 0.5])
-  plt.xlabel("Epoch")
-  plt.ylabel("Cross-entropy loss")
-  plt.savefig(result_path + "fig_exp1.pdf")
-  """
 
 if __name__ == "__main__":
   main()

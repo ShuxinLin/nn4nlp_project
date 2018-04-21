@@ -241,7 +241,7 @@ class ner(nn.Module):
     return dec_hidden_seq, score_seq, logP_seq, attention_seq
 
 
-  def train(self, shuffle, beam_size, result_path):
+  def train(self, shuffle, beam_size, result_path, do_evaluation):
     # Will manually average over (sentence_len * instance_num)
     #loss_function = nn.CrossEntropyLoss(size_average=False)
 
@@ -369,25 +369,34 @@ class ner(nn.Module):
 
       time_end = time.time()
 
-      # Do evaluation on training set using model at this point
-      # using decode_greedy or decode_beam
-      train_loss, train_fscore = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
-      # Do evaluation on validation set as well
-      val_loss, val_fscore = self.evaluate(self.val_X, self.val_Y, None, None, "val", None, beam_size)
-      test_loss, test_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "test", None, beam_size)
+      if do_evaluation:
+        # Do evaluation on training set using model at this point
+        # using decode_greedy or decode_beam
+        train_loss, train_fscore = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
+        # Do evaluation on validation set as well
+        val_loss, val_fscore = self.evaluate(self.val_X, self.val_Y, None, None, "val", None, beam_size)
+        test_loss, test_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "test", None, beam_size)
 
-      print("epoch", epoch,
-            ", accumulated loss during training = %.6f" % avg_loss,
-            "\n training loss = %.6f" % train_loss,
-            ", validation loss = %.6f" % val_loss,
-            ", test loss = %.6f" % test_loss,
-            "\n training F score = %.6f" % train_fscore,
-            ", validation F score = %.6f" % val_fscore,
-            ", test F score = %.6f" % test_fscore,
-            "\n time = %.6f" % (time_end - time_begin))
+        print("epoch", epoch,
+              ", accumulated loss during training = %.6f" % avg_loss,
+              "\n training loss = %.6f" % train_loss,
+              ", validation loss = %.6f" % val_loss,
+              ", test loss = %.6f" % test_loss,
+              "\n training F score = %.6f" % train_fscore,
+              ", validation F score = %.6f" % val_fscore,
+              ", test F score = %.6f" % test_fscore,
+              "\n time = %.6f" % (time_end - time_begin))
 
-      output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
-      output_file.flush()
+        output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
+        output_file.flush()
+      else:
+        print("epoch", epoch,
+              ", accumulated loss during training = %.6f" % avg_loss,
+              "\n time = %.6f" % (time_end - time_begin))
+
+        output_file.write("%d\t%f\t%f\n" % (epoch, avg_loss, time_end - time_begin))
+        output_file.flush()
+      # End if do_evaluation
 
       # Save model
       # In our current way of doing experiment, we don't keep is_best
