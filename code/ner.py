@@ -382,13 +382,12 @@ class ner(nn.Module):
       # Save model
       # In our current way of doing experiment, we don't keep is_best
       is_best = False
-      save_checkpoint({ \
-        'epoch': epoch + 1,
-        'arch': args.arch,
-        'state_dict': model.state_dict(),
-        'best_prec1': best_prec1,
-        'optimizer' : optimizer.state_dict()},
-        is_best)
+      checkpoint_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".tar")
+      save_checkpoint({'epoch': epoch,
+                       'state_dict': self.state_dict(),
+                       'optimizer' : optimizer.state_dict()},
+                      checkpoint_filename,
+                      is_best)
 
     # End for epoch
 
@@ -397,14 +396,10 @@ class ner(nn.Module):
     return train_loss_list
 
 
-  # filename.tar
-  def save_checkpoint(state, is_best, filename):
+  def save_checkpoint(state, filename, is_best):
     torch.save(state, filename)
     if is_best:
-      torch.save(state, 'model_best.pth.tar')
-
-
-
+      torch.save(state, "best.tar")
 
 
   def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq):
