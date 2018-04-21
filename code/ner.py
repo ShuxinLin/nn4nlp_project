@@ -722,7 +722,7 @@ class ner(nn.Module):
 
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
-      logP_matrix = torch.cat(logP_list, dim=1)
+      logP_matrix = torch.cat(logP_out_list, dim=1)
 
       logP_beam, index_beam = \
         torch.topk(logP_matrix, beam_size, dim=1)
