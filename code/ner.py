@@ -691,7 +691,7 @@ class ner(nn.Module):
         prev_logP = logP_beam[:, b].contiguous().view(batch_size, 1)
 
         score_out_of_this_word = self.hidden2score(dec_hidden_out)
-        logP_of_this_word = score2logP(score_out_of_this_word).view(batch_size, self.label_size)
+        logP_of_this_word = self.score2logP(score_out_of_this_word).view(batch_size, self.label_size)
 
         #score_out = self.hidden2score(dec_hidden_out) + prev_score
         logP_out = logP_of_this_word + prev_logP
