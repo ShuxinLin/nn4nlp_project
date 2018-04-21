@@ -603,14 +603,14 @@ class ner(nn.Module):
     #score_out = self.hidden2score(dec_hidden_out) + init_score
     score_out = self.hidden2score(dec_hidden_out) \
       .view(batch_size, self.label_size)
+    logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
 
     # For output: (1, batch size, label dim)
     score_output_beam = torch.stack([score_out], dim = 0)
     # Swap into shape (batch size, 1, label dim)
     score_output_beam = score_output_beam.permute(1, 0, 2)
 
-    logP = self.score2logP(score_out).view(batch_size, self.label_size)
-    
+    logP_output_beam = torch.stack([logP_out], dim=0).permute(1, 0, 2)
 
     # WE ARE HERE: well, need to let logP replace score_out, score_output_beam...
     # and fix the following line
@@ -620,11 +620,13 @@ class ner(nn.Module):
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
     score_matrix = torch.cat([score_out], dim = 1)
+    logP_matrix = torch.cat([logP_out], dim=1)
+
     # All beta^{t=0, b} are actually 0
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
     # y_beam, score_beam => same
-    score_beam, index_beam = torch.topk(score_matrix, beam_size, dim = 1)
+    logP_beam, index_beam = torch.topk(logP_matrix, beam_size, dim=1)
     beta_beam = torch.floor(index_beam.float() / self.label_size).long()
     y_beam = torch.remainder(index_beam, self.label_size)
     beta_seq.append(beta_beam)
@@ -634,6 +636,7 @@ class ner(nn.Module):
       attention_seq.append(attention_beam)
 
     score_seq.append(score_output_beam)
+    logP_seq.append(logP_output_beam)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -647,6 +650,7 @@ class ner(nn.Module):
         attention_list =[]
 
       score_output_beam_list = []
+      logP_output_beam_list = []
 
       for b in range(beam_size):
         # Extract the b-th column of y_beam
@@ -685,10 +689,19 @@ class ner(nn.Module):
 
         prev_score = score_beam[:, b].contiguous() \
           .view(batch_size, 1)
-        score_out = self.hidden2score(dec_hidden_out) + prev_score
-        score_out_list.append(score_out)
+        prev_logP = logP_beam[:, b].contiguous().view(batch_size, 1)
+
+        score_out_of_this_word = self.hidden2score(dec_hidden_out)
+        logP_of_this_word = score2logP(score_out_of_this_word).view(batch_size, self.label_size)
+
+        #score_out = self.hidden2score(dec_hidden_out) + prev_score
+        logP_out = logP_of_this_word + prev_logP
+
+        score_out_list.append(score_out_of_this_word)
+        logP_out_list.append(logP_out)
 
         score_output_beam_list.append(score_out)
+        logP_output_beam_list.append(logP_out)
       # End for b
 
       # dec_hidden_beam shape => (beam size, batch size, hidden dim)
@@ -705,11 +718,14 @@ class ner(nn.Module):
       score_output_beam = torch.stack(score_output_beam_list, dim = 0)
       score_output_beam = score_output_beam.permute(1, 0, 2)
 
+      logP_output_beam = torch.stack(logP_output_beam_list, dim=0).permute(1, 0, 2)
+
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
+      logP_matrix = torch.cat(logP_list, dim=1)
 
-      score_beam, index_beam = \
-        torch.topk(score_matrix, beam_size, dim = 1)
+      logP_beam, index_beam = \
+        torch.topk(logP_matrix, beam_size, dim=1)
       beta_beam = torch.floor(
         index_beam.float() / self.label_size).long()
       y_beam = torch.remainder(index_beam, self.label_size)
@@ -720,8 +736,11 @@ class ner(nn.Module):
         attention_seq.append(attention_beam)
 
       score_seq.append(score_output_beam)
+      logP_seq.append(logP_output_beam)
     # End for t
 
+    # Backtracking
+    #
     # Only output the highest-scored beam (for each instance in the batch)
     label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
       .view(batch_size, 1)
@@ -738,6 +757,7 @@ class ner(nn.Module):
       attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
@@ -751,6 +771,7 @@ class ner(nn.Module):
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
 
       score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
+      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
     # End for t
 
     if self.attention:
@@ -763,8 +784,9 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
+    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    return label_pred_seq, score_pred_seq, attention_pred_seq
+    return label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
