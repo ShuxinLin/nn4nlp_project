@@ -90,6 +90,9 @@ class ner(nn.Module):
     # Transform from hidden state to scores of all possible labels
     self.hidden2score = nn.Linear(self.hidden_dim, self.label_size)
 
+    # From score to log probability
+    self.score2logP = nn.LogSoftmax(dim=1)
+
   def encode(self, sentence, init_enc_hidden, init_enc_cell):
     # sentence shape is (batch_size, sentence_length)
     sentence_emb = self.word_embedding(sentence)
@@ -130,6 +133,7 @@ class ner(nn.Module):
 
     dec_hidden_seq = []
     score_seq = []
+    logP_seq = []
     label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
 
     if self.gpu:
@@ -179,6 +183,8 @@ class ner(nn.Module):
     score = self.hidden2score(dec_hidden_out) \
       .view(current_batch_size, self.label_size)
     score_seq.append(score)
+    logP = self.score2logP(score).view(current_batch_size, self.label_size)
+    logP_seq.append(logP)
 
     # The rest parts of the sentence
     for i in range(label_seq_len - 1):
@@ -203,6 +209,8 @@ class ner(nn.Module):
       score = self.hidden2score(dec_hidden_out) \
         .view(current_batch_size, self.label_size)
       score_seq.append(score)
+      logP = self.score2logP(score).view(current_batch_size, self.label_size)
+      logP_seq.append(logP)
 
     # It could make sense to reshape decoder hidden output
     # But currently we don't use this output in later stage
@@ -221,13 +229,19 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_seq = torch.cat(score_seq, dim=0)
+    logP_seq = torch.cat(logP_seq, dim=0)
 
-    return dec_hidden_seq, score_seq, attention_seq
+    #return dec_hidden_seq, score_seq, attention_seq
+    return dec_hidden_seq, score_seq, logP_seq, attention_seq
 
 
   def train(self, shuffle, beam_size, result_path):
     # Will manually average over (sentence_len * instance_num)
-    loss_function = nn.CrossEntropyLoss(size_average=False)
+    #loss_function = nn.CrossEntropyLoss(size_average=False)
+
+    # We now use logSoftmax -> NLLLoss
+    loss_function = nn.NLLLoss(size_average=False)
+
     # Note that here we called nn.Module.parameters()
     optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
 
@@ -300,7 +314,8 @@ class ner(nn.Module):
         #init_dec_cell = enc_cell_out[0]
 
         # Attention added
-        dec_hidden_seq, score_seq, attention_seq = \
+        #dec_hidden_seq, score_seq, attention_seq = \
+        dec_hidden_seq, score_seq, logP_seq, attention_seq = \
           self.decode_train(label_var, init_dec_hidden,
                             init_dec_cell, enc_hidden_seq)
 
@@ -319,14 +334,22 @@ class ner(nn.Module):
         #print("after: score_seq=",score_seq[:10, 3:6])
         #time.sleep(1)
 
+        logP_seq = self.score2logP(score_seq)
+
         # Input: (N,C) where C = number of classes
         # Target: (N) where each value is 0 <= targets[i] <= C−1
-        loss = loss_function(score_seq, label_var_for_loss)
+        #loss = loss_function(score_seq, label_var_for_loss)
+
+        # We now use logSoftmax -> NLLLoss
+        loss = loss_function(logP_seq, label_var_for_loss) \
+               / (current_sen_len * current_batch_size)
 
         if self.gpu:
-          loss = loss.cpu()
-        loss_sum += loss.data.numpy()[0] / current_sen_len
-        
+          loss_value = loss.cpu()
+        else:
+          loss_value = loss
+        loss_sum += loss_value.data.numpy()[0] * current_batch_size
+
         loss.backward()
         optimizer.step()
       # End for batch_idx
@@ -368,6 +391,7 @@ class ner(nn.Module):
     # for debugging purpose.
 
     score_seq = []
+    logP_seq = []
 
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
@@ -420,6 +444,9 @@ class ner(nn.Module):
     # during evaluation
     score_seq.append(score_out)
 
+    logP = self.score2logP(score_out).view(batch_size, self.label_size)
+    logP_seq.append(logP)
+
     # index.shape => (batch size, 1)
     # score => same
     # Here "1" in torch.max is "dim = 1"
@@ -469,7 +496,10 @@ class ner(nn.Module):
 
       score_seq.append(score_out)
 
-      _, index = torch.max(score_out, 1, keepdim = True)
+      logP = self.score2logP(score_out).view(batch_size, self.label_size)
+      logP_seq.append(logP)
+
+      _, index = torch.max(logP, 1, keepdim = True)
       # Note that here, unlike in beam search (backtracking),
       # we simply append next predicted label
       label_pred_seq = torch.cat([label_pred_seq, index], dim = 1)
@@ -492,7 +522,10 @@ class ner(nn.Module):
     score_seq = torch.cat(score_seq, dim=0)
     score_pred_seq = score_seq
 
-    return label_pred_seq, score_pred_seq, attention_pred_seq
+    logP_seq = torch.cat(logP_seq, dim=0)
+    logP_pred_seq = logP_seq
+
+    return label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
     # init_label's shape => (batch size, 1),
@@ -512,10 +545,10 @@ class ner(nn.Module):
 
     # init_score's shape => (batch size, 1),
     # with all elements 0
-    init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
+    #init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
 
-    if self.gpu:
-      init_score = init_score.cuda()
+    #if self.gpu:
+    #  init_score = init_score.cuda()
 
     # Each beta is (batch size, beam size) matrix,
     # and there will be T_y of them in the sequence
@@ -524,6 +557,7 @@ class ner(nn.Module):
     y_seq = []
 
     score_seq = []
+    logP_seq = []
 
     if self.attention:
       # This would be the attention alpha_{ij} coefficients
@@ -566,12 +600,22 @@ class ner(nn.Module):
       attention_beam = attention_beam.permute(1, 0, 2)
 
     # score_out.shape => (batch size, |V^y|)
-    score_out = self.hidden2score(dec_hidden_out) + init_score
+    #score_out = self.hidden2score(dec_hidden_out) + init_score
+    score_out = self.hidden2score(dec_hidden_out) \
+      .view(batch_size, self.label_size)
 
     # For output: (1, batch size, label dim)
     score_output_beam = torch.stack([score_out], dim = 0)
     # Swap into shape (batch size, 1, label dim)
     score_output_beam = score_output_beam.permute(1, 0, 2)
+
+    logP = self.score2logP(score_out).view(batch_size, self.label_size)
+    
+
+    # WE ARE HERE: well, need to let logP replace score_out, score_output_beam...
+    # and fix the following line
+    #logP_seq.append(logP)
+
 
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
@@ -757,10 +801,6 @@ class ner(nn.Module):
       #print("label=",label)
       #time.sleep(1)
 
-
-      # Always clear the gradients before use
-      self.zero_grad()
-
       sen_var = Variable(torch.LongTensor(sen))
       label_var = Variable(torch.LongTensor(label))
 
@@ -794,9 +834,9 @@ class ner(nn.Module):
       #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       # Compute loss function value
       label_var_for_loss = label_var.permute(1, 0) \
