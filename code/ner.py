@@ -687,8 +687,7 @@ class ner(nn.Module):
         if self.attention:
           attention_list.append(attention)
 
-        #prev_score = score_beam[:, b].contiguous() \
-          .view(batch_size, 1)
+        #prev_score = score_beam[:, b].contiguous().view(batch_size, 1)
         prev_logP = logP_beam[:, b].contiguous().view(batch_size, 1)
 
         score_out_of_this_word = self.hidden2score(dec_hidden_out)
