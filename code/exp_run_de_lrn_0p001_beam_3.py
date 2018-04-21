@@ -85,7 +85,7 @@ def minibatch_de(data, batch_size):
 
 
 def main():
-  rnd_seed = 20
+  rnd_seed = None
   if rnd_seed:
     torch.manual_seed(rnd_seed)
     np.random.seed(rnd_seed)
