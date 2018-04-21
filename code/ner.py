@@ -379,11 +379,32 @@ class ner(nn.Module):
       output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
       output_file.flush()
 
+      # Save model
+      # In our current way of doing experiment, we don't keep is_best
+      is_best = False
+      save_checkpoint({ \
+        'epoch': epoch + 1,
+        'arch': args.arch,
+        'state_dict': model.state_dict(),
+        'best_prec1': best_prec1,
+        'optimizer' : optimizer.state_dict()},
+        is_best)
+
     # End for epoch
 
     output_file.close()
 
     return train_loss_list
+
+
+  # filename.tar
+  def save_checkpoint(state, is_best, filename):
+    torch.save(state, filename)
+    if is_best:
+      torch.save(state, 'model_best.pth.tar')
+
+
+
 
 
   def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq):
