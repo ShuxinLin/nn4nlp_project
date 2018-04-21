@@ -687,7 +687,7 @@ class ner(nn.Module):
         if self.attention:
           attention_list.append(attention)
 
-        prev_score = score_beam[:, b].contiguous() \
+        #prev_score = score_beam[:, b].contiguous() \
           .view(batch_size, 1)
         prev_logP = logP_beam[:, b].contiguous().view(batch_size, 1)
 
