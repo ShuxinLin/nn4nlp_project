@@ -160,8 +160,8 @@ def main():
 
   #eval_output_file_greedy = open(os.path.join(result_path, "eval_greedy.txt"), "w+")
   eval_output_file_beam_1 = open(os.path.join(result_path, "eval_beam_1.txt"), "w+")
-  eval_output_file_beam_2 = open(os.path.join(result_path, "eval_beam_2.txt"), "w+")
-  eval_output_file_beam_3 = open(os.path.join(result_path, "eval_beam_3.txt"), "w+")
+  #eval_output_file_beam_2 = open(os.path.join(result_path, "eval_beam_2.txt"), "w+")
+  #eval_output_file_beam_3 = open(os.path.join(result_path, "eval_beam_3.txt"), "w+")
 
   for epoch in range(0, max_epoch):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
@@ -181,6 +181,7 @@ def main():
     test_loss_beam_1, test_fscore_beam_1 = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
     time_end_beam_1 = time.time()
 
+    """
     ###
     beam_size = 2
 
@@ -201,7 +202,7 @@ def main():
     time_begin_beam_3 = time.time()
     test_loss_beam_3, test_fscore_beam_3 = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, beam_size)
     time_end_beam_3 = time.time()
-
+    """
 
     print("epoch %d" % epoch)
     print("Beam size 1\n"
@@ -212,6 +213,7 @@ def main():
           "validation F score = %.6f" % val_fscore_beam_1,
           ", test F score = %.6f\n" % test_fscore_beam_1,
           "test time = %.6f" % (time_end_beam_1 - time_begin_beam_1))
+    """
     print("Beam size 2\n"
           #"training loss = %.6f" % train_loss_beam_1,
           "validation loss = %.6f" % val_loss_beam_2,
@@ -228,20 +230,23 @@ def main():
           "validation F score = %.6f" % val_fscore_beam_3,
           ", test F score = %.6f\n" % test_fscore_beam_3,
           "test time = %.6f" % (time_end_beam_3 - time_begin_beam_3))
+    """
 
     eval_output_file_beam_1.write("%d\t%f\t%f\t%f\t%f\t%f\n" % (epoch, val_loss_beam_1, test_loss_beam_1, val_fscore_beam_1, test_fscore_beam_1, time_end_beam_1 - time_begin_beam_1))
     eval_output_file_beam_1.flush()
 
+    """
     eval_output_file_beam_2.write("%d\t%f\t%f\t%f\t%f\t%f\n" % (epoch, val_loss_beam_2, test_loss_beam_2, val_fscore_beam_2, test_fscore_beam_2, time_end_beam_2 - time_begin_beam_2))
     eval_output_file_beam_2.flush()
 
     eval_output_file_beam_3.write("%d\t%f\t%f\t%f\t%f\t%f\n" % (epoch, val_loss_beam_3, test_loss_beam_3, val_fscore_beam_3, test_fscore_beam_3, time_end_beam_3 - time_begin_beam_3))
     eval_output_file_beam_3.flush()
+    """
   # End for epoch
 
   eval_output_file_beam_1.close()
-  eval_output_file_beam_2.close()
-  eval_output_file_beam_3.close()
+  #eval_output_file_beam_2.close()
+  #eval_output_file_beam_3.close()
 
 
 
