@@ -206,8 +206,9 @@ def main():
     time_end_beam_3 = time.time()
     """
 
-    """
+    
     print("epoch %d" % epoch)
+    """
     print("Beam size 1\n"
           #"training loss = %.6f" % train_loss_beam_1,
           "validation loss = %.6f" % val_loss_beam_1,
