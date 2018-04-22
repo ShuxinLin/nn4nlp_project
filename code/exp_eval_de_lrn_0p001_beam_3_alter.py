@@ -114,7 +114,7 @@ def main():
 
   data_path = "../dataset/German/"
 
-  result_path = "../result_lrn_0p001_beam_alter/"
+  result_path = "../result_lrn_0p001/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
@@ -159,9 +159,9 @@ def main():
   ##################
 
   #eval_output_file_greedy = open(os.path.join(result_path, "eval_greedy.txt"), "w+")
-  #eval_output_file_beam_1 = open(os.path.join(result_path, "eval_beam_1.txt"), "w+")
-  #eval_output_file_beam_2 = open(os.path.join(result_path, "eval_beam_2.txt"), "w+")
-  eval_output_file_beam_3 = open(os.path.join(result_path, "eval_beam_3.txt"), "w+")
+  #eval_output_file_beam_1 = open(os.path.join(result_path, "eval_beam_1_alter.txt"), "w+")
+  #eval_output_file_beam_2 = open(os.path.join(result_path, "eval_beam_2_alter.txt"), "w+")
+  eval_output_file_beam_3 = open(os.path.join(result_path, "eval_beam_3_alter.txt"), "w+")
 
   for epoch in range(0, max_epoch):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
