@@ -225,7 +225,7 @@ def main():
           #"training F score = %.6f" % train_fscore_beam_1,
           "validation F score = %.6f" % val_fscore_beam_2,
           ", test F score = %.6f\n" % test_fscore_beam_2,
-          "test time = %.6f" % (time_end_beam_1 - time_begin_beam_1))
+          "test time = %.6f" % (time_end_beam_2 - time_begin_beam_2))
 
     """
     print("Beam size 3\n"
