@@ -151,20 +151,9 @@ def main():
   if pretrained == 'de64':
     word_embedding_dim = 64
 
-  gpu = True
+  gpu = False
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
-
-  load_model_filename = None
-
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
-  if gpu:
-    machine = machine.cuda()
-
-  shuffle = True
-
-  # Pure training, no evaluation
-  train_loss_list = machine.train(shuffle, result_path, False, None)
 
 
   ##################
