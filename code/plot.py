@@ -6,7 +6,7 @@ import numpy as np
 import re
 
 
-logfile = open("../gitignore/result_lrn_0p001/eval_greedy.txt", "r")
+logfile = open("../gitignore/result_lrn_0p001_atten/eval_greedy.txt", "r")
 
 train_f = []
 val_f = []
@@ -30,7 +30,7 @@ plt.plot(epoch[:epochToPlot], train_f[:epochToPlot], "r-", epoch[:epochToPlot], 
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score')
-plt.savefig('../gitignore/result_lrn_0p001/fig_lrn_0p001_greedy_f.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_greedy_f.pdf')
 
 
 logfile.close()
@@ -39,7 +39,7 @@ logfile.close()
 
 
 
-logfile = open("../gitignore/result_lrn_0p001/eval_beam_1.txt", "r")
+logfile = open("../gitignore/result_lrn_0p001_atten/eval_beam_1.txt", "r")
 
 train_f = []
 val_f = []
@@ -63,7 +63,7 @@ plt.plot(epoch[:epochToPlot], train_f[:epochToPlot], "r-", epoch[:epochToPlot], 
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score')
-plt.savefig('../gitignore/result_lrn_0p001/fig_lrn_0p001_beam_1_f.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_beam_1_f.pdf')
 
 
 logfile.close()
@@ -74,7 +74,7 @@ logfile.close()
 
 
 
-logfile = open("../gitignore/result_lrn_0p001/eval_beam_3.txt", "r")
+logfile = open("../gitignore/result_lrn_0p001_atten/eval_beam_3.txt", "r")
 
 train_f = []
 val_f = []
@@ -98,7 +98,7 @@ plt.plot(epoch[:epochToPlot], train_f[:epochToPlot], "r-", epoch[:epochToPlot], 
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score')
-plt.savefig('../gitignore/result_lrn_0p001/fig_lrn_0p001_beam_3_f.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_beam_3_f.pdf')
 
 
 logfile.close()
@@ -114,7 +114,7 @@ plt.plot(epoch[:epochToPlot], greedy_test_f[:epochToPlot], "r-", epoch[:epochToP
 #plt.ylim([0, 0.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score')
-plt.savefig('../gitignore/result_lrn_0p001/fig_lrn_0p001_combine_f.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_combine_f.pdf')
 
 
 
@@ -127,7 +127,7 @@ plt.plot(epoch[:epochToPlot], np.zeros(epochToPlot), "k--")
 plt.ylim([-2.5, 2.5])
 plt.xlabel('Epoch')
 plt.ylabel('F-score diff (beam_3 - greedy)')
-plt.savefig('../gitignore/result_lrn_0p001/fig_lrn_0p001_diff_f.pdf')
+plt.savefig('../gitignore/result_lrn_0p001_atten/fig_lrn_0p001_diff_f.pdf')
 
 
 
