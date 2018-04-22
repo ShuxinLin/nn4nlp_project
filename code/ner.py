@@ -28,7 +28,8 @@ class ner(nn.Module):
                test_X=None, test_Y=None,
                attention="fixed",
                gpu=False,
-               pretrained=None):
+               pretrained=None,
+               load_model_filename=None):
 
     super(ner, self).__init__()
     self.word_embedding_dim = word_embedding_dim
@@ -45,6 +46,7 @@ class ner(nn.Module):
     self.val_Y = val_Y
     self.test_X = test_X
     self.test_Y = test_Y
+    self.load_model_filename = load_model_filename
 
     # For now we hard code the index of "<BEG>"
     self.BEG_INDEX = 1
@@ -90,6 +92,13 @@ class ner(nn.Module):
     # Transform from hidden state to scores of all possible labels
     self.hidden2score = nn.Linear(self.hidden_dim, self.label_size)
 
+    # From score to log probability
+    self.score2logP = nn.LogSoftmax(dim=1)
+
+    if self.load_model_filename:
+      self.checkpoint = torch.load(self.load_model_filename)
+      self.load_state_dict(self.checkpoint["state_dict"])
+
   def encode(self, sentence, init_enc_hidden, init_enc_cell):
     # sentence shape is (batch_size, sentence_length)
     sentence_emb = self.word_embedding(sentence)
@@ -130,6 +139,7 @@ class ner(nn.Module):
 
     dec_hidden_seq = []
     score_seq = []
+    logP_seq = []
     label_emb_seq = self.label_embedding(label_seq).permute(1, 0, 2)
 
     if self.gpu:
@@ -179,6 +189,8 @@ class ner(nn.Module):
     score = self.hidden2score(dec_hidden_out) \
       .view(current_batch_size, self.label_size)
     score_seq.append(score)
+    logP = self.score2logP(score).view(current_batch_size, self.label_size)
+    logP_seq.append(logP)
 
     # The rest parts of the sentence
     for i in range(label_seq_len - 1):
@@ -203,6 +215,8 @@ class ner(nn.Module):
       score = self.hidden2score(dec_hidden_out) \
         .view(current_batch_size, self.label_size)
       score_seq.append(score)
+      logP = self.score2logP(score).view(current_batch_size, self.label_size)
+      logP_seq.append(logP)
 
     # It could make sense to reshape decoder hidden output
     # But currently we don't use this output in later stage
@@ -221,15 +235,23 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_seq = torch.cat(score_seq, dim=0)
+    logP_seq = torch.cat(logP_seq, dim=0)
 
-    return dec_hidden_seq, score_seq, attention_seq
+    #return dec_hidden_seq, score_seq, attention_seq
+    return dec_hidden_seq, score_seq, logP_seq, attention_seq
 
 
-  def train(self, shuffle, beam_size, result_path):
+  def train(self, shuffle, result_path, do_evaluation, beam_size):
     # Will manually average over (sentence_len * instance_num)
-    loss_function = nn.CrossEntropyLoss(size_average=False)
+    #loss_function = nn.CrossEntropyLoss(size_average=False)
+
+    # We now use logSoftmax -> NLLLoss
+    loss_function = nn.NLLLoss(size_average=False)
+
     # Note that here we called nn.Module.parameters()
     optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+    if self.load_model_filename:
+      optimizer.load_state_dict(self.checkpoint["optimizer"])
 
     # self.train_X = [batch_1, batch_2, ...]
     # batch_i = [ [idx_1, idx_2, ...], ...]
@@ -244,7 +266,9 @@ class ner(nn.Module):
 
     output_file = open(os.path.join(result_path, "log.txt"), "w+")
 
-    for epoch in range(self.max_epoch):
+    initial_epoch = (self.checkpoint["epoch"] + 1) if self.load_model_filename else 0
+
+    for epoch in range(initial_epoch, initial_epoch + self.max_epoch):
       time_begin = time.time()
       loss_sum = 0
 
@@ -300,7 +324,8 @@ class ner(nn.Module):
         #init_dec_cell = enc_cell_out[0]
 
         # Attention added
-        dec_hidden_seq, score_seq, attention_seq = \
+        #dec_hidden_seq, score_seq, attention_seq = \
+        dec_hidden_seq, score_seq, logP_seq, attention_seq = \
           self.decode_train(label_var, init_dec_hidden,
                             init_dec_cell, enc_hidden_seq)
 
@@ -319,14 +344,22 @@ class ner(nn.Module):
         #print("after: score_seq=",score_seq[:10, 3:6])
         #time.sleep(1)
 
+        logP_seq = self.score2logP(score_seq)
+
         # Input: (N,C) where C = number of classes
         # Target: (N) where each value is 0 <= targets[i] <= C−1
-        loss = loss_function(score_seq, label_var_for_loss)
+        #loss = loss_function(score_seq, label_var_for_loss)
+
+        # We now use logSoftmax -> NLLLoss
+        loss = loss_function(logP_seq, label_var_for_loss) \
+               / (current_sen_len * current_batch_size)
 
         if self.gpu:
-          loss = loss.cpu()
-        loss_sum += loss.data.numpy()[0] / current_sen_len
-        
+          loss_value = loss.cpu()
+        else:
+          loss_value = loss
+        loss_sum += loss_value.data.numpy()[0] * current_batch_size
+
         loss.backward()
         optimizer.step()
       # End for batch_idx
@@ -336,26 +369,45 @@ class ner(nn.Module):
 
       time_end = time.time()
 
-      # Do evaluation on training set using model at this point
-      # using decode_greedy or decode_beam
-      #train_loss, train_fscore = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
-      # Do evaluation on validation set as well
-      val_loss, val_fscore = self.evaluate(self.val_X, self.val_Y, None, None, "val", None, beam_size)
-      test_loss, test_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "test", None, beam_size)
+      if do_evaluation:
+        # Do evaluation on training set using model at this point
+        # using decode_greedy or decode_beam
+        #train_loss, train_fscore = self.evaluate(self.train_X, self.train_Y, None, None, "train", None, beam_size)
+        # Do evaluation on validation set as well
+        val_loss, val_fscore = self.evaluate(self.val_X, self.val_Y, None, None, "val", None, beam_size)
+        test_loss, test_fscore = self.evaluate(self.test_X, self.test_Y, None, None, "test", None, beam_size)
 
-      print("epoch", epoch,
-            ", accumulated loss during training = %.6f" % avg_loss,
-            #"\n training loss = %.6f" % train_loss,
-            "\n, validation loss = %.6f" % val_loss,
-            ", test loss = %.6f" % test_loss,
-            #"\n training F score = %.6f" % train_fscore,
-            "\n, validation F score = %.6f" % val_fscore,
-            ", test F score = %.6f" % test_fscore,
-            "\n time = %.6f" % (time_end - time_begin))
+        print("epoch", epoch,
+              ", accumulated loss during training = %.6f\n" % avg_loss,
+              #"\n training loss = %.6f" % train_loss,
+              "validation loss = %.6f" % val_loss,
+              ", test loss = %.6f\n" % test_loss,
+              #"\n training F score = %.6f" % train_fscore,
+              "validation F score = %.6f" % val_fscore,
+              ", test F score = %.6f" % test_fscore,
+              "\n time = %.6f" % (time_end - time_begin))
 
-      #output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
-      output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, val_loss, test_loss, val_fscore, test_fscore, time_end - time_begin))
-      output_file.flush()
+        #output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, train_loss, val_loss, test_loss, train_fscore, val_fscore, test_fscore, time_end - time_begin))
+        output_file.write("%d\t%f\t%f\t%f\t%f\t%f\t%f\n" % (epoch, avg_loss, val_loss, test_loss, val_fscore, test_fscore, time_end - time_begin))
+        output_file.flush()
+      else:
+        print("epoch", epoch,
+              ", accumulated loss during training = %.6f" % avg_loss,
+              "\n time = %.6f" % (time_end - time_begin))
+
+        output_file.write("%d\t%f\t%f\n" % (epoch, avg_loss, time_end - time_begin))
+        output_file.flush()
+      # End if do_evaluation
+
+      # Save model
+      # In our current way of doing experiment, we don't keep is_best
+      is_best = False
+      checkpoint_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
+      self.save_checkpoint({'epoch': epoch,
+                       'state_dict': self.state_dict(),
+                       'optimizer' : optimizer.state_dict()},
+                      checkpoint_filename,
+                      is_best)
 
     # End for epoch
 
@@ -364,11 +416,18 @@ class ner(nn.Module):
     return train_loss_list
 
 
+  def save_checkpoint(self, state, filename, is_best):
+    torch.save(state, filename)
+    if is_best:
+      torch.save(state, "best.pth")
+
+
   def decode_greedy(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq):
     # Current version is as parallel to beam as possible
     # for debugging purpose.
 
     score_seq = []
+    logP_seq = []
 
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
@@ -421,6 +480,9 @@ class ner(nn.Module):
     # during evaluation
     score_seq.append(score_out)
 
+    logP = self.score2logP(score_out).view(batch_size, self.label_size)
+    logP_seq.append(logP)
+
     # index.shape => (batch size, 1)
     # score => same
     # Here "1" in torch.max is "dim = 1"
@@ -470,7 +532,10 @@ class ner(nn.Module):
 
       score_seq.append(score_out)
 
-      _, index = torch.max(score_out, 1, keepdim = True)
+      logP = self.score2logP(score_out).view(batch_size, self.label_size)
+      logP_seq.append(logP)
+
+      _, index = torch.max(logP, 1, keepdim = True)
       # Note that here, unlike in beam search (backtracking),
       # we simply append next predicted label
       label_pred_seq = torch.cat([label_pred_seq, index], dim = 1)
@@ -493,7 +558,10 @@ class ner(nn.Module):
     score_seq = torch.cat(score_seq, dim=0)
     score_pred_seq = score_seq
 
-    return label_pred_seq, score_pred_seq, attention_pred_seq
+    logP_seq = torch.cat(logP_seq, dim=0)
+    logP_pred_seq = logP_seq
+
+    return label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
     # init_label's shape => (batch size, 1),
@@ -513,10 +581,10 @@ class ner(nn.Module):
 
     # init_score's shape => (batch size, 1),
     # with all elements 0
-    init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
+    #init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
 
-    if self.gpu:
-      init_score = init_score.cuda()
+    #if self.gpu:
+    #  init_score = init_score.cuda()
 
     # Each beta is (batch size, beam size) matrix,
     # and there will be T_y of them in the sequence
@@ -525,6 +593,7 @@ class ner(nn.Module):
     y_seq = []
 
     score_seq = []
+    logP_seq = []
 
     if self.attention:
       # This would be the attention alpha_{ij} coefficients
@@ -567,16 +636,28 @@ class ner(nn.Module):
       attention_beam = attention_beam.permute(1, 0, 2)
 
     # score_out.shape => (batch size, |V^y|)
-    score_out = self.hidden2score(dec_hidden_out) + init_score
+    #score_out = self.hidden2score(dec_hidden_out) + init_score
+    score_out = self.hidden2score(dec_hidden_out) \
+      .view(batch_size, self.label_size)
+    logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
 
     # For output: (1, batch size, label dim)
     score_output_beam = torch.stack([score_out], dim = 0)
     # Swap into shape (batch size, 1, label dim)
     score_output_beam = score_output_beam.permute(1, 0, 2)
 
+    logP_output_beam = torch.stack([logP_out], dim=0).permute(1, 0, 2)
+
+    # WE ARE HERE: well, need to let logP replace score_out, score_output_beam...
+    # and fix the following line
+    #logP_seq.append(logP)
+
+
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
     score_matrix = torch.cat([score_out], dim = 1)
+    logP_matrix = torch.cat([logP_out], dim=1)
+
     # All beta^{t=0, b} are actually 0
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
@@ -587,7 +668,8 @@ class ner(nn.Module):
     # beam_size -> beam_size + 1 -> beam_size -> ...
     parity = 0
 
-    score_beam, index_beam = torch.topk(score_matrix, beam_size, dim = 1)
+    logP_beam, index_beam = torch.topk(logP_matrix, beam_size, dim=1)
+
     beta_beam = torch.floor(index_beam.float() / self.label_size).long()
     y_beam = torch.remainder(index_beam, self.label_size)
     beta_seq.append(beta_beam)
@@ -597,6 +679,7 @@ class ner(nn.Module):
       attention_seq.append(attention_beam)
 
     score_seq.append(score_output_beam)
+    logP_seq.append(logP_output_beam)
 
     #print("t = 0, beam size =", beam_size)
     #print("beta_seq=",beta_seq)
@@ -615,11 +698,13 @@ class ner(nn.Module):
       dec_hidden_out_list = []
       dec_cell_out_list = []
       score_out_list = []
+      logP_out_list = []
 
       if self.attention:
         attention_list =[]
 
       score_output_beam_list = []
+      logP_output_beam_list = []
 
       for b in range(beam_size):
         # Extract the b-th column of y_beam
@@ -656,12 +741,20 @@ class ner(nn.Module):
         if self.attention:
           attention_list.append(attention)
 
-        prev_score = score_beam[:, b].contiguous() \
-          .view(batch_size, 1)
-        score_out = self.hidden2score(dec_hidden_out) + prev_score
-        score_out_list.append(score_out)
+        #prev_score = score_beam[:, b].contiguous().view(batch_size, 1)
+        prev_logP = logP_beam[:, b].contiguous().view(batch_size, 1)
+
+        score_out_of_this_word = self.hidden2score(dec_hidden_out)
+        logP_of_this_word = self.score2logP(score_out_of_this_word).view(batch_size, self.label_size)
+
+        #score_out = self.hidden2score(dec_hidden_out) + prev_score
+        logP_out = logP_of_this_word + prev_logP
+
+        score_out_list.append(score_out_of_this_word)
+        logP_out_list.append(logP_out)
 
         score_output_beam_list.append(score_out)
+        logP_output_beam_list.append(logP_out)
       # End for b
 
       # dec_hidden_beam shape => (beam size, batch size, hidden dim)
@@ -678,8 +771,11 @@ class ner(nn.Module):
       score_output_beam = torch.stack(score_output_beam_list, dim = 0)
       score_output_beam = score_output_beam.permute(1, 0, 2)
 
+      logP_output_beam = torch.stack(logP_output_beam_list, dim=0).permute(1, 0, 2)
+
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       score_matrix = torch.cat(score_out_list, dim = 1)
+      logP_matrix = torch.cat(logP_out_list, dim=1)
 
       # TESTING: Alternatingly adjust beam size
       if parity:
@@ -689,8 +785,9 @@ class ner(nn.Module):
         beam_size += 1
         parity = 1
 
-      score_beam, index_beam = \
-        torch.topk(score_matrix, beam_size, dim = 1)
+      logP_beam, index_beam = \
+        torch.topk(logP_matrix, beam_size, dim=1)
+
       beta_beam = torch.floor(
         index_beam.float() / self.label_size).long()
       y_beam = torch.remainder(index_beam, self.label_size)
@@ -702,12 +799,12 @@ class ner(nn.Module):
 
       score_seq.append(score_output_beam)
 
-      #print("t=", t, ", beam size=", beam_size)
-      #print("beta_seq=",beta_seq)
-      #print("y_seq=",y_seq)
-      #print("score_seq=",score_seq)
+      logP_seq.append(logP_output_beam)
+
     # End for t
 
+    # Backtracking
+    #
     # Only output the highest-scored beam (for each instance in the batch)
     label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
       .view(batch_size, 1)
@@ -724,6 +821,7 @@ class ner(nn.Module):
       attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     #print("backtracking...")
     #print("t=",seq_len)
@@ -744,10 +842,8 @@ class ner(nn.Module):
 
       score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
 
-      #print("t=",seq_len)
-      #print("label_pred_seq=",label_pred_seq)
-      #print("input_beam=",input_beam)
-      #print("score_pred_seq=",score_pred_seq)
+      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
+
     # End for t
 
     if self.attention:
@@ -760,11 +856,10 @@ class ner(nn.Module):
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
     score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
+    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    #print("beam search ends: score_pred_seq=",score_pred_seq)
-    #time.sleep(5)
+    return label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq
 
-    return label_pred_seq, score_pred_seq, attention_pred_seq
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
@@ -801,10 +896,6 @@ class ner(nn.Module):
       #print("label=",label)
       #time.sleep(1)
 
-
-      # Always clear the gradients before use
-      self.zero_grad()
-
       sen_var = Variable(torch.LongTensor(sen))
       label_var = Variable(torch.LongTensor(label))
 
@@ -838,9 +929,9 @@ class ner(nn.Module):
       #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq, score_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       # Compute loss function value
       label_var_for_loss = label_var.permute(1, 0) \
