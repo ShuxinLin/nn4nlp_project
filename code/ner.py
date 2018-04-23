@@ -81,7 +81,7 @@ class ner(nn.Module):
     # batch, hidden_size), and it is "tensor containing the hidden state
     # for t = seq_len".
     #
-    # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+    # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hidden_dim vector, to use as the input of the decoder
     self.enc2dec_hidden = nn.Linear(2 * self.hidden_dim, self.hidden_dim, bias=False)
     self.enc2dec_cell = nn.Linear(2 * self.hidden_dim, self.hidden_dim, bias=False)
 
@@ -316,7 +316,7 @@ class ner(nn.Module):
         # batch, hidden_size), and it is "tensor containing the hidden state
         # for t = seq_len".
         #
-        # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+        # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hidden_dim vector, to use as the input of the decoder
         init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
         init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
 
@@ -921,7 +921,7 @@ class ner(nn.Module):
       # batch, hidden_size), and it is "tensor containing the hidden state
       # for t = seq_len".
       #
-      # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hid_dim vector, to use as the input of the decoder
+      # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hidden_dim vector, to use as the input of the decoder
       init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
       init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
 
@@ -1023,3 +1023,106 @@ class ner(nn.Module):
     avg_loss = loss_sum / instance_num
 
     return avg_loss, fscore
+
+
+
+
+
+
+
+  # decode_beam_step -
+  # Args: This function takes a beam of (y, beta) = (label index prediction from the previous step, incoming beam index), and the beam of hidden vectors and cell vectors from the previous step, and the accumulated logP's of these (y, beta)'s in the beam.
+  # Returns: Accumulated logP of all the possible labels in all beams [shape is (batch size, incoming beam size * label vocab number)], (non-accumulated, row prediction at this time step) logP of all the possible labels in all beams [shape is (batch size, incoming beam size * label vocab number)], the output hidden vectors and cell vectors from all incoming beams [shape is (incoming beam size, batch size = 1, hidden dim)].
+  # Note that: Currently only support single instance, no minibatch.
+  #
+  # dec_hidden_beam_in: The beam of decoder hidden vectors from the previous step.
+  #                     Shape: (beam size, batch size = 1, hidden dim)
+  # enc_hidden_seq: For attention. Can be put to None if no attention is used.
+  #                 Shape: (seq len, batch size = 1, 2 * hidden dim) => for bi-directional LSTM encoder
+  # attend_index: The index (time step, 0-based) in the enc_hidden_seq to attend to (used in fixed attention)
+
+  def decode_beam_step(self, beam_size_in, y_beam_in, beta_beam_in, dec_hidden_beam_in, dec_cell_beam_in, accum_logP_beam_in, enc_hidden_seq, attend_index):
+
+    # Currently only support single instance, no minibatch
+    batch_size = 1
+
+    # dec_hidden_out_list is the collection of the output hidden vectors from the input beam of y's.
+    # If there are beam_size_in incoming beams, then there are also beam_size_in output hidden vectors in dec_hidden_out_list (one-to-one)
+    # These hidden vectors will then be chosen according to top-K operation later
+    # It is a list of (batch size = 1, hidden dim) matrices
+    dec_hidden_out_list = []
+    dec_cell_out_list = []
+    if self.attention:
+      attention_list = []
+    accum_logP_out_list = []
+    logP_out_list = []
+
+    for b in range(beam_size_in):
+      # Extract the b-th column of y_beam
+      y_emb_in = self.label_embedding(
+        y_beam_in[:, b].contiguous() \
+        .view(batch_size, 1)) \
+        .view(batch_size, self.label_embedding_dim)
+
+      # Extract: beta-th beam, batch_index-th row of dec_hidden_beam_in
+      dec_hidden_in = \
+        dec_hidden_beam_in[beta_beam_in[:, b], range(batch_size)] \
+        .view(batch_size, self.hidden_dim)
+      dec_cell_in = \
+        dec_cell_beam_in[beta_beam_in[:, b], range(batch_size)] \
+        .view(batch_size, self.hidden_dim)
+      dec_hidden_out, dec_cell_out = \
+        self.decoder_cell(y_emb_in, (dec_hidden_in, dec_cell_in))
+
+      # Attention
+      if self.attention:
+        dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+        dec_hidden_out, attention = \
+          self.attention(dec_hidden_out, enc_hidden_seq, attend_index, self.enc2dec_hidden)
+
+        # remove the added dim
+        dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
+        attention = attention.view(batch_size, seq_len)
+      # End if self.attention
+
+      dec_hidden_out_list.append(dec_hidden_out)
+      dec_cell_out_list.append(dec_cell_out)
+      if self.attention:
+        attention_list.append(attention)
+
+      # score_out and logP_out are shape (batch size = 1, label size)
+      # They are the row predictions of the decoder for this step (not accumulated)
+      score_out = self.hidden2score(dec_hidden_out)
+      logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
+
+      # accum_logP_in is shape (batch size = 1, 1)
+      # It is the accumulated logP (sum over the path) of this beam we are now dealing with
+      accum_logP_in = accum_logP_beam_in[:, b].contiguous().view(batch_size, 1)
+
+      # The new accumulated logP would be (accum_logP_in + the predicted logP made for each label at this step)
+      # Shape (batch size = 1, label size)
+      # accum_logP_out is from which top-K will pick the new beam to output
+      accum_logP_out = logP_out + accum_logP_in
+
+      accum_logP_out_list.append(accum_logP_out)
+      logP_out_list.append(logP_out)
+    # End for b
+
+    # Here we should output the "state" we have so far
+    # Some external program should take this state, and determine the new beam size. It will then call other function to generate new beams, and then take those beams as new input to this function.
+    accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1) \
+                  .view(batch_size, beam_size_in * self.label_size)
+    logP_matrix = torch.cat(logP_out_list, dim=1) \
+                  .view(batch_size, beam_size_in * self.label_size)
+    # dec_hidden_beam_out shape => (beam_size_in, batch size = 1, hidden dim)
+    dec_hidden_beam_out = torch.stack(dec_hidden_out_list, dim=0)
+    dec_cell_beam_out = torch.stack(dec_cell_out_list, dim=0)
+
+    return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out
+
+
+
+
+
+
+
