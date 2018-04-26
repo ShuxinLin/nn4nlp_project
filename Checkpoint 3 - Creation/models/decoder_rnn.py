@@ -22,7 +22,7 @@ class DecoderRNN(GenericRNN):
   Sicne we use packing of batch, `is_batch_first` must always be True 
 
   """
-
+  # TODO: add label embed as input parameters
   def __init__(self, n_layers=1, hidden_size=64, cell_type='LSTM',
                is_bidirectional=False, max_seq_len=30, in_dropout=0.,
                out_dropout=0., out_vocab_size=10,
@@ -74,6 +74,10 @@ class DecoderRNN(GenericRNN):
     # special tokens
     self.__SOS_ID = SOS_ID
     self.__EOS_ID = EOS_ID
+
+    # label embedding layer (10 => 8 )
+    # TODO: change this
+    self.__label_embed = nn.Embedding(len(self._label_to_idx), 8)
 
   @property
   def rnn_cell(self):

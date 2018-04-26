@@ -40,6 +40,7 @@ class EncoderWordRNN(GenericRNN):
                                   bidirectional=is_bidirectional,
                                   dropout=out_dropout)
 
+
     # zero padding variable-length input of a batch or not
     self.__is_packing_needed = is_packing_needed
     self.__is_batch_first = is_batch_first
@@ -86,6 +87,8 @@ class EncoderWordRNN(GenericRNN):
       # print("Unpacked output: {}".format(out))
 
     # get the `true` output if bidirectional
+
+    # TODO: return raw otuput and hidden and let DECODER to deal with that
     if self._is_bidirectional:
       out = out[:, :, :self._hidden_size] + out[:, :, self._hidden_size:]
 

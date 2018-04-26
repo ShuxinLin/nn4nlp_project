@@ -2,7 +2,7 @@ generic:
   task_name: 'toy'
 
 encoder:
-  n_layers: 1
+  n_layers: 2
   cell_type: 'gru'
   is_bidirectional: Y
   hidden_size: 64
@@ -17,7 +17,7 @@ encoder:
   embed_pretrain_path: ''
 
 decoder:
-  n_layers: 1
+  n_layers: 2
   cell_type: 'gru'
   hidden_size: 64
   is_bidirectional: FALSE
@@ -28,7 +28,7 @@ decoder:
   is_embedding_used: Y
   out_embedding_dim: 10
   is_embed_pretrain: FALSE
-  is_attended: FALSE
+  is_attended: Y
   attention_type: 'fixed'
   is_softmax_output_needed: Y
   SOS_ID: 0
@@ -39,7 +39,7 @@ trainer:
   is_checkpoint_retrieved: Y
   is_tagging: True
   teacher_forcing_ratio: 0.5
-  optim_type: 'adam'
+  optim_type: 'sgd'
   momentum: 0.8
   decode_method: 'greedy'
   batch_style: 'naive_bucket'

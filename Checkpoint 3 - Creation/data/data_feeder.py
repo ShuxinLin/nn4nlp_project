@@ -330,8 +330,8 @@ class DataFeeder(object):
       # print("There are {} sentences of length={}".format(len(X), sentence_len))
 
       all_indexes = list(range(len(X)))
-      if shuffle:
-        random.shuffle(all_indexes)
+      # if shuffle:
+      #   random.shuffle(all_indexes)
 
       n_batches = len(X) // batch_size
       left_over_idxes = all_indexes[(n_batches * batch_size):]
@@ -364,5 +364,14 @@ class DataFeeder(object):
           X_all_batches.append(Xs)
           y_all_batches.append(ys)
           all_lengths_batches.append(lens)
+
+    if shuffle:
+      all_indexes = list(range(len(X_all_batches)))
+      random.shuffle(all_indexes)
+
+      # rearrange
+      X_all_batches = [X_all_batches[i] for i in all_indexes]
+      y_all_batches = [y_all_batches[i] for i in all_indexes]
+      all_lengths_batches = [all_lengths_batches[i] for i in all_indexes]
 
     return X_all_batches, y_all_batches, all_lengths_batches
