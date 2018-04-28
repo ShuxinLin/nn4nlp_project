@@ -15,7 +15,6 @@ from operator import itemgetter
 import collections
 
 from ner import ner
-from det_agent import det_agent
 
 
 def get_index2word(dict_file):
@@ -87,27 +86,6 @@ def minibatch_de(data, batch_size):
   return list(X_batch), list(Y_batch)
 
 
-def minibatch_of_one_de(data):
-  print("Generate mini batches, each with only 1 instance.")
-  X_batch = []
-  Y_batch = []
-  all_data = []
-  indexed_data = construct_df(data)
-  for index, row in indexed_data.iterrows():
-    splitted_sentence = list(map(int, row['SENTENCE'].split()))
-    splitted_entities = list(map(int, row['ENTITY'].split()))
-    assert len(splitted_entities) == len(splitted_sentence)
-    all_data.append((len(splitted_sentence), splitted_sentence, splitted_entities))
-
-  # Does not have to sort if each minibatch has only 1 instance
-
-  X_batch = [[data[1]] for data in all_data]
-  Y_batch = [[data[2]] for data in all_data]
-  assert len(X_batch) == len(Y_batch)
-
-  return list(X_batch), list(Y_batch)
-
-
 def main():
   rnd_seed = None
   if rnd_seed:
@@ -120,15 +98,17 @@ def main():
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
+  batch_size = 32
+
   dict_file = "../dataset/German/vocab1.de"
   entity_file = "../dataset/German/vocab1.en"
   index2word = get_index2word(dict_file)
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
+  #print("label_size=",label_size)
 
-  val_X, val_Y = minibatch_of_one_de('valid')
-  test_X, test_Y = minibatch_of_one_de('test')
+  train_X, train_Y = minibatch_de('train', batch_size)
 
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
@@ -136,7 +116,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 100
+  max_epoch = 3
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -149,50 +129,20 @@ def main():
   if pretrained == 'de64':
     word_embedding_dim = 64
 
-  gpu = False
+  gpu = True
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
 
+  load_model_filename = None
 
-  ##################
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None, val_Y=None, test_X=None, test_Y=None, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
+  if gpu:
+    machine = machine.cuda()
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_adapt.txt"), "w+")
+  shuffle = True
 
-  for epoch in range(0, max_epoch):
-    load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
-
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
-    if gpu:
-      machine = machine.cuda()
-
-    initial_beam_size = 3
-    max_beam_size = 20
-
-    accum_logP_ratio_low = 0.1
-    logP_ratio_low = 0.1
-
-    agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
-
-    # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, "adaptive", initial_beam_size, max_beam_size, agent)
-
-    time_begin = time.time()
-    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, "adaptive", initial_beam_size, max_beam_size, agent)
-    time_end = time.time()
-
-    print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    log_msg = "%d\t%f\t%f\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    print(print_msg)
-    print(log_msg, file=eval_output_file, flush=True)
-  # End for epoch
-
-  eval_output_file_beam_adapt.close()
-
-
-  # Write out files
-  #train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  #val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
-  #test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
+  # Pure training, no evaluation
+  train_loss_list = machine.train(shuffle, result_path, False, None)
 
 
 if __name__ == "__main__":
