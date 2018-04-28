@@ -426,7 +426,6 @@ class ner(nn.Module):
     # Current version is as parallel to beam as possible
     # for debugging purpose.
 
-    score_seq = []
     logP_seq = []
 
     # init_label's shape => (batch size, 1),
@@ -475,10 +474,6 @@ class ner(nn.Module):
     ##score_out = self.hidden2score(dec_hidden_out) + init_score
     score_out = self.hidden2score(dec_hidden_out) \
       .view(batch_size, self.label_size)
-
-    # To output the score_seq for calculating loss function value
-    # during evaluation
-    score_seq.append(score_out)
 
     logP = self.score2logP(score_out).view(batch_size, self.label_size)
     logP_seq.append(logP)
@@ -530,8 +525,6 @@ class ner(nn.Module):
       score_out = self.hidden2score(dec_hidden_out) \
         .view(batch_size, self.label_size)
 
-      score_seq.append(score_out)
-
       logP = self.score2logP(score_out).view(batch_size, self.label_size)
       logP_seq.append(logP)
 
@@ -555,15 +548,31 @@ class ner(nn.Module):
     # It happens that directly concatenate along dim = 0 gives you
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
-    score_seq = torch.cat(score_seq, dim=0)
-    score_pred_seq = score_seq
 
     logP_seq = torch.cat(logP_seq, dim=0)
     logP_pred_seq = logP_seq
 
-    return label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq
+    return label_pred_seq, logP_pred_seq, attention_pred_seq
+
 
   def decode_beam(self, batch_size, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size):
+    # This is for backtracking
+    #
+    # Each beta is (batch size, beam size) matrix,
+    # and there will be T_y of them in the sequence
+    # y => same
+    beta_seq = []
+    y_seq = []
+    logP_seq = []
+    accum_logP_seq = []
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      attention_seq = []
+
+
+    ### Initial step t = 0 ###
+
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
     if self.gpu:
@@ -578,27 +587,6 @@ class ner(nn.Module):
         Variable(torch.LongTensor(batch_size, 1).zero_()) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
-
-    # init_score's shape => (batch size, 1),
-    # with all elements 0
-    #init_score = Variable(torch.FloatTensor(batch_size, 1).zero_())
-
-    #if self.gpu:
-    #  init_score = init_score.cuda()
-
-    # Each beta is (batch size, beam size) matrix,
-    # and there will be T_y of them in the sequence
-    # y => same
-    beta_seq = []
-    y_seq = []
-
-    score_seq = []
-    logP_seq = []
-
-    if self.attention:
-      # This would be the attention alpha_{ij} coefficients
-      # in the shape of (output seq len, batch size, beam size, input seq len)
-      attention_seq = []
 
     # t = 0, only one input beam from init (t = -1)
     # Only one dec_hidden_out, dec_cell_out
@@ -622,6 +610,7 @@ class ner(nn.Module):
     dec_hidden_beam = torch.stack([dec_hidden_out], dim = 0)
     dec_cell_beam = torch.stack([dec_cell_out], dim = 0)
 
+    # This one is for backtracking (need permute)
     if self.attention:
       # For better explanation, see in the "for t" loop below
       #
@@ -636,55 +625,44 @@ class ner(nn.Module):
       attention_beam = attention_beam.permute(1, 0, 2)
 
     # score_out.shape => (batch size, |V^y|)
-    #score_out = self.hidden2score(dec_hidden_out) + init_score
     score_out = self.hidden2score(dec_hidden_out) \
       .view(batch_size, self.label_size)
     logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
 
-    # For output: (1, batch size, label dim)
-    score_output_beam = torch.stack([score_out], dim = 0)
-    # Swap into shape (batch size, 1, label dim)
-    score_output_beam = score_output_beam.permute(1, 0, 2)
+    # Initial step, accumulated logP is the same as logP
+    accum_logP_out = logP_out
 
-    logP_output_beam = torch.stack([logP_out], dim=0).permute(1, 0, 2)
+    logP_out_list = [logP_out]
+    accum_logP_out_list = [accum_logP_out]
 
-    # WE ARE HERE: well, need to let logP replace score_out, score_output_beam...
-    # and fix the following line
-    #logP_seq.append(logP)
+    # This one is for backtracking (need permute)
+    logP_output_beam = torch.stack(logP_out_list, dim=0).permute(1, 0, 2)
+    accum_logP_output_beam = torch.stack(accum_logP_out_list, dim=0).permute(1, 0, 2)
 
-
-    # score_matrix.shape => (batch size, |V^y| * 1)
+    # This is for topk
+    #
+    # accum_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
-    score_matrix = torch.cat([score_out], dim = 1)
-    logP_matrix = torch.cat([logP_out], dim=1)
+    logP_matrix = torch.cat(logP_out_list, dim=1)
+    accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1)
 
     # All beta^{t=0, b} are actually 0
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
     # y_beam, score_beam => same
 
-
-    # TESTING: use alternating beam size:
-    # beam_size -> beam_size + 1 -> beam_size -> ...
-    parity = 0
-
-    logP_beam, index_beam = torch.topk(logP_matrix, beam_size, dim=1)
+    accum_logP_beam, index_beam = torch.topk(accum_logP_matrix, beam_size, dim=1)
 
     beta_beam = torch.floor(index_beam.float() / self.label_size).long()
     y_beam = torch.remainder(index_beam, self.label_size)
+
+    # This one is for backtracking
     beta_seq.append(beta_beam)
     y_seq.append(y_beam)
-
     if self.attention:
       attention_seq.append(attention_beam)
-
-    score_seq.append(score_output_beam)
     logP_seq.append(logP_output_beam)
-
-    #print("t = 0, beam size =", beam_size)
-    #print("beta_seq=",beta_seq)
-    #print("y_seq=",y_seq)
-    #print("score_seq=",score_seq)
+    accum_logP_seq.append(accum_logP_output_beam)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -697,28 +675,32 @@ class ner(nn.Module):
 
       dec_hidden_out_list = []
       dec_cell_out_list = []
-      score_out_list = []
-      logP_out_list = []
-
       if self.attention:
         attention_list =[]
+      ##score_out_list = []
+      logP_out_list = []
+      accum_logP_out_list = []
 
-      score_output_beam_list = []
+      # This is for backtracking
       logP_output_beam_list = []
+      accum_logP_output_beam_list = []
 
       for b in range(beam_size):
         # Extract the b-th column of y_beam
         prev_pred_label_emb = self.label_embedding(
-          y_seq[t - 1][:, b].contiguous() \
+          ##y_seq[t - 1][:, b].contiguous() \
+          y_beam[:, b].contiguous() \
           .view(batch_size, 1)) \
           .view(batch_size, self.label_embedding_dim)
 
         # Extract: beta-th beam, batch_index-th row of dec_hidden_beam
         prev_dec_hidden_out = \
-          dec_hidden_beam[beta_seq[t - 1][:, b],
+          ##dec_hidden_beam[beta_seq[t - 1][:, b],
+          dec_hidden_beam[beta_beam[:, b],
           range(batch_size)]
         prev_dec_cell_out = \
-          dec_cell_beam[beta_seq[t - 1][:, b],
+          ##dec_cell_beam[beta_seq[t - 1][:, b],
+          dec_cell_beam[beta_beam[:, b],
           range(batch_size)]
         dec_hidden_out, dec_cell_out = self.decoder_cell(
           prev_pred_label_emb,
@@ -737,30 +719,29 @@ class ner(nn.Module):
 
         dec_hidden_out_list.append(dec_hidden_out)
         dec_cell_out_list.append(dec_cell_out)
-
         if self.attention:
           attention_list.append(attention)
 
-        #prev_score = score_beam[:, b].contiguous().view(batch_size, 1)
-        prev_logP = logP_beam[:, b].contiguous().view(batch_size, 1)
+        score_out = self.hidden2score(dec_hidden_out)
+        logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
 
-        score_out_of_this_word = self.hidden2score(dec_hidden_out)
-        logP_of_this_word = self.score2logP(score_out_of_this_word).view(batch_size, self.label_size)
+        accum_logP = accum_logP_beam[:, b].contiguous().view(batch_size, 1)
 
-        #score_out = self.hidden2score(dec_hidden_out) + prev_score
-        logP_out = logP_of_this_word + prev_logP
+        accum_logP_out = logP_out + accum_logP
 
-        score_out_list.append(score_out_of_this_word)
         logP_out_list.append(logP_out)
+        accum_logP_out_list.append(accum_logP_out)
 
-        score_output_beam_list.append(score_out)
+        # For backtracking
         logP_output_beam_list.append(logP_out)
+        accum_logP_output_beam_list.append(accum_logP_out)
       # End for b
 
       # dec_hidden_beam shape => (beam size, batch size, hidden dim)
       dec_hidden_beam = torch.stack(dec_hidden_out_list, dim = 0)
       dec_cell_beam = torch.stack(dec_cell_out_list, dim = 0)
 
+      # This one is for backtracking (need permute)
       if self.attention:
         attention_beam = torch.stack(attention_list, dim = 0)
         # Now attention_beam has shape (beam size, batch size, input seq len)
@@ -768,46 +749,34 @@ class ner(nn.Module):
         # the shape (batch size, beam size, input seq len)
         attention_beam = attention_beam.permute(1, 0, 2)
 
-      score_output_beam = torch.stack(score_output_beam_list, dim = 0)
-      score_output_beam = score_output_beam.permute(1, 0, 2)
-
+      # This one is for backtracking (need permute)
       logP_output_beam = torch.stack(logP_output_beam_list, dim=0).permute(1, 0, 2)
+      accum_logP_output_beam = torch.stack(accum_logP_output_beam_list, dim=0).permute(1, 0, 2)
 
       # score_matrix.shape => (batch size, |V^y| * beam_size)
-      score_matrix = torch.cat(score_out_list, dim = 1)
       logP_matrix = torch.cat(logP_out_list, dim=1)
+      accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1)
 
-      # TESTING: Alternatingly adjust beam size
-      if parity:
-        beam_size -= 1
-        parity = 0
-      else:
-        beam_size += 1
-        parity = 1
-
-      logP_beam, index_beam = \
-        torch.topk(logP_matrix, beam_size, dim=1)
+      accum_logP_beam, index_beam = \
+        torch.topk(accum_logP_matrix, beam_size, dim=1)
 
       beta_beam = torch.floor(
         index_beam.float() / self.label_size).long()
       y_beam = torch.remainder(index_beam, self.label_size)
+
+      # For backtracking
       beta_seq.append(beta_beam)
       y_seq.append(y_beam)
-
       if self.attention:
         attention_seq.append(attention_beam)
-
-      score_seq.append(score_output_beam)
-
       logP_seq.append(logP_output_beam)
-
+      accum_logP_seq.append(accum_logP_output_beam)
     # End for t
 
     # Backtracking
     #
     # Only output the highest-scored beam (for each instance in the batch)
-    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
-      .view(batch_size, 1)
+    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous().view(batch_size, 1)
     input_beam = beta_seq[seq_len - 1][:, 0]
 
     if self.attention:
@@ -820,14 +789,8 @@ class ner(nn.Module):
       # Here we initialize the first element
       attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
-    score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
     logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-
-    #print("backtracking...")
-    #print("t=",seq_len)
-    #print("label_pred_seq=",label_pred_seq)
-    #print("input_beam=",input_beam)
-    #print("score_pred_seq=",score_pred_seq)
+    accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
 
     for t in range(seq_len - 2, -1, -1):
       label_pred_seq = torch.cat(
@@ -840,10 +803,8 @@ class ner(nn.Module):
       if self.attention:
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
 
-      score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
-
       logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
-
+      accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
     # End for t
 
     if self.attention:
@@ -855,19 +816,15 @@ class ner(nn.Module):
     # It happens that directly concatenate along dim = 0 gives you
     # a convenient shape (batch_size * seq_len, label_size)
     # for later cross entropy loss
-    score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
     logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
+    accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    return label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
   # "beam_size = 0" will use greedy
   # "beam_size = 1" will still use beam search, just with beam size = 1
   def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, beam_size):
-    # To compute loss function value during evaluation time
-    # Will manually average over (sentence_len * instance_num)
-    loss_function = nn.CrossEntropyLoss(size_average=False)
-
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -880,8 +837,6 @@ class ner(nn.Module):
     correctness = 0
     for batch in eval_data_X:
       instance_num += len(batch)
-
-    loss_sum = 0
 
     true_pos_count = 0
     pred_pos_count = 0
@@ -929,17 +884,9 @@ class ner(nn.Module):
       #init_dec_cell = enc_cell_out[0]
 
       if beam_size > 0:
-        label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       else:
-        label_pred_seq, score_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
-
-      # Compute loss function value
-      label_var_for_loss = label_var.permute(1, 0) \
-        .contiguous().view(-1)
-      loss = loss_function(score_pred_seq, label_var_for_loss)
-      if self.gpu:
-        loss = loss.cpu()
-      loss_sum += loss.data.numpy()[0] / current_sen_len
+        label_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
 
       O_INDEX = 4
       assert self.label_size == 12
@@ -1020,14 +967,7 @@ class ner(nn.Module):
       f_label.close()
       f_result_processed.close()
 
-    avg_loss = loss_sum / instance_num
-
-    return avg_loss, fscore
-
-
-
-
-
+    return fscore
 
 
   # decode_beam_step -
@@ -1121,8 +1061,194 @@ class ner(nn.Module):
     return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out
 
 
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, agent):
+    # Currently, batch size can only be 1
+    batch_size = 1
 
+    # init_label's shape => (batch size, 1),
+    # with all elements self.BEG_INDEX
+    if self.gpu:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
+    else:
+      init_label_emb = \
+        self.label_embedding(
+        Variable(torch.LongTensor(batch_size, 1).zero_()) \
+        + self.BEG_INDEX) \
+        .view(batch_size, self.label_embedding_dim)
 
+    # Each beta is (batch size, beam size) matrix,
+    # and there will be T_y of them in the sequence
+    # y => same
+    beta_seq = []
+    y_seq = []
 
+    ##score_seq = []
+    logP_seq = []
+    accum_logP_seq = []
 
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      attention_seq = []
 
+    # t = 0, only one input beam from init (t = -1)
+    # Only one dec_hidden_out, dec_cell_out
+    # => dec_hidden_out has shape (batch size, hidden dim)
+    dec_hidden_out, dec_cell_out = \
+      self.decoder_cell(init_label_emb,
+      (init_dec_hidden, init_dec_cell))
+
+    # Attention
+    if self.attention:
+      dec_hidden_out = dec_hidden_out[None, :, :]  # add 1 nominal dim
+      dec_hidden_out, attention = \
+        self.attention(dec_hidden_out, enc_hidden_seq, 0, self.enc2dec_hidden)
+
+      # remove the added dim
+      dec_hidden_out = dec_hidden_out.view(batch_size, self.hidden_dim)
+      attention = attention.view(batch_size, seq_len)
+
+    # dec_hidden_beam shape => (1, batch size, hidden dim),
+    # 1 because there is only 1 input beam
+    dec_hidden_beam = torch.stack([dec_hidden_out], dim = 0)
+    dec_cell_beam = torch.stack([dec_cell_out], dim = 0)
+
+    # This one is for backtracking (need permute)
+    if self.attention:
+      # For better explanation, see in the "for t" loop below
+      #
+      # Originally attention has shape (batch size, input seq len)
+      #
+      # At t = 0, there is only 1 beam, so formally attention is actually
+      # in shape (1, batch size, input seq len), where 1 is beam size.
+      attention_beam = torch.stack([attention], dim = 0)
+
+      # We need to permute (swap) the dimensions into
+      # the shape (batch size, 1, input seq len)
+      attention_beam = attention_beam.permute(1, 0, 2)
+
+    # score_out.shape => (batch size, |V^y|)
+    score_out = self.hidden2score(dec_hidden_out) \
+      .view(batch_size, self.label_size)
+    logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
+
+    # For output: (1, batch size, label dim)
+    ##score_output_beam = torch.stack([score_out], dim = 0)
+    # Swap into shape (batch size, 1, label dim)
+    ##score_output_beam = score_output_beam.permute(1, 0, 2)
+
+    # This one is for backtracking (need permute)
+    logP_output_beam = torch.stack([logP_out], dim=0).permute(1, 0, 2)
+
+    # score_matrix.shape => (batch size, |V^y| * 1)
+    # * 1 because there is only 1 input beam
+    ##score_matrix = torch.cat([score_out], dim = 1)
+    logP_matrix = torch.cat([logP_out], dim=1)
+
+    # All beta^{t=0, b} are actually 0
+    # beta_beam.shape => (batch size, beam size),
+    # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
+    # y_beam, score_beam => same
+
+    logP_beam, index_beam = torch.topk(logP_matrix, initial_beam_size, dim=1)
+
+    beta_beam = torch.floor(index_beam.float() / self.label_size).long()
+    y_beam = torch.remainder(index_beam, self.label_size)
+    beta_seq.append(beta_beam)
+    y_seq.append(y_beam)
+
+    if self.attention:
+      attention_seq.append(attention_beam)
+
+    ##score_seq.append(score_output_beam)
+    logP_seq.append(logP_output_beam)
+
+    # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
+    for t in range(1, seq_len):
+      # We loop through beam because we expect that
+      # usually batch size > beam size
+      #
+      # DESIGN: This may not be true anymore in adaptive beam search,
+      # since we expect batch size = 1 in this case.
+      # So is beam operations vectorizable?
+
+      accum_logP_matrix, logP_matrix, dec_hidden_beam, dec_cell_beam = \
+        self.decode_beam_step(beam_size, y_beam, beta_beam,
+                              dec_hidden_beam, dec_cell_beam, accum_logP_beam,
+                              enc_hidden_seq, t)
+
+      ### TODO begin ###
+      state = make_state(...)
+      beam_size = agent(state)
+      ### TODO end ###
+
+      accum_logP_beam, index_beam = \
+        torch.topk(accum_logP_matrix, beam_size, dim=1)
+
+      beta_beam = torch.floor(
+        index_beam.float() / self.label_size).long()
+      y_beam = torch.remainder(index_beam, self.label_size)
+      beta_seq.append(beta_beam)
+      y_seq.append(y_beam)
+
+      if self.attention:
+        attention_seq.append(attention_beam)
+
+      logP_seq.append(logP_output_beam)
+    # End for t
+
+    # Backtracking
+    #
+    # Only output the highest-scored beam (for each instance in the batch)
+    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
+      .view(batch_size, 1)
+    input_beam = beta_seq[seq_len - 1][:, 0]
+
+    if self.attention:
+      # Now attention_seq is
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      #
+      # attention_pred_seq would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, input seq len)
+      #
+      # Here we initialize the first element
+      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    ##score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    for t in range(seq_len - 2, -1, -1):
+      label_pred_seq = torch.cat(
+        [y_seq[t][range(batch_size), input_beam] \
+        .contiguous().view(batch_size, 1),
+        label_pred_seq], dim = 1)
+
+      input_beam = beta_seq[t][range(batch_size), input_beam]
+
+      if self.attention:
+        attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+
+      ##score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
+
+      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
+    # End for t
+
+    if self.attention:
+      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+    else:
+      attention_pred_seq = None
+
+    # For score_seq, actually don't need to reshape!
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
+    #
+    # We actually don't calculate loss in evaluation anymore
+    ##score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
+    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
+
+    return label_pred_seq, logP_pred_seq, attention_pred_seq
