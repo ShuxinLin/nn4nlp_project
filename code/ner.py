@@ -1061,7 +1061,7 @@ class ner(nn.Module):
     return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out
 
 
-  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, agent):
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent):
     # Currently, batch size can only be 1
     batch_size = 1
 
@@ -1181,10 +1181,14 @@ class ner(nn.Module):
                               dec_hidden_beam, dec_cell_beam, accum_logP_beam,
                               enc_hidden_seq, t)
 
-      ### TODO begin ###
-      state = make_state(...)
-      beam_size = agent(state)
-      ### TODO end ###
+      state = self.make_state(accum_logP_matrix, logP_matrix,
+                              beam_size, max_beam_size)
+
+      action = agent.get_action(state)
+      if action == agent.DECREASE:
+        beam_size -= 1
+      elif action == agent.INCREASE:
+        beam_size += 1
 
       accum_logP_beam, index_beam = \
         torch.topk(accum_logP_matrix, beam_size, dim=1)
@@ -1252,3 +1256,12 @@ class ner(nn.Module):
     logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
     return label_pred_seq, logP_pred_seq, attention_pred_seq
+
+
+  def make_state(self, accum_logP_matrix, logP_matrix, beam_size, max_beam_size):
+    accum_logP_state, _ = \
+      torch.topk(accum_logP_matrix, max_beam_size, dim=1)
+    logP_state, _ = \
+      torch.topk(logP_matrix, max_beam_size, dim=1)
+
+    return accum_logP_state.extend(logP_state).append(beam_size)
