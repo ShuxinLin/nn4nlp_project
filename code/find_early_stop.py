@@ -1,6 +1,6 @@
 import numpy as np
 
-logfile = open("../result_lrn_0p001/eval_beam_3.txt", "r")
+logfile = open("../result_lrn_0p001_atten/eval_beam_3.txt", "r")
 
 data = []
 for line in logfile:
