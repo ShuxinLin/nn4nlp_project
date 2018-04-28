@@ -682,24 +682,21 @@ class ner(nn.Module):
       accum_logP_out_list = []
 
       # This is for backtracking
-      logP_output_beam_list = []
-      accum_logP_output_beam_list = []
+      ##logP_output_beam_list = []
+      ##accum_logP_output_beam_list = []
 
       for b in range(beam_size):
         # Extract the b-th column of y_beam
         prev_pred_label_emb = self.label_embedding(
-          ##y_seq[t - 1][:, b].contiguous() \
           y_beam[:, b].contiguous() \
           .view(batch_size, 1)) \
           .view(batch_size, self.label_embedding_dim)
 
         # Extract: beta-th beam, batch_index-th row of dec_hidden_beam
         prev_dec_hidden_out = \
-          ##dec_hidden_beam[beta_seq[t - 1][:, b],
           dec_hidden_beam[beta_beam[:, b],
           range(batch_size)]
         prev_dec_cell_out = \
-          ##dec_cell_beam[beta_seq[t - 1][:, b],
           dec_cell_beam[beta_beam[:, b],
           range(batch_size)]
         dec_hidden_out, dec_cell_out = self.decoder_cell(
@@ -733,8 +730,8 @@ class ner(nn.Module):
         accum_logP_out_list.append(accum_logP_out)
 
         # For backtracking
-        logP_output_beam_list.append(logP_out)
-        accum_logP_output_beam_list.append(accum_logP_out)
+        ##logP_output_beam_list.append(logP_out)
+        ##accum_logP_output_beam_list.append(accum_logP_out)
       # End for b
 
       # dec_hidden_beam shape => (beam size, batch size, hidden dim)
@@ -750,8 +747,10 @@ class ner(nn.Module):
         attention_beam = attention_beam.permute(1, 0, 2)
 
       # This one is for backtracking (need permute)
-      logP_output_beam = torch.stack(logP_output_beam_list, dim=0).permute(1, 0, 2)
-      accum_logP_output_beam = torch.stack(accum_logP_output_beam_list, dim=0).permute(1, 0, 2)
+      ##logP_output_beam = torch.stack(logP_output_beam_list, dim=0).permute(1, 0, 2)
+      ##accum_logP_output_beam = torch.stack(accum_logP_output_beam_list, dim=0).permute(1, 0, 2)
+      logP_output_beam = torch.stack(logP_out_list, dim=0).permute(1, 0, 2)
+      accum_logP_output_beam = torch.stack(accum_logP_out_list, dim=0).permute(1, 0, 2)
 
       # score_matrix.shape => (batch size, |V^y| * beam_size)
       logP_matrix = torch.cat(logP_out_list, dim=1)
@@ -1052,6 +1051,11 @@ class ner(nn.Module):
 
     # Here we should output the "state" we have so far
     # Some external program should take this state, and determine the new beam size. It will then call other function to generate new beams, and then take those beams as new input to this function.
+
+    # This one is for backtracking (need permute)
+    logP_output_beam = torch.stack(logP_out_list, dim=0).permute(1, 0, 2)
+    accum_logP_output_beam = torch.stack(accum_logP_out_list, dim=0).permute(1, 0, 2)
+
     accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1) \
                   .view(batch_size, beam_size_in * self.label_size)
     logP_matrix = torch.cat(logP_out_list, dim=1) \
@@ -1060,7 +1064,7 @@ class ner(nn.Module):
     dec_hidden_beam_out = torch.stack(dec_hidden_out_list, dim=0)
     dec_cell_beam_out = torch.stack(dec_cell_out_list, dim=0)
 
-    return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out
+    return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out, accum_logP_output_beam, logP_output_beam
 
 
   def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent):
@@ -1138,37 +1142,42 @@ class ner(nn.Module):
       .view(batch_size, self.label_size)
     logP_out = self.score2logP(score_out).view(batch_size, self.label_size)
 
-    # For output: (1, batch size, label dim)
-    ##score_output_beam = torch.stack([score_out], dim = 0)
-    # Swap into shape (batch size, 1, label dim)
-    ##score_output_beam = score_output_beam.permute(1, 0, 2)
+    # Initial step, accumulated logP is the same as logP
+    accum_logP_out = logP_out
+
+    logP_out_list = [logP_out]
+    accum_logP_out_list = [accum_logP_out]
 
     # This one is for backtracking (need permute)
-    logP_output_beam = torch.stack([logP_out], dim=0).permute(1, 0, 2)
+    logP_output_beam = torch.stack(logP_out_list, dim=0).permute(1, 0, 2)
+    accum_logP_output_beam = torch.stack(accum_logP_out_list, dim=0).permute(1, 0, 2)
 
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
     ##score_matrix = torch.cat([score_out], dim = 1)
-    logP_matrix = torch.cat([logP_out], dim=1)
+    logP_matrix = torch.cat(logP_out_list, dim=1)
+    accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1)
 
     # All beta^{t=0, b} are actually 0
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
     # y_beam, score_beam => same
 
-    logP_beam, index_beam = torch.topk(logP_matrix, initial_beam_size, dim=1)
+    beam_size = initial_beam_size
+    accum_logP_beam, index_beam = torch.topk(accum_logP_matrix, beam_size, dim=1)
 
     beta_beam = torch.floor(index_beam.float() / self.label_size).long()
     y_beam = torch.remainder(index_beam, self.label_size)
+
+    # This one is for backtracking
     beta_seq.append(beta_beam)
     y_seq.append(y_beam)
-
     if self.attention:
       attention_seq.append(attention_beam)
-
-    ##score_seq.append(score_output_beam)
     logP_seq.append(logP_output_beam)
     accum_logP_seq.append(accum_logP_output_beam)
+
+    #print(">>>>t=0, accum_logP_seq=",accum_logP_seq)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -1179,7 +1188,7 @@ class ner(nn.Module):
       # since we expect batch size = 1 in this case.
       # So is beam operations vectorizable?
 
-      accum_logP_matrix, logP_matrix, dec_hidden_beam, dec_cell_beam = \
+      accum_logP_matrix, logP_matrix, dec_hidden_beam, dec_cell_beam, accum_logP_output_beam, logP_output_beam = \
         self.decode_beam_step(beam_size, y_beam, beta_beam,
                               dec_hidden_beam, dec_cell_beam, accum_logP_beam,
                               enc_hidden_seq, t)
@@ -1207,7 +1216,15 @@ class ner(nn.Module):
 
       logP_seq.append(logP_output_beam)
       accum_logP_seq.append(accum_logP_output_beam)
+      #print(">>>>t=",t,", accum_logP_seq=",accum_logP_seq)
     # End for t
+
+    #print("before backtracking")
+    #print("y_seq=",y_seq)
+    #print("beta_seq=",beta_seq)
+    #print("accum_logP_seq=",accum_logP_seq)
+    #print("logP_seq=",logP_seq)
+    #print("the seq_len =",seq_len)
 
     # Backtracking
     #
@@ -1243,6 +1260,11 @@ class ner(nn.Module):
 
       ##score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
 
+      #print("in t loop")
+      #print("t=",t)
+      #print("accum_logP_seq[t]=",accum_logP_seq[t])
+      #print("batch_size=",batch_size)
+      #print("input_beam",input_beam)
       logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
       accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
     # End for t
@@ -1271,4 +1293,13 @@ class ner(nn.Module):
     logP_state, _ = \
       torch.topk(logP_matrix, max_beam_size, dim=1)
 
-    return accum_logP_state.extend(logP_state).append(beam_size)
+    if self.gpu:
+      accum_logP_state = accum_logP_state.cpu().data.numpy()[0]
+      logP_state = logP_state.cpu().data.numpy()[0]
+    else:
+      accum_logP_state = accum_logP_state.data.numpy()[0]
+      logP_state = logP_state.data.numpy()[0]
+
+    state = np.concatenate((accum_logP_state, logP_state, np.array([beam_size])), axis=0)
+
+    return state

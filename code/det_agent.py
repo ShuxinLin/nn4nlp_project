@@ -39,8 +39,8 @@ class det_agent():
   # 0: decrease the beam size by 1 (similar to stated above: would be no effect if the current beam size is already 1.)
   def get_action(self, state):
     accum_logP = state[0:self.max_beam_size]
-    logP = state[max_beam_size:2 * self.max_beam_size]
-    beam_size_in = state[2 * self.max_beam_size]
+    logP = state[self.max_beam_size:2 * self.max_beam_size]
+    beam_size_in = int(state[2 * self.max_beam_size])
 
     # Determine whether to decrease the beam size
     # Only observe the accum_logP at (beam_size_in - 1)
@@ -58,7 +58,7 @@ class det_agent():
     # Determine whether to increase the beam size
     # Only observe the accum_logP at beam_size_in (that is, the new candidate in the increased beam)
     # If it is higher than the highest accum_logP (at position 0) by the ratio accum_logP_ratio_low, then increase the size by 1 (kind of like: if the current beam size was one size larger (beam_size_in + 1), it would not be pruned)
-    if beam_size_in < max_beam_size:
+    if beam_size_in < self.max_beam_size:
       if accum_logP[beam_size_in] - accum_logP[0] > np.log(self.accum_logP_ratio_low):
         return self.INCREASE
       # Do similar with logP
