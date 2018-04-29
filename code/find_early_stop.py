@@ -1,6 +1,6 @@
 import numpy as np
 
-logfile = open("../result_lrn_0p001_atten/eval_beam_3.txt", "r")
+logfile = open("../result_toy/eval_beam_3.txt", "r")
 
 data = []
 for line in logfile:
@@ -9,7 +9,7 @@ data = np.array(data)
 
 logfile.close()
 
-val_f_vec = data[:, 5]
+val_f_vec = data[:, 1]
 prev = -1
 wait_threshold = 3
 for epoch, f in enumerate(val_f_vec):

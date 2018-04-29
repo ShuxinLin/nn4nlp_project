@@ -15,6 +15,7 @@ from operator import itemgetter
 import collections
 
 from ner import ner
+from det_agent import det_agent
 
 from data.toy_reverse_data_feeder import ToyDataFeeder
 from data.toy_reverse_data import parse_data
@@ -72,61 +73,51 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_3_adapt_ckpt_10.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_greedy_ckpt_24.txt"), "w+")
 
-  epoch = 10
+  epoch = 24
 
   load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location=lambda storage, loc: storage)
   if gpu:
     machine = machine.cuda()
 
-  initial_beam_size = 3
-  max_beam_size = 20
+  decode_method = "greedy"
 
-  accum_logP_ratio_low = 0.1
-  logP_ratio_low = 0.1
+  beam_size = None
+  #max_beam_size = label_size
+  max_beam_size = None
 
-  agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
+  #accum_logP_ratio_low = 0.1
+  #logP_ratio_low = 0.1
+
+  #agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
+  agent = None
+
+  # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
+  # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
+  f_score_index_begin = 4
 
   # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, "adaptive", initial_beam_size, max_beam_size, agent)
+  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
 
   time_begin = time.time()
-  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, "adaptive", initial_beam_size, max_beam_size, agent)
+  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
   time_end = time.time()
 
   print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-  log_msg = "%d\t%f\t%f\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+  log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
   print(print_msg)
   print(log_msg, file=eval_output_file, flush=True)
 
-  eval_output_file_beam_adapt.close()
+  eval_output_file.close()
 
 
   # Write out files
   #train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
   #val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
   #test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
-
-
-
-
-
-
-
-
-  load_model_filename = None
-
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None, val_Y=None, test_X=None, test_Y=None, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
-  if gpu:
-    machine = machine.cuda()
-
-  shuffle = True
-
-  # Pure training, no evaluation
-  train_loss_list = machine.train(shuffle, result_path, False, None)
 
 
 if __name__ == "__main__":
