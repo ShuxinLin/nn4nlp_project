@@ -1175,9 +1175,9 @@ class ner(nn.Module):
                               beam_size, max_beam_size)
 
       action = agent.get_action(state)
-      if action == agent.DECREASE:
+      if action == agent.DECREASE and beam_size > 1:
         beam_size -= 1
-      elif action == agent.INCREASE:
+      elif action == agent.INCREASE and beam_size < max_beam_size:
         beam_size += 1
 
       accum_logP_beam, index_beam = \
