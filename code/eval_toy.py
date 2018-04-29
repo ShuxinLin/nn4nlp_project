@@ -92,9 +92,9 @@ def main():
     #agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
     agent = None
 
-    # For toy dataset
-    f_score_index_begin = 0
-    print(index2label)
+    # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
+    # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
+    f_score_index_begin = 4
 
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
     val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)

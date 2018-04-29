@@ -822,7 +822,7 @@ class ner(nn.Module):
 
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
-  # For toy dataset, f_score_index_begin = 0 (because )
+  # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
   def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, f_score_index_begin):
     batch_num = len(eval_data_X)
 
@@ -846,9 +846,6 @@ class ner(nn.Module):
       label = eval_data_Y[batch_idx]
       current_batch_size = len(sen)
       current_sen_len = len(sen[0])
-
-      #print("label=",label)
-      #time.sleep(1)
 
       sen_var = Variable(torch.LongTensor(sen))
       label_var = Variable(torch.LongTensor(label))
@@ -879,9 +876,6 @@ class ner(nn.Module):
       init_dec_hidden = self.enc2dec_hidden(torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
       init_dec_cell = self.enc2dec_cell(torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
 
-      #init_dec_hidden = enc_hidden_out[0]
-      #init_dec_cell = enc_cell_out[0]
-
       if decode_method == "greedy":
         label_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
       elif decode_method == "beam":
@@ -890,22 +884,14 @@ class ner(nn.Module):
         # the input argument "beam_size" serves as initial_beam_size here
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
 
-      #O_INDEX = 4
-      #assert self.label_size == 12
       for label_index in range(f_score_index_begin, self.label_size):
-        #print("label_var=", label_var)
         true_pos = (label_var == label_index)
-        #print("true_pos=", true_pos)
-        #time.sleep(1)
         true_pos_count += true_pos.float().sum()
-        #print("true_pos.sum()=",true_pos.sum())
 
         pred_pos = (label_pred_seq == label_index)
-        #print("pred_pos=", pred_pos)
         pred_pos_count += pred_pos.float().sum()
 
         true_pred_pos = true_pos & pred_pos
-        #print("true_pred_pos=",true_pred_pos)
         true_pred_pos_count += true_pred_pos.float().sum()
 
       # Write result into file
