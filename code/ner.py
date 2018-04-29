@@ -1070,7 +1070,6 @@ class ner(nn.Module):
     beta_seq = []
     y_seq = []
 
-    ##score_seq = []
     logP_seq = []
     accum_logP_seq = []
 
@@ -1132,7 +1131,6 @@ class ner(nn.Module):
 
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
-    ##score_matrix = torch.cat([score_out], dim = 1)
     logP_matrix = torch.cat(logP_out_list, dim=1)
     accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1)
 
@@ -1154,8 +1152,6 @@ class ner(nn.Module):
       attention_seq.append(attention_beam)
     logP_seq.append(logP_output_beam)
     accum_logP_seq.append(accum_logP_output_beam)
-
-    #print(">>>>t=0, accum_logP_seq=",accum_logP_seq)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -1188,79 +1184,20 @@ class ner(nn.Module):
       y_beam = torch.remainder(index_beam, self.label_size)
       beta_seq.append(beta_beam)
       y_seq.append(y_beam)
-
       if self.attention:
         attention_seq.append(attention_beam)
-
       logP_seq.append(logP_output_beam)
       accum_logP_seq.append(accum_logP_output_beam)
-      #print(">>>>t=",t,", accum_logP_seq=",accum_logP_seq)
-    # End for t
 
-    #print("before backtracking")
-    #print("y_seq=",y_seq)
-    #print("beta_seq=",beta_seq)
-    #print("accum_logP_seq=",accum_logP_seq)
-    #print("logP_seq=",logP_seq)
-    #print("the seq_len =",seq_len)
+      # TODO: Get reward here...
+      #reward = self.get_reward()
+    # End for t
 
     # Backtracking
-    #
-    # Only output the highest-scored beam (for each instance in the batch)
-    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
-      .view(batch_size, 1)
-    input_beam = beta_seq[seq_len - 1][:, 0]
-
     if self.attention:
-      # Now attention_seq is
-      # in the shape of (output seq len, batch size, beam size, input seq len)
-      #
-      # attention_pred_seq would be the attention alpha_{ij} coefficients
-      # in the shape of (output seq len, batch size, input seq len)
-      #
-      # Here we initialize the first element
-      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-
-    ##score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-    accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-
-    for t in range(seq_len - 2, -1, -1):
-      label_pred_seq = torch.cat(
-        [y_seq[t][range(batch_size), input_beam] \
-        .contiguous().view(batch_size, 1),
-        label_pred_seq], dim = 1)
-
-      input_beam = beta_seq[t][range(batch_size), input_beam]
-
-      if self.attention:
-        attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
-
-      ##score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
-
-      #print("in t loop")
-      #print("t=",t)
-      #print("accum_logP_seq[t]=",accum_logP_seq[t])
-      #print("batch_size=",batch_size)
-      #print("input_beam",input_beam)
-      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
-      accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
-    # End for t
-
-    if self.attention:
-      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
     else:
-      attention_pred_seq = None
-
-    # For score_seq, actually don't need to reshape!
-    # It happens that directly concatenate along dim = 0 gives you
-    # a convenient shape (batch_size * seq_len, label_size)
-    # for later cross entropy loss
-    #
-    # We actually don't calculate loss in evaluation anymore
-    ##score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
-    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
-    accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
+      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, None, logP_seq, accum_logP_seq)
 
     return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
@@ -1282,5 +1219,57 @@ class ner(nn.Module):
 
     return state
 
-  def get_reward(self, )
 
+  def backtracking(self, seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq):
+    # Only output the highest-scored beam (for each instance in the batch)
+    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
+      .view(batch_size, 1)
+    input_beam = beta_seq[seq_len - 1][:, 0]
+
+    if self.attention:
+      # Now attention_seq is
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      #
+      # attention_pred_seq would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, input seq len)
+      #
+      # Here we initialize the first element
+      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+    accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    for t in range(seq_len - 2, -1, -1):
+      label_pred_seq = torch.cat(
+        [y_seq[t][range(batch_size), input_beam] \
+        .contiguous().view(batch_size, 1),
+        label_pred_seq], dim = 1)
+
+      input_beam = beta_seq[t][range(batch_size), input_beam]
+
+      if self.attention:
+        attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+
+      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
+      accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
+    # End for t
+
+    if self.attention:
+      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+    else:
+      attention_pred_seq = None
+
+    # For score_seq, actually don't need to reshape!
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
+    #
+    # We actually don't calculate loss in evaluation anymore
+    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
+    accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
+
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
+
+
+  def get_reward(self):
+    pass

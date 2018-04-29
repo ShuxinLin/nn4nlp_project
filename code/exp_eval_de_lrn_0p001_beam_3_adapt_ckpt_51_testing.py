@@ -116,7 +116,9 @@ def main():
 
   data_path = "../dataset/German/"
 
-  result_path = "../result/"
+  result_path = "../result_lrn_0p001/"
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
 
   dict_file = "../dataset/German/vocab1.de"
   entity_file = "../dataset/German/vocab1.en"
@@ -154,41 +156,45 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_adapt.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_beam_3_adapt_ckpt_51_testing.txt"), "w+")
 
-  for epoch in range(0, max_epoch):
-    load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
-    if gpu:
-      machine = machine.cuda()
+  epoch = 51
+  load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
-    decode_method = "adaptive"
+  batch_size = 1
 
-    initial_beam_size = 3
-    max_beam_size = label_size
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
+  if gpu:
+    machine = machine.cuda()
 
-    accum_logP_ratio_low = 0.1
-    logP_ratio_low = 0.1
+  decode_method = "adaptive"
 
-    agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
+  initial_beam_size = 3
+  # When you have only one beam, it does not make sense to consider max_beam_size larger than the size of your label vocabulary
+  max_beam_size = label_size
 
-    # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
-    # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-    f_score_index_begin = 5
+  accum_logP_ratio_low = 0.1
+  logP_ratio_low = 0.1
 
-    # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+  agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
 
-    time_begin = time.time()
-    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
-    time_end = time.time()
+  # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
+  # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
+  f_score_index_begin = 5
 
-    print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    print(print_msg)
-    print(log_msg, file=eval_output_file, flush=True)
-  # End for epoch
+  # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
+  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+
+  time_begin = time.time()
+  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+  time_end = time.time()
+
+  print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+  log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+  print(print_msg)
+  print(log_msg, file=eval_output_file, flush=True)
+
 
   eval_output_file.close()
 
