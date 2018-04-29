@@ -118,23 +118,5 @@ def main():
   #test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
 
 
-
-
-
-
-
-
-  load_model_filename = None
-
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None, val_Y=None, test_X=None, test_Y=None, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
-  if gpu:
-    machine = machine.cuda()
-
-  shuffle = True
-
-  # Pure training, no evaluation
-  train_loss_list = machine.train(shuffle, result_path, False, None)
-
-
 if __name__ == "__main__":
   main()
