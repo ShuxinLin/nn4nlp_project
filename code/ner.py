@@ -960,7 +960,7 @@ class ner(nn.Module):
   #                 Shape: (seq len, batch size = 1, 2 * hidden dim) => for bi-directional LSTM encoder
   # attend_index: The index (time step, 0-based) in the enc_hidden_seq to attend to (used in fixed attention)
 
-  def decode_beam_step(self, beam_size_in, y_beam_in, beta_beam_in, dec_hidden_beam_in, dec_cell_beam_in, accum_logP_beam_in, enc_hidden_seq, attend_index):
+  def decode_beam_step(self, beam_size_in, y_beam_in, beta_beam_in, dec_hidden_beam_in, dec_cell_beam_in, accum_logP_beam_in, enc_hidden_seq, seq_len, attend_index):
 
     # Currently only support single instance, no minibatch
     batch_size = 1
@@ -1042,7 +1042,15 @@ class ner(nn.Module):
     dec_hidden_beam_out = torch.stack(dec_hidden_out_list, dim=0)
     dec_cell_beam_out = torch.stack(dec_cell_out_list, dim=0)
 
-    return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out, accum_logP_output_beam, logP_output_beam
+    # This one is for backtracking (need permute)
+    if self.attention:
+      attention_beam_out = torch.stack(attention_list, dim = 0)
+      # Now attention_beam has shape (beam size, batch size, input seq len)
+      # We need to permute (swap) the dimensions into
+      # the shape (batch size, beam size, input seq len)
+      attention_beam_out = attention_beam_out.permute(1, 0, 2)
+
+    return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out, attention_beam_out, accum_logP_output_beam, logP_output_beam
 
 
   def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent):
@@ -1166,10 +1174,10 @@ class ner(nn.Module):
       # since we expect batch size = 1 in this case.
       # So is beam operations vectorizable?
 
-      accum_logP_matrix, logP_matrix, dec_hidden_beam, dec_cell_beam, accum_logP_output_beam, logP_output_beam = \
+      accum_logP_matrix, logP_matrix, dec_hidden_beam, dec_cell_beam, attention_beam, accum_logP_output_beam, logP_output_beam = \
         self.decode_beam_step(beam_size, y_beam, beta_beam,
                               dec_hidden_beam, dec_cell_beam, accum_logP_beam,
-                              enc_hidden_seq, t)
+                              enc_hidden_seq, seq_len, t)
 
       state = self.make_state(accum_logP_matrix, logP_matrix,
                               beam_size, max_beam_size)
