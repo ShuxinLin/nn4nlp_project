@@ -1281,3 +1281,6 @@ class ner(nn.Module):
     state = np.concatenate((accum_logP_state, logP_state, np.array([beam_size])), axis=0)
 
     return state
+
+  def get_reward(self, )
+
