@@ -92,11 +92,15 @@ def main():
     #agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
     agent = None
 
+    # For toy dataset
+    f_score_index_begin = 0
+    print(index2label)
+
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent)
+    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
 
     time_begin = time.time()
-    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent)
+    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
     time_end = time.time()
 
     print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)

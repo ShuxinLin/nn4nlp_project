@@ -821,7 +821,9 @@ class ner(nn.Module):
     return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size=None, agent=None):
+  # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
+  # For toy dataset, f_score_index_begin = 0 (because )
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, f_score_index_begin):
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -887,11 +889,10 @@ class ner(nn.Module):
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
-        
 
-      O_INDEX = 4
-      assert self.label_size == 12
-      for label_index in range(O_INDEX + 1, self.label_size):
+      #O_INDEX = 4
+      #assert self.label_size == 12
+      for label_index in range(f_score_index_begin, self.label_size):
         #print("label_var=", label_var)
         true_pos = (label_var == label_index)
         #print("true_pos=", true_pos)
@@ -936,15 +937,6 @@ class ner(nn.Module):
           result_label = index2label[label[i]]
           result_pred = index2label[label_pred_seq[i]]
           f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
-    #   else:
-    #     correctness += np.sum(np.array(label) == np.array(label_pred_seq))
-    # accuracy = correctness / instance_num
-    # print(" accuracy for ", suffix, " = ", accuracy)
-
-
-          #elif sen[i] == 2:   # <EOS>
-          #    f_result_processed.write('\n')
-        # End if result_path
     # End for batch_idx
 
     if self.gpu:
