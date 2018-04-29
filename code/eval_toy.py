@@ -77,7 +77,7 @@ def main():
   for epoch in range(0, max_epoch):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
+    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location=lambda storage, loc: storage)
     if gpu:
       machine = machine.cuda()
 
