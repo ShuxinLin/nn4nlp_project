@@ -72,40 +72,37 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_3.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_beam_3_adapt_ckpt_10.txt"), "w+")
 
-  for epoch in range(0, max_epoch):
-    load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
+  epoch = 10
 
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
-    if gpu:
-      machine = machine.cuda()
+  load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
-    decode_method = "beam"
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
+  if gpu:
+    machine = machine.cuda()
 
-    beam_size = 3
-    max_beam_size = None
+  initial_beam_size = 3
+  max_beam_size = 20
 
-    #accum_logP_ratio_low = 0.1
-    #logP_ratio_low = 0.1
+  accum_logP_ratio_low = 0.1
+  logP_ratio_low = 0.1
 
-    #agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
-    agent = None
+  agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
 
-    # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent)
+  # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
+  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, "adaptive", initial_beam_size, max_beam_size, agent)
 
-    time_begin = time.time()
-    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent)
-    time_end = time.time()
+  time_begin = time.time()
+  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, "adaptive", initial_beam_size, max_beam_size, agent)
+  time_end = time.time()
 
-    print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    print(print_msg)
-    print(log_msg, file=eval_output_file, flush=True)
-  # End for epoch
+  print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+  log_msg = "%d\t%f\t%f\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+  print(print_msg)
+  print(log_msg, file=eval_output_file, flush=True)
 
-  eval_output_file.close()
+  eval_output_file_beam_adapt.close()
 
 
   # Write out files

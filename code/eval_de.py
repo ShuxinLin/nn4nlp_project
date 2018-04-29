@@ -165,6 +165,8 @@ def main():
     if gpu:
       machine = machine.cuda()
 
+    decode_method = "adaptive"
+
     initial_beam_size = 3
     max_beam_size = 20
 
@@ -174,19 +176,19 @@ def main():
     agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
 
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, "adaptive", initial_beam_size, max_beam_size, agent)
+    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent)
 
     time_begin = time.time()
-    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, "adaptive", initial_beam_size, max_beam_size, agent)
+    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent)
     time_end = time.time()
 
     print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-    log_msg = "%d\t%f\t%f\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+    log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
     print(print_msg)
     print(log_msg, file=eval_output_file, flush=True)
   # End for epoch
 
-  eval_output_file_beam_adapt.close()
+  eval_output_file.close()
 
 
   # Write out files
