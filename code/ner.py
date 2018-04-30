@@ -1161,6 +1161,21 @@ class ner(nn.Module):
     logP_seq.append(logP_output_beam)
     accum_logP_seq.append(accum_logP_output_beam)
 
+    ###############################
+    # Reinforcement learning:
+    # Episodes and learning signals only come from sentences with length >= 3.
+    #
+    # Consider sentence t = 0, 1, ..., L_y - 1, where L_y >= 3.
+    # s_0 => accum_logP_matrix (coming from decoding the initial_beam_size incoming beam generated at t = 0 output) and the initial_beam_size (beam size picked to send into t = 1 for LSTM to generate the accum_logP_matrix at the output of t = 1).
+    # (We need to take the top-1 of this accum_logP_matrix, do the backtracking to find the best sequence [for t = 0, 1], and compute the F-score. This is for the reward calculation later.)
+    # a_0 => Look at this accum_logP_matrix and initial_beam_size, decide whether to increase or decrease the beam size to send into t = 2 LSTM step.
+    # "env.step()" => take this beam_size picked at t = 1 for sending into t = 2, input them into LSTM at t = 2, and output the new output accum_logP_matrix at t = 2.
+    # r_0 => use this accum_logP_matrix at t = 2 output, simply pick the top-1, and do backtracking, find the best sequence so far (t = 0, 1, 2), and compute the F-score. Take the difference of this F-score and the previous F-score. This is one contribution to the reward. Then, if a_0 is to +1 the beam size, contribute -1 to the reward, and vice versa; this is the second contribution to the reward. (The two contribution is linearly combined with some coefficients.)
+    # s_1 => the accum_logP_matrix at t = 2 output, and the beam size picked at t = 1 output (by the agent, after action a_0).
+    # Then go on.
+    # About terminal state: Easy to see. For example, if sentence length is 3, then t = 2 is the last one. Indeed we don't have to take further action.
+    ###############################
+
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       # We loop through beam because we expect that
@@ -1279,5 +1294,15 @@ class ner(nn.Module):
     return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
-  def get_reward(self):
-    pass
+  def get_reward(self, seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq, ):
+    y_pred_seq, _, _, _ = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+
+
+
+
+
+
+
+
+
+
