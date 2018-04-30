@@ -949,7 +949,9 @@ class ner(nn.Module):
     return fscore
 
 
-  # decode_beam_step -
+  # decode_beam_step - this function basically servers as the "env.step()" function in RL: (citing below)
+  # "Take this beam_size picked at t = 1 for sending into t = 2, input them into LSTM at t = 2, and output the new output accum_logP_matrix at t = 2."
+  #
   # Args: This function takes a beam of (y, beta) = (label index prediction from the previous step, incoming beam index), and the beam of hidden vectors and cell vectors from the previous step, and the accumulated logP's of these (y, beta)'s in the beam.
   # Returns: Accumulated logP of all the possible labels in all beams [shape is (batch size, incoming beam size * label vocab number)], (non-accumulated, row prediction at this time step) logP of all the possible labels in all beams [shape is (batch size, incoming beam size * label vocab number)], the output hidden vectors and cell vectors from all incoming beams [shape is (incoming beam size, batch size = 1, hidden dim)].
   # Note that: Currently only support single instance, no minibatch.
@@ -959,7 +961,6 @@ class ner(nn.Module):
   # enc_hidden_seq: For attention. Can be put to None if no attention is used.
   #                 Shape: (seq len, batch size = 1, 2 * hidden dim) => for bi-directional LSTM encoder
   # attend_index: The index (time step, 0-based) in the enc_hidden_seq to attend to (used in fixed attention)
-
   def decode_beam_step(self, beam_size_in, y_beam_in, beta_beam_in, dec_hidden_beam_in, dec_cell_beam_in, accum_logP_beam_in, enc_hidden_seq, seq_len, attend_index):
 
     # Currently only support single instance, no minibatch
@@ -1053,6 +1054,20 @@ class ner(nn.Module):
     return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out, attention_beam_out, accum_logP_output_beam, logP_output_beam
 
 
+  ###############################
+  # Reinforcement learning:
+  # Episodes and learning signals only come from sentences with length >= 3.
+  #
+  # Consider sentence t = 0, 1, ..., L_y - 1, where L_y >= 3.
+  # s_0 => accum_logP_matrix (coming from decoding the initial_beam_size incoming beam generated at t = 0 output) and the initial_beam_size (beam size picked to send into t = 1 for LSTM to generate the accum_logP_matrix at the output of t = 1).
+  # (We need to take the top-1 of this accum_logP_matrix, do the backtracking to find the best sequence [for t = 0, 1], and compute the F-score. This is for the reward calculation later.)
+  # a_0 => Look at this accum_logP_matrix and initial_beam_size, decide whether to increase or decrease the beam size to send into t = 2 LSTM step.
+  # "env.step()" => take this beam_size picked at t = 1 for sending into t = 2, input them into LSTM at t = 2, and output the new output accum_logP_matrix at t = 2.
+  # r_0 => use this accum_logP_matrix at t = 2 output, simply pick the top-1, and do backtracking, find the best sequence so far (t = 0, 1, 2), and compute the F-score. Take the difference of this F-score and the previous F-score. This is one contribution to the reward. Then, if a_0 is to +1 the beam size, contribute -1 to the reward, and vice versa; this is the second contribution to the reward. (The two contribution is linearly combined with some coefficients.)
+  # s_1 => the accum_logP_matrix at t = 2 output, and the beam size picked at t = 1 output (by the agent, after action a_0).
+  # Then go on.
+  # About terminal state: Easy to see. For example, if sentence length is 3, then t = 2 is the last one. Indeed we don't have to take further action.
+  ###############################
   def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent):
     # Currently, batch size can only be 1
     batch_size = 1
@@ -1161,21 +1176,6 @@ class ner(nn.Module):
     logP_seq.append(logP_output_beam)
     accum_logP_seq.append(accum_logP_output_beam)
 
-    ###############################
-    # Reinforcement learning:
-    # Episodes and learning signals only come from sentences with length >= 3.
-    #
-    # Consider sentence t = 0, 1, ..., L_y - 1, where L_y >= 3.
-    # s_0 => accum_logP_matrix (coming from decoding the initial_beam_size incoming beam generated at t = 0 output) and the initial_beam_size (beam size picked to send into t = 1 for LSTM to generate the accum_logP_matrix at the output of t = 1).
-    # (We need to take the top-1 of this accum_logP_matrix, do the backtracking to find the best sequence [for t = 0, 1], and compute the F-score. This is for the reward calculation later.)
-    # a_0 => Look at this accum_logP_matrix and initial_beam_size, decide whether to increase or decrease the beam size to send into t = 2 LSTM step.
-    # "env.step()" => take this beam_size picked at t = 1 for sending into t = 2, input them into LSTM at t = 2, and output the new output accum_logP_matrix at t = 2.
-    # r_0 => use this accum_logP_matrix at t = 2 output, simply pick the top-1, and do backtracking, find the best sequence so far (t = 0, 1, 2), and compute the F-score. Take the difference of this F-score and the previous F-score. This is one contribution to the reward. Then, if a_0 is to +1 the beam size, contribute -1 to the reward, and vice versa; this is the second contribution to the reward. (The two contribution is linearly combined with some coefficients.)
-    # s_1 => the accum_logP_matrix at t = 2 output, and the beam size picked at t = 1 output (by the agent, after action a_0).
-    # Then go on.
-    # About terminal state: Easy to see. For example, if sentence length is 3, then t = 2 is the last one. Indeed we don't have to take further action.
-    ###############################
-
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
       # We loop through beam because we expect that
@@ -1190,6 +1190,10 @@ class ner(nn.Module):
                               dec_hidden_beam, dec_cell_beam, accum_logP_beam,
                               enc_hidden_seq, seq_len, t)
 
+      # Actually, at t = T_y - 1 == seq_len - 1,
+      # you don't have to take action (you don't have to pick a beam of predictions anymore), because at this last output step, you would pick only the highest result, and do the backtracking from it to determine the best sequence.
+      # However, in the current version of this code, we temporarily keep doing one more beam picking, just to be compatible with the backtracking function and the rest of the code.
+      # We delay the improvement to the future work.
       state = self.make_state(accum_logP_matrix, logP_matrix,
                               beam_size, max_beam_size)
 
@@ -1212,10 +1216,14 @@ class ner(nn.Module):
       logP_seq.append(logP_output_beam)
       accum_logP_seq.append(accum_logP_output_beam)
 
-      # TODO: Get reward here...
-      #reward = self.get_reward()
+      # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
+      # TODO: code here...
+
+      # If t >= 2, compute the reward.
+      # TODO: code here...
     # End for t
 
+    # TODO: we probably don't need the following backtracking code anymore
     # Backtracking
     if self.attention:
       label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
@@ -1225,6 +1233,7 @@ class ner(nn.Module):
     return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
+  # make_state - generate the state for the RL agent
   def make_state(self, accum_logP_matrix, logP_matrix, beam_size, max_beam_size):
     accum_logP_state, _ = \
       torch.topk(accum_logP_matrix, max_beam_size, dim=1)
