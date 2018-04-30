@@ -160,6 +160,7 @@ def main():
 
   for epoch in range(0, max_epoch):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
+    batch_size = 1
 
     machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
     if gpu:
@@ -180,13 +181,13 @@ def main():
     f_score_index_begin = 5
 
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+    val_fscore, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
 
     time_begin = time.time()
-    test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+    test_fscore, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
     time_end = time.time()
 
-    print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+    print_msg = "epoch %d, val F = %.6f, test F = %.6f, val b = %.6f, test b = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, val_avg_beam_size, test_avg_beam_size, time_end - time_begin)
     log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
     print(print_msg)
     print(log_msg, file=eval_output_file, flush=True)

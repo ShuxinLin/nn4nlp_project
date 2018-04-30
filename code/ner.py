@@ -831,9 +831,15 @@ class ner(nn.Module):
       f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
       f_label = open(result_path + "label_" + suffix + ".txt", 'w')
       f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
+      f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
+
 
     instance_num = 0
     correctness = 0
+
+    beam_size_seqs = []
+    action_seqs = []
+
     for batch in eval_data_X:
       instance_num += len(batch)
 
@@ -842,6 +848,7 @@ class ner(nn.Module):
     true_pred_pos_count = 0
 
     for batch_idx in range(batch_num):
+      print(batch_idx)
       sen = eval_data_X[batch_idx]
       label = eval_data_Y[batch_idx]
       current_batch_size = len(sen)
@@ -882,7 +889,9 @@ class ner(nn.Module):
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
+        beam_size_seqs.append(beam_size_seq)
+        action_seqs.append(action_seq)
 
       for label_index in range(f_score_index_begin, self.label_size):
         true_pos = (label_var == label_index)
@@ -923,6 +932,11 @@ class ner(nn.Module):
           result_label = index2label[label[i]]
           result_pred = index2label[label_pred_seq[i]]
           f_result_processed.write("%s %s %s\n" % (result_sen, result_label, result_pred))
+
+        if decode_method == "adaptive":
+          beam_size_seq_str = ' '.join(map(str, beam_size_seq))
+          f_beam_size.write(beam_size_seq_str + '\n')
+
     # End for batch_idx
 
     if self.gpu:
@@ -945,6 +959,11 @@ class ner(nn.Module):
       f_pred.close()
       f_label.close()
       f_result_processed.close()
+      f_beam_size.close()
+
+    if decode_method == "adaptive":
+      avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for beam_size_seq in beam_size_seqs]
+      return fscore, sum(avg_beam_sizes) / len(avg_beam_sizes)
 
     return fscore
 
@@ -1042,6 +1061,7 @@ class ner(nn.Module):
     dec_hidden_beam_out = torch.stack(dec_hidden_out_list, dim=0)
     dec_cell_beam_out = torch.stack(dec_cell_out_list, dim=0)
 
+    attention_beam_out = None
     # This one is for backtracking (need permute)
     if self.attention:
       attention_beam_out = torch.stack(attention_list, dim = 0)
@@ -1149,7 +1169,10 @@ class ner(nn.Module):
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
     # y_beam, score_beam => same
 
+    action_seq = []
+    beam_size_seq = []
     beam_size = initial_beam_size
+    beam_size_seq.append(beam_size)
     accum_logP_beam, index_beam = torch.topk(accum_logP_matrix, beam_size, dim=1)
 
     beta_beam = torch.floor(index_beam.float() / self.label_size).long()
@@ -1183,10 +1206,12 @@ class ner(nn.Module):
                               beam_size, max_beam_size)
 
       action = agent.get_action(state)
+      action_seq.append(action)
       if action == agent.DECREASE and beam_size > 1:
         beam_size -= 1
       elif action == agent.INCREASE and beam_size < max_beam_size:
         beam_size += 1
+      beam_size_seq.append(beam_size)
 
       accum_logP_beam, index_beam = \
         torch.topk(accum_logP_matrix, beam_size, dim=1)
@@ -1270,7 +1295,7 @@ class ner(nn.Module):
     logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
     accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq
 
 
   def make_state(self, accum_logP_matrix, logP_matrix, beam_size, max_beam_size):
