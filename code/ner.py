@@ -1307,7 +1307,8 @@ class ner(nn.Module):
     y_pred_seq, _, _, _ = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
 
 
-
+  def get_fscore(self):
+    pass
 
 
 
