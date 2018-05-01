@@ -358,8 +358,8 @@ class ner(nn.Module):
           loss_value = loss.cpu()
         else:
           loss_value = loss
-        print(loss_value.data.numpy())
-        loss_sum += loss_value.data.numpy()[0] * current_batch_size
+        #print(loss_value.data.numpy())
+        loss_sum += loss_value.data.numpy() * current_batch_size
 
         loss.backward()
         optimizer.step()
