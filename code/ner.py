@@ -882,7 +882,12 @@ class ner(nn.Module):
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
+        ### test
+        print("input sentence =", sen)
+        print("true label =", label)
+        print("predicted label =", label_pred_seq)
+        print("episode =", episode)
 
       for label_index in range(f_score_index_begin, self.label_size):
         true_pos = (label_var == label_index)
@@ -1068,9 +1073,30 @@ class ner(nn.Module):
   # Then go on.
   # About terminal state: Easy to see. For example, if sentence length is 3, then t = 2 is the last one. Indeed we don't have to take further action.
   ###############################
-  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent):
+  #
+  # This function is like generate_episode() for RL
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, label_true_seq, f_score_index_begin):
     # Currently, batch size can only be 1
     batch_size = 1
+
+    # Each beta is (batch size, beam size) matrix,
+    # and there will be T_y of them in the sequence
+    # y => same
+    beta_seq = []
+    y_seq = []
+
+    logP_seq = []
+    accum_logP_seq = []
+
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      attention_seq = []
+    else:
+      attention_seq = None
+
+    # For RL episode
+    episode = []
 
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
@@ -1086,20 +1112,6 @@ class ner(nn.Module):
         Variable(torch.LongTensor(batch_size, 1).zero_()) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
-
-    # Each beta is (batch size, beam size) matrix,
-    # and there will be T_y of them in the sequence
-    # y => same
-    beta_seq = []
-    y_seq = []
-
-    logP_seq = []
-    accum_logP_seq = []
-
-    if self.attention:
-      # This would be the attention alpha_{ij} coefficients
-      # in the shape of (output seq len, batch size, beam size, input seq len)
-      attention_seq = []
 
     # t = 0, only one input beam from init (t = -1)
     # Only one dec_hidden_out, dec_cell_out
@@ -1157,6 +1169,13 @@ class ner(nn.Module):
     logP_matrix = torch.cat(logP_out_list, dim=1)
     accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1)
 
+    # Just for code consistency (about reward calculation)
+    cur_beam_size_in = 1
+
+    # Just for code consistency (about experience tuple)
+    cur_state = self.make_state(accum_logP_matrix, logP_matrix, 1, max_beam_size)
+    action = None
+
     # All beta^{t=0, b} are actually 0
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
@@ -1194,8 +1213,19 @@ class ner(nn.Module):
       # you don't have to take action (you don't have to pick a beam of predictions anymore), because at this last output step, you would pick only the highest result, and do the backtracking from it to determine the best sequence.
       # However, in the current version of this code, we temporarily keep doing one more beam picking, just to be compatible with the backtracking function and the rest of the code.
       # We delay the improvement to the future work.
+      #
+      # Note that this state is actually the output state at t
       state = self.make_state(accum_logP_matrix, logP_matrix,
                               beam_size, max_beam_size)
+
+      # For experience tuple
+      prev_state = cur_state
+      cur_state = state
+      prev_action = action
+
+      # For reward calculation
+      prev_beam_size_in = cur_beam_size_in
+      cur_beam_size_in = beam_size
 
       action = agent.get_action(state)
       if action == agent.DECREASE and beam_size > 1:
@@ -1217,20 +1247,20 @@ class ner(nn.Module):
       accum_logP_seq.append(accum_logP_output_beam)
 
       # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
-      # TODO: code here...
+      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+      cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
 
-      # If t >= 2, compute the reward.
-      # TODO: code here...
+      # If t >= 2, compute the reward,
+      # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
+      if t >= 2:
+        reward = self.get_reward(cur_fscore, fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size)
+        experience_tuple = (prev_state, prev_action, reward, cur_state)
+        episode.append(experience_tuple)
+
+      fscore = cur_fscore
     # End for t
 
-    # TODO: we probably don't need the following backtracking code anymore
-    # Backtracking
-    if self.attention:
-      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
-    else:
-      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, None, logP_seq, accum_logP_seq)
-
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
 
 
   # make_state - generate the state for the RL agent
@@ -1303,16 +1333,42 @@ class ner(nn.Module):
     return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
-  def get_reward(self, seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq, ):
-    y_pred_seq, _, _, _ = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+  # Observe the beam size to determine the reward, because it is possible that the agent wants to decrease the beam size, but the beam size is already minimum, so the environment does not allow the beam size to decrease.
+  def get_reward(self, cur_fscore, prev_fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size):
+    reward = reward_coef_fscore * (cur_fscore - prev_fscore) + reward_coef_beam_size * (prev_beam_size_in - cur_beam_size_in)
 
 
-  def get_fscore(self):
-    pass
+  # It computes partial F-score, so expect label_var.size()[1] >= label_pred_seq.size()[1] generally
+  # This function should work for batch size > 1 as well
+  def get_fscore(self, label_pred_seq, label_var, f_score_index_begin):
+    label_pred_seq_padded = np.pad(label_pred_seq, ((0, 0), (0, label_var.shape[1] - label_pred_seq.shape[1])), "constant", constant_values=(f_score_index_begin - 1, f_score_index_begin - 1))
 
+    true_pos_count = 0
+    pred_pos_count = 0
+    true_pred_pos_count = 0
+    for label_index in range(f_score_index_begin, self.label_size):
+      true_pos = (label_var == label_index)
+      true_pos_count += true_pos.float().sum()
 
+      pred_pos = (label_pred_seq == label_index)
+      pred_pos_count += pred_pos.float().sum()
 
+      true_pred_pos = true_pos & pred_pos
+      true_pred_pos_count += true_pred_pos.float().sum()
 
+    if self.gpu:
+      true_pos_count = true_pos_count.cpu()
+      pred_pos_count = pred_pos_count.cpu()
+      true_pred_pos_count = true_pred_pos_count.cpu()
 
+    true_pos_count = true_pos_count.data.numpy()[0]
+    pred_pos_count = pred_pos_count.data.numpy()[0]
+    true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
 
+    precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
 
+    recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
+    fscore = 2 / ( 1/precision + 1/recall ) if (precision > 0 and recall > 0) else 0
+    fscore = fscore * 100
+
+    return fscore
