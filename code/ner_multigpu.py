@@ -54,7 +54,7 @@ class ner(nn.Module):
     self.gpu = gpu
     self.gpu_no = gpu_no
     if self.gpu:
-      self.cuda = torch.device("cuda:" + str(self.gpu_no))
+      self.cuda_dev = torch.device("cuda:" + str(self.gpu_no))
 
     # Attention
     if attention:
@@ -149,7 +149,7 @@ class ner(nn.Module):
       init_label_emb = \
         self.label_embedding(
         Variable(torch.LongTensor(current_batch_size, 1).zero_() \
-        + self.BEG_INDEX).cuda(self.cuda)) \
+        + self.BEG_INDEX).cuda(self.cuda_dev)) \
         .view(current_batch_size, self.label_embedding_dim)
     else:
       init_label_emb = \
@@ -295,8 +295,8 @@ class ner(nn.Module):
         label_var = Variable(torch.LongTensor(label))
 
         if self.gpu:
-          sen_var = sen_var.cuda(self.cuda)
-          label_var = label_var.cuda(self.cuda)
+          sen_var = sen_var.cuda(self.cuda_dev)
+          label_var = label_var.cuda(self.cuda_dev)
 
         # Initialize the hidden and cell states
         # The axes semantics are
@@ -309,8 +309,8 @@ class ner(nn.Module):
           torch.zeros(2, current_batch_size, self.hidden_dim))
 
         if self.gpu:
-          init_enc_hidden = init_enc_hidden.cuda(self.cuda)
-          init_enc_cell = init_enc_cell.cuda(self.cuda)
+          init_enc_hidden = init_enc_hidden.cuda(self.cuda_dev)
+          init_enc_cell = init_enc_cell.cuda(self.cuda_dev)
 
         enc_hidden_seq, (enc_hidden_out, enc_cell_out) = \
           self.encode(sen_var, init_enc_hidden, init_enc_cell)
@@ -437,7 +437,7 @@ class ner(nn.Module):
     if self.gpu:
       init_label_emb = \
         self.label_embedding(
-        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda) \
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda_dev) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
     else:
@@ -582,7 +582,7 @@ class ner(nn.Module):
     if self.gpu:
       init_label_emb = \
         self.label_embedding(
-        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda) \
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda_dev) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
     else:
@@ -862,8 +862,8 @@ class ner(nn.Module):
       label_var = Variable(torch.LongTensor(label))
 
       if self.gpu:
-        sen_var = sen_var.cuda(self.cuda)
-        label_var = label_var.cuda(self.cuda)
+        sen_var = sen_var.cuda(self.cuda_dev)
+        label_var = label_var.cuda(self.cuda_dev)
 
       # Initialize the hidden and cell states
       # The axes semantics are
@@ -874,8 +874,8 @@ class ner(nn.Module):
       init_enc_cell = Variable(torch.zeros((2, current_batch_size, self.hidden_dim)))
 
       if self.gpu:
-        init_enc_hidden = init_enc_hidden.cuda(self.cuda)
-        init_enc_cell = init_enc_cell.cuda(self.cuda)
+        init_enc_hidden = init_enc_hidden.cuda(self.cuda_dev)
+        init_enc_cell = init_enc_cell.cuda(self.cuda_dev)
 
       enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
@@ -1128,7 +1128,7 @@ class ner(nn.Module):
     if self.gpu:
       init_label_emb = \
         self.label_embedding(
-        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda) \
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda_dev) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
     else:
