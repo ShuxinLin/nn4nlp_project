@@ -133,7 +133,7 @@ def main():
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
   gpu_no = 2
-  cuda = "cuda:" + str(gpu_no)
+  cuda = torch.device("cuda:" + str(gpu_no))
 
   load_model_filename = None
 
