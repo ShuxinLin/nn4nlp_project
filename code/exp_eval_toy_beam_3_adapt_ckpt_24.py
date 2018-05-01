@@ -98,11 +98,15 @@ def main():
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
   f_score_index_begin = 4
 
+  # RL reward coefficient
+  reward_coef_fscore = 1
+  reward_coef_beam_size = 1
+
   # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
+  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
 
   time_begin = time.time()
-  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
+  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
   time_end = time.time()
 
   print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)

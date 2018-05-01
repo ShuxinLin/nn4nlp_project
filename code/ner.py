@@ -823,7 +823,7 @@ class ner(nn.Module):
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, f_score_index_begin):
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin):
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -889,9 +889,13 @@ class ner(nn.Module):
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
-        beam_size_seqs.append(beam_size_seq)
-        action_seqs.append(action_seq)
+
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
+        ### Debugging...
+        #print("input sentence =", sen)
+        #print("true label =", label)
+        #print("predicted label =", label_pred_seq)
+        #print("episode =", episode)
 
       for label_index in range(f_score_index_begin, self.label_size):
         true_pos = (label_var == label_index)
@@ -968,7 +972,9 @@ class ner(nn.Module):
     return fscore
 
 
-  # decode_beam_step -
+  # decode_beam_step - this function basically servers as the "env.step()" function in RL: (citing below)
+  # "Take this beam_size picked at t = 1 for sending into t = 2, input them into LSTM at t = 2, and output the new output accum_logP_matrix at t = 2."
+  #
   # Args: This function takes a beam of (y, beta) = (label index prediction from the previous step, incoming beam index), and the beam of hidden vectors and cell vectors from the previous step, and the accumulated logP's of these (y, beta)'s in the beam.
   # Returns: Accumulated logP of all the possible labels in all beams [shape is (batch size, incoming beam size * label vocab number)], (non-accumulated, row prediction at this time step) logP of all the possible labels in all beams [shape is (batch size, incoming beam size * label vocab number)], the output hidden vectors and cell vectors from all incoming beams [shape is (incoming beam size, batch size = 1, hidden dim)].
   # Note that: Currently only support single instance, no minibatch.
@@ -978,7 +984,6 @@ class ner(nn.Module):
   # enc_hidden_seq: For attention. Can be put to None if no attention is used.
   #                 Shape: (seq len, batch size = 1, 2 * hidden dim) => for bi-directional LSTM encoder
   # attend_index: The index (time step, 0-based) in the enc_hidden_seq to attend to (used in fixed attention)
-
   def decode_beam_step(self, beam_size_in, y_beam_in, beta_beam_in, dec_hidden_beam_in, dec_cell_beam_in, accum_logP_beam_in, enc_hidden_seq, seq_len, attend_index):
 
     # Currently only support single instance, no minibatch
@@ -1069,13 +1074,50 @@ class ner(nn.Module):
       # We need to permute (swap) the dimensions into
       # the shape (batch size, beam size, input seq len)
       attention_beam_out = attention_beam_out.permute(1, 0, 2)
+    else:
+      attention_beam_out = None
 
     return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out, attention_beam_out, accum_logP_output_beam, logP_output_beam
 
 
-  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent):
+  ###############################
+  # Reinforcement learning:
+  # Episodes and learning signals only come from sentences with length >= 3.
+  #
+  # Consider sentence t = 0, 1, ..., L_y - 1, where L_y >= 3.
+  # s_0 => accum_logP_matrix (coming from decoding the initial_beam_size incoming beam generated at t = 0 output) and the initial_beam_size (beam size picked to send into t = 1 for LSTM to generate the accum_logP_matrix at the output of t = 1).
+  # (We need to take the top-1 of this accum_logP_matrix, do the backtracking to find the best sequence [for t = 0, 1], and compute the F-score. This is for the reward calculation later.)
+  # a_0 => Look at this accum_logP_matrix and initial_beam_size, decide whether to increase or decrease the beam size to send into t = 2 LSTM step.
+  # "env.step()" => take this beam_size picked at t = 1 for sending into t = 2, input them into LSTM at t = 2, and output the new output accum_logP_matrix at t = 2.
+  # r_0 => use this accum_logP_matrix at t = 2 output, simply pick the top-1, and do backtracking, find the best sequence so far (t = 0, 1, 2), and compute the F-score. Take the difference of this F-score and the previous F-score. This is one contribution to the reward. Then, if a_0 is to +1 the beam size, contribute -1 to the reward, and vice versa; this is the second contribution to the reward. (The two contribution is linearly combined with some coefficients.)
+  # s_1 => the accum_logP_matrix at t = 2 output, and the beam size picked at t = 1 output (by the agent, after action a_0).
+  # Then go on.
+  # About terminal state: Easy to see. For example, if sentence length is 3, then t = 2 is the last one. Indeed we don't have to take further action.
+  ###############################
+  #
+  # This function is like generate_episode() for RL
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_true_seq, f_score_index_begin):
     # Currently, batch size can only be 1
     batch_size = 1
+
+    # Each beta is (batch size, beam size) matrix,
+    # and there will be T_y of them in the sequence
+    # y => same
+    beta_seq = []
+    y_seq = []
+
+    logP_seq = []
+    accum_logP_seq = []
+
+    if self.attention:
+      # This would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      attention_seq = []
+    else:
+      attention_seq = None
+
+    # For RL episode
+    episode = []
 
     # init_label's shape => (batch size, 1),
     # with all elements self.BEG_INDEX
@@ -1091,21 +1133,6 @@ class ner(nn.Module):
         Variable(torch.LongTensor(batch_size, 1).zero_()) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
-
-    # Each beta is (batch size, beam size) matrix,
-    # and there will be T_y of them in the sequence
-    # y => same
-    beta_seq = []
-    y_seq = []
-
-    ##score_seq = []
-    logP_seq = []
-    accum_logP_seq = []
-
-    if self.attention:
-      # This would be the attention alpha_{ij} coefficients
-      # in the shape of (output seq len, batch size, beam size, input seq len)
-      attention_seq = []
 
     # t = 0, only one input beam from init (t = -1)
     # Only one dec_hidden_out, dec_cell_out
@@ -1160,9 +1187,15 @@ class ner(nn.Module):
 
     # score_matrix.shape => (batch size, |V^y| * 1)
     # * 1 because there is only 1 input beam
-    ##score_matrix = torch.cat([score_out], dim = 1)
     logP_matrix = torch.cat(logP_out_list, dim=1)
     accum_logP_matrix = torch.cat(accum_logP_out_list, dim=1)
+
+    # Just for code consistency (about reward calculation)
+    cur_beam_size_in = 1
+
+    # Just for code consistency (about experience tuple)
+    cur_state = self.make_state(accum_logP_matrix, logP_matrix, 1, max_beam_size)
+    action = None
 
     # All beta^{t=0, b} are actually 0
     # beta_beam.shape => (batch size, beam size),
@@ -1186,7 +1219,8 @@ class ner(nn.Module):
     logP_seq.append(logP_output_beam)
     accum_logP_seq.append(accum_logP_output_beam)
 
-    #print(">>>>t=0, accum_logP_seq=",accum_logP_seq)
+    # Just for sentence with length = 1
+    label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -1202,8 +1236,23 @@ class ner(nn.Module):
                               dec_hidden_beam, dec_cell_beam, accum_logP_beam,
                               enc_hidden_seq, seq_len, t)
 
+      # Actually, at t = T_y - 1 == seq_len - 1,
+      # you don't have to take action (you don't have to pick a beam of predictions anymore), because at this last output step, you would pick only the highest result, and do the backtracking from it to determine the best sequence.
+      # However, in the current version of this code, we temporarily keep doing one more beam picking, just to be compatible with the backtracking function and the rest of the code.
+      # We delay the improvement to the future work.
+      #
+      # Note that this state is actually the output state at t
       state = self.make_state(accum_logP_matrix, logP_matrix,
                               beam_size, max_beam_size)
+
+      # For experience tuple
+      prev_state = cur_state
+      cur_state = state
+      prev_action = action
+
+      # For reward calculation
+      prev_beam_size_in = cur_beam_size_in
+      cur_beam_size_in = beam_size
 
       action = agent.get_action(state)
       action_seq.append(action)
@@ -1221,83 +1270,29 @@ class ner(nn.Module):
       y_beam = torch.remainder(index_beam, self.label_size)
       beta_seq.append(beta_beam)
       y_seq.append(y_beam)
-
       if self.attention:
         attention_seq.append(attention_beam)
-
       logP_seq.append(logP_output_beam)
       accum_logP_seq.append(accum_logP_output_beam)
-      #print(">>>>t=",t,", accum_logP_seq=",accum_logP_seq)
+
+      # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
+      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+      cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
+
+      # If t >= 2, compute the reward,
+      # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
+      if t >= 2:
+        reward = self.get_reward(cur_fscore, fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size)
+        experience_tuple = (prev_state, prev_action, reward, cur_state)
+        episode.append(experience_tuple)
+
+      fscore = cur_fscore
     # End for t
 
-    #print("before backtracking")
-    #print("y_seq=",y_seq)
-    #print("beta_seq=",beta_seq)
-    #print("accum_logP_seq=",accum_logP_seq)
-    #print("logP_seq=",logP_seq)
-    #print("the seq_len =",seq_len)
-
-    # Backtracking
-    #
-    # Only output the highest-scored beam (for each instance in the batch)
-    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
-      .view(batch_size, 1)
-    input_beam = beta_seq[seq_len - 1][:, 0]
-
-    if self.attention:
-      # Now attention_seq is
-      # in the shape of (output seq len, batch size, beam size, input seq len)
-      #
-      # attention_pred_seq would be the attention alpha_{ij} coefficients
-      # in the shape of (output seq len, batch size, input seq len)
-      #
-      # Here we initialize the first element
-      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-
-    ##score_pred_seq = (score_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-    accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-
-    for t in range(seq_len - 2, -1, -1):
-      label_pred_seq = torch.cat(
-        [y_seq[t][range(batch_size), input_beam] \
-        .contiguous().view(batch_size, 1),
-        label_pred_seq], dim = 1)
-
-      input_beam = beta_seq[t][range(batch_size), input_beam]
-
-      if self.attention:
-        attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
-
-      ##score_pred_seq = torch.cat([(score_seq[t][range(batch_size), input_beam, :])[None, :, :], score_pred_seq], dim = 0)
-
-      #print("in t loop")
-      #print("t=",t)
-      #print("accum_logP_seq[t]=",accum_logP_seq[t])
-      #print("batch_size=",batch_size)
-      #print("input_beam",input_beam)
-      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
-      accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
-    # End for t
-
-    if self.attention:
-      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
-    else:
-      attention_pred_seq = None
-
-    # For score_seq, actually don't need to reshape!
-    # It happens that directly concatenate along dim = 0 gives you
-    # a convenient shape (batch_size * seq_len, label_size)
-    # for later cross entropy loss
-    #
-    # We actually don't calculate loss in evaluation anymore
-    ##score_pred_seq = score_pred_seq.view(batch_size * seq_len, self.label_size)
-    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
-    accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
-
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
 
 
+  # make_state - generate the state for the RL agent
   def make_state(self, accum_logP_matrix, logP_matrix, beam_size, max_beam_size):
     accum_logP_state, _ = \
       torch.topk(accum_logP_matrix, max_beam_size, dim=1)
@@ -1314,3 +1309,119 @@ class ner(nn.Module):
     state = np.concatenate((accum_logP_state, logP_state, np.array([beam_size])), axis=0)
 
     return state
+
+
+  def backtracking(self, seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq):
+    # Only output the highest-scored beam (for each instance in the batch)
+    label_pred_seq = y_seq[seq_len - 1][:, 0].contiguous() \
+      .view(batch_size, 1)
+    input_beam = beta_seq[seq_len - 1][:, 0]
+
+    if self.attention:
+      # Now attention_seq is
+      # in the shape of (output seq len, batch size, beam size, input seq len)
+      #
+      # attention_pred_seq would be the attention alpha_{ij} coefficients
+      # in the shape of (output seq len, batch size, input seq len)
+      #
+      # Here we initialize the first element
+      attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+    accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+
+    for t in range(seq_len - 2, -1, -1):
+      label_pred_seq = torch.cat(
+        [y_seq[t][range(batch_size), input_beam] \
+        .contiguous().view(batch_size, 1),
+        label_pred_seq], dim = 1)
+
+      input_beam = beta_seq[t][range(batch_size), input_beam]
+
+      if self.attention:
+        attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+
+      logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
+      accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
+    # End for t
+
+    if self.attention:
+      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+    else:
+      attention_pred_seq = None
+
+    # For score_seq, actually don't need to reshape!
+    # It happens that directly concatenate along dim = 0 gives you
+    # a convenient shape (batch_size * seq_len, label_size)
+    # for later cross entropy loss
+    #
+    # We actually don't calculate loss in evaluation anymore
+    logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
+    accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
+
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq
+
+
+  # Observe the beam size to determine the reward, because it is possible that the agent wants to decrease the beam size, but the beam size is already minimum, so the environment does not allow the beam size to decrease.
+  def get_reward(self, cur_fscore, prev_fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size):
+    reward = reward_coef_fscore * (cur_fscore - prev_fscore) * 0.01 + reward_coef_beam_size * (prev_beam_size_in - cur_beam_size_in)
+    return reward
+
+
+  # It computes partial F-score, so expect label_var.size()[1] >= label_pred_seq.size()[1] generally
+  # This function should work for batch size > 1 as well
+  def get_fscore(self, label_pred_seq_input, label_var_input, f_score_index_begin):
+    if self.gpu:
+      label_pred_seq = label_pred_seq_input.cpu().data.numpy()
+      label_var = label_var_input.cpu().data.numpy()
+    else:
+      label_pred_seq = label_pred_seq_input.data.numpy()
+      label_var = label_var_input.data.numpy()
+
+    #print("label_pred_seq=", label_pred_seq)
+    #print("label_pred_seq.shape[1]=", label_pred_seq.shape[1])
+    #print("label_var=", label_var)
+    #print("label_var.shape[1]=", label_var.shape[1])
+
+    label_pred_seq_padded = np.pad(label_pred_seq, ((0, 0), (0, label_var.shape[1] - label_pred_seq.shape[1])), "constant", constant_values=(f_score_index_begin - 1, f_score_index_begin - 1))
+
+    #print("label_pred_seq_padded=", label_pred_seq_padded)
+
+    true_pos_count = 0
+    pred_pos_count = 0
+    true_pred_pos_count = 0
+    for label_index in range(f_score_index_begin, self.label_size):
+      true_pos = (label_var == label_index)
+      true_pos_count += true_pos.sum()
+
+      #print("true_pos=",true_pos)
+      #print("true_pos_count=",true_pos_count)
+
+      pred_pos = (label_pred_seq_padded == label_index)
+      pred_pos_count += pred_pos.sum()
+
+      #print("pred_pos=",pred_pos)
+      #print("pred_pos_count=",pred_pos_count)
+
+      true_pred_pos = true_pos & pred_pos
+      true_pred_pos_count += true_pred_pos.sum()
+
+      #print("true_pred_pos=",true_pred_pos)
+      #print("true_pred_pos_count=",true_pred_pos_count)
+
+    #if self.gpu:
+    #  true_pos_count = true_pos_count.cpu()
+    #  pred_pos_count = pred_pos_count.cpu()
+    #  true_pred_pos_count = true_pred_pos_count.cpu()
+
+    #true_pos_count = true_pos_count.data.numpy()[0]
+    #pred_pos_count = pred_pos_count.data.numpy()[0]
+    #true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
+
+    precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
+
+    recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
+    fscore = 2 / ( 1/precision + 1/recall ) if (precision > 0 and recall > 0) else 0
+    fscore = fscore * 100
+
+    return fscore
