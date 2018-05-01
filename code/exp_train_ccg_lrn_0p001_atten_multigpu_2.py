@@ -94,7 +94,7 @@ def main():
 
   #data_path = "../dataset/German/"
 
-  result_path = "../result_ccg_lrn_0p001_atten/"
+  result_path = "../result_ccg_lrn_0p001_atten_2/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
