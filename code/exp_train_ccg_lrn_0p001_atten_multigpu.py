@@ -140,8 +140,8 @@ def main():
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None, val_Y=None, test_X=None, test_Y=None, attention=attention, gpu=gpu, gpu_no=gpu_no, pretrained=pretrained, load_model_filename=load_model_filename)
   if gpu:
-    torch.cuda.device(gpu_no)
-    machine = machine.cuda()
+    with torch.cuda.device(gpu_no):
+      machine = machine.cuda()
 
   shuffle = True
 
