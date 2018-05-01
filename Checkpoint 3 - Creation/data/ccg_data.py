@@ -10,18 +10,24 @@ def parse_data(filename=None):
   count = 0
   with open(filename) as f:
     for line in f:
-      count += 1
-      sentence, annotations = line.split('|||')
-      words = sentence.split()
-      tags = annotations.split()
-      assert len(words) == len(tags)
+      line = line.strip()
+      if line != '':
+        count += 1
 
-      # print words, tags
-      for tag in tags:
-        tag_set.add(tag)
+        if len(line.split('|||')) == 1:
+          print(line.split('|||'))
 
-      all_sentences.append(words)
-      super_tags.append(tags)
+        sentence, annotations = line.split('|||')
+        words = sentence.split()
+        tags = annotations.split()
+        assert len(words) == len(tags)
+
+        # print words, tags
+        for tag in tags:
+          tag_set.add(tag)
+
+        all_sentences.append(words)
+        super_tags.append(tags)
 
   print("{} processed, there are {} lines, tag space has {} different tags".
         format(filename, count, len(tag_set)))
@@ -30,7 +36,7 @@ def parse_data(filename=None):
 
 
 if __name__ == "__main__":
-  ccg_data_dir = "../../../dataset/supertag_data"
+  ccg_data_dir = "../../dataset/supertag_data"
   train_words, train_tags, train_tag_set = parse_data(os.path.join(ccg_data_dir,
                                                                    "train.dat"))
   dev_words, dev_tags, dev_tag_set = parse_data(os.path.join(ccg_data_dir,

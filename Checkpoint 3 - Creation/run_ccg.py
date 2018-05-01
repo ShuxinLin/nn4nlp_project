@@ -41,23 +41,17 @@ def main():
   # ---------------------------------------------
   #             DATA FEED
   # ---------------------------------------------
-  test = "../dataset/CoNLL-2003/eng.testa"
-  dev = "../dataset/CoNLL-2003/eng.testb"
-  train = "../dataset/CoNLL-2003/eng.train"
+  test = "../dataset/supertag_data/test.dat"
+  dev = "../dataset/supertag_data/dev.dat"
+  train = "../dataset/supertag_data/train.dat"
 
-  X_testa, y_testa = parse_data(test)
-  X_testb, y_testb = parse_data(dev)
-  X_train, y_train = parse_data(train)
+  X_testa, y_testa, _ = parse_data(test)
+  X_testb, y_testb, _ = parse_data(dev)
+  X_train, y_train, _ = parse_data(train)
 
-  PAD_token = '<p>'
-  SOS_token = '<s>'
-  EOS_token = '<e>'
-  UNK_token = '<u>'
-
-
-  train_ner_data_feeder = NERDataFeeder(X_train, y_train)
-  testa_ner_data_feeder = NERDataFeeder(X_testa, y_testa)
-  testb_ner_data_feeder = NERDataFeeder(X_testb, y_testb)
+  train_ner_data_feeder = CCGDataFeeder(X_train, y_train)
+  testa_ner_data_feeder = CCGDataFeeder(X_testa, y_testa)
+  testb_ner_data_feeder = CCGDataFeeder(X_testb, y_testb)
 
   # import pdb;
   # pdb.set_trace()
