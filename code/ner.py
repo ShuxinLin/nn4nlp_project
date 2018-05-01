@@ -823,7 +823,7 @@ class ner(nn.Module):
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, f_score_index_begin):
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin):
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -882,12 +882,12 @@ class ner(nn.Module):
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, label_var, f_score_index_begin)
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
         ### Debugging...
-        print("input sentence =", sen)
-        print("true label =", label)
-        print("predicted label =", label_pred_seq)
-        print("episode =", episode)
+        #print("input sentence =", sen)
+        #print("true label =", label)
+        #print("predicted label =", label_pred_seq)
+        #print("episode =", episode)
 
       for label_index in range(f_score_index_begin, self.label_size):
         true_pos = (label_var == label_index)
@@ -1077,7 +1077,7 @@ class ner(nn.Module):
   ###############################
   #
   # This function is like generate_episode() for RL
-  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, label_true_seq, f_score_index_begin):
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_true_seq, f_score_index_begin):
     # Currently, batch size can only be 1
     batch_size = 1
 
@@ -1196,6 +1196,9 @@ class ner(nn.Module):
       attention_seq.append(attention_beam)
     logP_seq.append(logP_output_beam)
     accum_logP_seq.append(accum_logP_output_beam)
+
+    # Just for sentence with length = 1
+    label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
 
     # t = 1, 2, ..., (T_y - 1 == seq_len - 1)
     for t in range(1, seq_len):
@@ -1337,40 +1340,59 @@ class ner(nn.Module):
 
   # Observe the beam size to determine the reward, because it is possible that the agent wants to decrease the beam size, but the beam size is already minimum, so the environment does not allow the beam size to decrease.
   def get_reward(self, cur_fscore, prev_fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size):
-    reward = reward_coef_fscore * (cur_fscore - prev_fscore) + reward_coef_beam_size * (prev_beam_size_in - cur_beam_size_in)
+    reward = reward_coef_fscore * (cur_fscore - prev_fscore) * 0.01 + reward_coef_beam_size * (prev_beam_size_in - cur_beam_size_in)
+    return reward
 
 
   # It computes partial F-score, so expect label_var.size()[1] >= label_pred_seq.size()[1] generally
   # This function should work for batch size > 1 as well
-  def get_fscore(self, label_pred_seq, label_var, f_score_index_begin):
-    print("label_pred_seq=", label_pred_seq)
-    print("label_pred_seq.shape[1]=", label_pred_seq.shape[1])
-    print("label_var=", label_var)
-    print("label_var.shape[1]=", label_var.shape[1])
+  def get_fscore(self, label_pred_seq_input, label_var_input, f_score_index_begin):
+    if self.gpu:
+      label_pred_seq = label_pred_seq_input.cpu().data.numpy()
+      label_var = label_var_input.cpu().data.numpy()
+    else:
+      label_pred_seq = label_pred_seq_input.data.numpy()
+      label_var = label_var_input.data.numpy()
+
+    #print("label_pred_seq=", label_pred_seq)
+    #print("label_pred_seq.shape[1]=", label_pred_seq.shape[1])
+    #print("label_var=", label_var)
+    #print("label_var.shape[1]=", label_var.shape[1])
 
     label_pred_seq_padded = np.pad(label_pred_seq, ((0, 0), (0, label_var.shape[1] - label_pred_seq.shape[1])), "constant", constant_values=(f_score_index_begin - 1, f_score_index_begin - 1))
+
+    #print("label_pred_seq_padded=", label_pred_seq_padded)
 
     true_pos_count = 0
     pred_pos_count = 0
     true_pred_pos_count = 0
     for label_index in range(f_score_index_begin, self.label_size):
       true_pos = (label_var == label_index)
-      true_pos_count += true_pos.float().sum()
+      true_pos_count += true_pos.sum()
 
-      pred_pos = (label_pred_seq == label_index)
-      pred_pos_count += pred_pos.float().sum()
+      #print("true_pos=",true_pos)
+      #print("true_pos_count=",true_pos_count)
+
+      pred_pos = (label_pred_seq_padded == label_index)
+      pred_pos_count += pred_pos.sum()
+
+      #print("pred_pos=",pred_pos)
+      #print("pred_pos_count=",pred_pos_count)
 
       true_pred_pos = true_pos & pred_pos
-      true_pred_pos_count += true_pred_pos.float().sum()
+      true_pred_pos_count += true_pred_pos.sum()
 
-    if self.gpu:
-      true_pos_count = true_pos_count.cpu()
-      pred_pos_count = pred_pos_count.cpu()
-      true_pred_pos_count = true_pred_pos_count.cpu()
+      #print("true_pred_pos=",true_pred_pos)
+      #print("true_pred_pos_count=",true_pred_pos_count)
 
-    true_pos_count = true_pos_count.data.numpy()[0]
-    pred_pos_count = pred_pos_count.data.numpy()[0]
-    true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
+    #if self.gpu:
+    #  true_pos_count = true_pos_count.cpu()
+    #  pred_pos_count = pred_pos_count.cpu()
+    #  true_pred_pos_count = true_pred_pos_count.cpu()
+
+    #true_pos_count = true_pos_count.data.numpy()[0]
+    #pred_pos_count = pred_pos_count.data.numpy()[0]
+    #true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
 
     precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
 
