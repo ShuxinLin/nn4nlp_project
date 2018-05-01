@@ -133,13 +133,13 @@ def main():
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
   gpu_no = 2
-  cuda = torch.device("cuda:" + str(gpu_no))
+  cuda_dev = torch.device("cuda:" + str(gpu_no))
 
   load_model_filename = None
 
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None, val_Y=None, test_X=None, test_Y=None, attention=attention, gpu=gpu, gpu_no=gpu_no, pretrained=pretrained, load_model_filename=load_model_filename)
   if gpu:
-    machine = machine.cuda(cuda)
+    machine = machine.cuda(cuda_dev)
 
   shuffle = True
 
