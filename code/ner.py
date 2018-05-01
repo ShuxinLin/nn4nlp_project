@@ -882,8 +882,8 @@ class ner(nn.Module):
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent)
-        ### test
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, label_var, f_score_index_begin)
+        ### Debugging...
         print("input sentence =", sen)
         print("true label =", label)
         print("predicted label =", label_pred_seq)
@@ -1055,6 +1055,8 @@ class ner(nn.Module):
       # We need to permute (swap) the dimensions into
       # the shape (batch size, beam size, input seq len)
       attention_beam_out = attention_beam_out.permute(1, 0, 2)
+    else:
+      attention_beam_out = None
 
     return accum_logP_matrix, logP_matrix, dec_hidden_beam_out, dec_cell_beam_out, attention_beam_out, accum_logP_output_beam, logP_output_beam
 
@@ -1247,7 +1249,7 @@ class ner(nn.Module):
       accum_logP_seq.append(accum_logP_output_beam)
 
       # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
-      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(seq_len, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
       cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
 
       # If t >= 2, compute the reward,
@@ -1341,6 +1343,11 @@ class ner(nn.Module):
   # It computes partial F-score, so expect label_var.size()[1] >= label_pred_seq.size()[1] generally
   # This function should work for batch size > 1 as well
   def get_fscore(self, label_pred_seq, label_var, f_score_index_begin):
+    print("label_pred_seq=", label_pred_seq)
+    print("label_pred_seq.shape[1]=", label_pred_seq.shape[1])
+    print("label_var=", label_var)
+    print("label_var.shape[1]=", label_var.shape[1])
+
     label_pred_seq_padded = np.pad(label_pred_seq, ((0, 0), (0, label_var.shape[1] - label_pred_seq.shape[1])), "constant", constant_values=(f_score_index_begin - 1, f_score_index_begin - 1))
 
     true_pos_count = 0
