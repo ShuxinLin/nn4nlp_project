@@ -205,7 +205,7 @@ def test_adaptive(rank,
 
 
   avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
-  print("Avg TEST beam size: {}".format(avg_beam_sizes)
+  print("Avg TEST beam size: {}".format(avg_beam_sizes))
   print("Avg TEST Fscore = {}".format(fscore))
 
 
