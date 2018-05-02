@@ -13,7 +13,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 
 from attention import Attention
-from model import AdativeActorCritic
+from model import AdaptiveActorCritic
 
 
 class ner(nn.Module):
@@ -1524,10 +1524,7 @@ class ner(nn.Module):
       f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
 
     instance_num = 0
-    correctness = 0
-
     beam_size_seqs = []
-    action_seqs = []
 
     for batch in eval_data_X:
       instance_num += len(batch)
@@ -1788,8 +1785,6 @@ class ner(nn.Module):
     # beta_beam.shape => (batch size, beam size),
     # each row is [y^{t, b=0}, y^{t, b=1}, ..., y^{t, b=B-1}]
     # y_beam, score_beam => same
-
-    action_seq = []
     beam_size_seq = []
     beam_size = initial_beam_size
     beam_size_seq.append(beam_size)

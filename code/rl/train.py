@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 from envs import create_atari_env
 from model import ActorCritic
-from model import AdativeActorCritic
+from model import AdaptiveActorCritic
 
 
 def ensure_shared_grads(model, shared_model):
@@ -16,107 +16,6 @@ def ensure_shared_grads(model, shared_model):
     if shared_param.grad is not None:
       return
     shared_param._grad = param.grad
-
-
-def train(rank, args, shared_model, counter, lock, optimizer=None):
-  torch.manual_seed(args.seed + rank)
-
-  env = create_atari_env(args.env_name)
-  env.seed(args.seed + rank)
-
-  model = ActorCritic(env.observation_space.shape[0], env.action_space)
-
-  if optimizer is None:
-    optimizer = optim.Adam(shared_model.parameters(), lr=args.lr)
-
-  model.train()
-
-  state = env.reset()
-  state = torch.from_numpy(state)
-  done = True
-
-  episode_length = 0
-  while True:
-    # Sync with the shared model
-    model.load_state_dict(shared_model.state_dict())
-
-    if done:
-      cx = Variable(torch.zeros(1, 256))
-      hx = Variable(torch.zeros(1, 256))
-    else:
-      cx = Variable(cx.data)
-      hx = Variable(hx.data)
-
-    values = []
-    log_probs = []
-    rewards = []
-    entropies = []
-
-    for step in range(args.num_steps):
-      episode_length += 1
-      value, logit, (hx, cx) = model((Variable(state.unsqueeze(0)),
-                                      (hx, cx)))
-      prob = F.softmax(logit)  # 1 x 6
-      log_prob = F.log_softmax(logit)  # 1 x 6
-      entropy = -(log_prob * prob).sum(1, keepdim=True)  # 1 x 1
-
-      entropies.append(entropy)
-
-      action = prob.multinomial().data
-      log_prob = log_prob.gather(1, Variable(action))
-
-      state, reward, done, _ = env.step(action.numpy())
-      done = done or episode_length >= args.max_episode_length
-      reward = max(min(reward, 1), -1)
-
-      with lock:
-        counter.value += 1
-
-      if done:
-        episode_length = 0
-        state = env.reset()
-
-      state = torch.from_numpy(state)
-      values.append(value)
-      log_probs.append(log_prob)
-      rewards.append(reward)
-
-      if done:
-        break
-
-    R = torch.zeros(1, 1)
-    if not done:
-      value, _, _ = model((Variable(state.unsqueeze(0)), (hx, cx)))
-      R = value.data
-
-    values.append(Variable(R))
-    policy_loss = 0
-    value_loss = 0
-    R = Variable(R)
-    gae = torch.zeros(1, 1)
-    for i in reversed(range(len(rewards))):
-      R = args.gamma * R + rewards[i]
-      advantage = R - values[i]
-      value_loss = value_loss + 0.5 * advantage.pow(2)
-
-      # Generalized Advantage Estimataion
-      delta_t = rewards[i] + args.gamma * \
-                             values[i + 1].data - values[i].data
-      gae = gae * args.gamma * args.tau + delta_t
-
-      policy_loss = policy_loss - \
-                    log_probs[i] * Variable(gae) - args.entropy_coef * \
-                                                   entropies[i]
-
-    # print(policy_loss)
-
-    optimizer.zero_grad()
-
-    (policy_loss + args.value_loss_coef * value_loss).backward()
-    torch.nn.utils.clip_grad_norm(model.parameters(), args.max_grad_norm)
-
-    ensure_shared_grads(model, shared_model)
-    optimizer.step()
 
 
 def train_adaptive(rank,
@@ -136,7 +35,7 @@ def train_adaptive(rank,
   torch.manual_seed(123 + rank)
 
   # create adative model
-  model = AdativeActorCritic(max_beam_size=max_beam_size, action_space=3)
+  model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
 
   if optimizer is None:
     optimizer = optim.Adam(shared_model.parameters(), lr=lr)
@@ -156,10 +55,7 @@ def train_adaptive(rank,
     f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
 
   instance_num = 0
-  correctness = 0
-
   beam_size_seqs = []
-  action_seqs = []
 
   for batch in eval_data_X:
     instance_num += len(batch)
@@ -179,7 +75,7 @@ def train_adaptive(rank,
 
     # DEBUG
     # print(batch_idx, current_sen_len)
-    if current_sen_len < 3:
+    if current_sen_len < 3:  # ignore sentence having tiny length
       continue
 
 
@@ -224,7 +120,8 @@ def train_adaptive(rank,
       # the input argument "beam_size" serves as initial_beam_size here
       # TODO: implement this here
       label_pred_seq, accum_logP_pred_seq, logP_pred_seq, \
-      attention_pred_seq, episode = decode_one_sentence_adaptive_rl(machine,
+      attention_pred_seq, episode, sen_beam_size_seq = \
+        decode_one_sentence_adaptive_rl(machine,
         current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq,
         beam_size, max_beam_size, model, shared_model, reward_coef_fscore,
         reward_coef_beam_size, label_var, f_score_index_begin, counter, lock,
@@ -234,11 +131,15 @@ def train_adaptive(rank,
       raise Exception("Not implemented!")
     # ===================================
 
-      ### Debugging...
-      # print("input sentence =", sen)
-      # print("true label =", label)
-      # print("predicted label =", label_pred_seq)
-      # print("episode =", episode)
+
+    # update beam seq
+    beam_size_seqs += sen_beam_size_seq
+
+    ### Debugging...
+    # print("input sentence =", sen)
+    # print("true label =", label)
+    # print("predicted label =", label_pred_seq)
+    # print("episode =", episode)
 
     for label_index in range(f_score_index_begin, machine.label_size):
       true_pos = (label_var == label_index)
@@ -282,7 +183,7 @@ def train_adaptive(rank,
           "%s %s %s\n" % (result_sen, result_label, result_pred))
 
       if decode_method == "adaptive":
-        beam_size_seq_str = ' '.join(map(str, beam_size_seqs))
+        beam_size_seq_str = ' '.join(map(str, sen_beam_size_seq))
         f_beam_size.write(beam_size_seq_str + '\n')
 
   # End for batch_idx
@@ -310,11 +211,10 @@ def train_adaptive(rank,
     f_result_processed.close()
     f_beam_size.close()
 
-  if decode_method == "adaptive":
-    avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for
-                      beam_size_seq in beam_size_seqs]
-    print("Avg beam size: {}".format(sum(avg_beam_sizes) / len(avg_beam_sizes)))
-  # --------------------
+  avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for
+                    beam_size_seq in beam_size_seqs]
+  print("Avg beam size: {}".format(sum(avg_beam_sizes) / len(avg_beam_sizes)))
+  print("Avg Fscore = {}".format(fscore))
 
 
 def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
@@ -323,7 +223,8 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
                                     model, shared_model,
                                     reward_coef_fscore, reward_coef_beam_size,
                                     label_true_seq, f_score_index_begin,
-                                    counter, lock, optimizer, args,
+                                    counter, lock, optimizer,
+                                    args,
                                     ):
   # Currently, batch size can only be 1
   batch_size = 1
@@ -506,12 +407,9 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
     log_prob = F.log_softmax(logit)
 
 
-
     # TODO: for naive MLP policy network only
     prob = prob.view(1, -1)
     log_prob = log_prob.view(1, -1)
-
-
 
 
     entropy = -(log_prob * prob).sum(1, keepdim=True)
@@ -545,6 +443,7 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
       beam_size -= 1
     elif action == 2 and beam_size < max_beam_size:
       beam_size += 1
+
     beam_size_seq.append(beam_size)
 
     accum_logP_beam, index_beam = \
@@ -561,9 +460,11 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
     accum_logP_seq.append(accum_logP_output_beam)
 
     # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
-    label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = machine.backtracking(
+    label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = \
+      machine.backtracking(
       t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq,
       accum_logP_seq)
+
     cur_fscore = machine.get_fscore(label_pred_seq, label_true_seq,
                                     f_score_index_begin)
 
@@ -617,4 +518,5 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
   optimizer.step()
 
 
-  return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
+  return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, \
+         attention_pred_seq, episode, beam_size_seq

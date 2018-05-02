@@ -26,6 +26,7 @@ def get_index2word(dict_file):
 
   return index2word
 
+
 def get_index2label(entity_file):
   index2label = dict()
   with open(entity_file) as f:
@@ -33,6 +34,7 @@ def get_index2label(entity_file):
       (entity, index) = line.split()
       index2label[int(index)] = entity
   return index2label
+
 
 def construct_df(data):
   dataset_path = '../../dataset/German/'
@@ -46,6 +48,7 @@ def construct_df(data):
   df = pd.DataFrame({'SENTENCE': indexed_sentences, 'ENTITY': indexed_entities})
 
   return df
+
 
 def minibatch_de(data, batch_size):
   print("Generate mini batches.")
@@ -116,7 +119,7 @@ def main():
   hidden_dim = 64
   label_embedding_dim = 8
 
-  max_epoch = 3
+  max_epoch = 30
 
   # 0.001 is a good value
   learning_rate = 0.001
@@ -135,7 +138,11 @@ def main():
 
   load_model_filename = None
 
-  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None, val_Y=None, test_X=None, test_Y=None, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
+  machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size,
+                label_size, learning_rate=learning_rate, minibatch_size=batch_size,
+                max_epoch=max_epoch, train_X=train_X, train_Y=train_Y, val_X=None,
+                val_Y=None, test_X=None, test_Y=None, attention=attention,
+                gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename)
   if gpu:
     machine = machine.cuda()
 
@@ -143,6 +150,7 @@ def main():
 
   # Pure training, no evaluation shuffle, result_path, do_evaluation, beam_size
   train_loss_list = machine.train(shuffle, result_path, False, None)
+  print(train_loss_list)
 
 
 if __name__ == "__main__":

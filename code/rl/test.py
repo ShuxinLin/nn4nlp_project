@@ -8,7 +8,7 @@ from torch.autograd import Variable
 
 from envs import create_atari_env
 from model import ActorCritic
-from model import AdativeActorCritic
+from model import AdaptiveActorCritic
 
 
 def test(rank, args, shared_model, counter):
@@ -86,7 +86,7 @@ def test_adaptive(rank,
   torch.manual_seed(123 + rank)
 
   # create adative model
-  model = AdativeActorCritic(max_beam_size=max_beam_size, action_space=3)
+  model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
 
   model.eval()
 
@@ -103,14 +103,12 @@ def test_adaptive(rank,
     f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
 
   instance_num = 0
-  correctness = 0
-
   beam_size_seqs = []
-  action_seqs = []
 
   for batch in eval_data_X:
     instance_num += len(batch)
 
+  # for calculating F-SCORE
   true_pos_count = 0
   pred_pos_count = 0
   true_pred_pos_count = 0
@@ -171,7 +169,8 @@ def test_adaptive(rank,
       # the input argument "beam_size" serves as initial_beam_size here
       # TODO: implement this here
       label_pred_seq, accum_logP_pred_seq, logP_pred_seq, \
-      attention_pred_seq, episode = decode_one_sentence_adaptive_rl(machine,
+      attention_pred_seq, episode, sen_beam_size_seq= \
+        decode_one_sentence_adaptive_rl(machine,
         current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq,
         beam_size, max_beam_size, model, shared_model, reward_coef_fscore,
         reward_coef_beam_size, label_var, f_score_index_begin, counter,
@@ -181,11 +180,14 @@ def test_adaptive(rank,
       raise Exception("Not implemented!")
     # ===================================
 
-      ### Debugging...
-      # print("input sentence =", sen)
-      # print("true label =", label)
-      # print("predicted label =", label_pred_seq)
-      # print("episode =", episode)
+    # update beam seq
+    beam_size_seqs += sen_beam_size_seq
+
+    ### Debugging...
+    # print("input sentence =", sen)
+    # print("true label =", label)
+    # print("predicted label =", label_pred_seq)
+    # print("episode =", episode)
 
     for label_index in range(f_score_index_begin, machine.label_size):
       true_pos = (label_var == label_index)
@@ -229,7 +231,7 @@ def test_adaptive(rank,
           "%s %s %s\n" % (result_sen, result_label, result_pred))
 
       if decode_method == "adaptive":
-        beam_size_seq_str = ' '.join(map(str, beam_size_seqs))
+        beam_size_seq_str = ' '.join(map(str, sen_beam_size_seq))
         f_beam_size.write(beam_size_seq_str + '\n')
 
   # End for batch_idx
@@ -257,11 +259,11 @@ def test_adaptive(rank,
     f_result_processed.close()
     f_beam_size.close()
 
-  if decode_method == "adaptive":
-    avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for
-                      beam_size_seq in beam_size_seqs]
-    print("Avg beam size: {}".format(sum(avg_beam_sizes) / len(avg_beam_sizes)))
-  # --------------------
+
+  avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for
+                    beam_size_seq in beam_size_seqs]
+  print("Avg beam size: {}".format(sum(avg_beam_sizes) / len(avg_beam_sizes)))
+  print("Avg Fscore = {}".format(fscore))
 
 
 def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
@@ -524,10 +526,11 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
       rewards.append(reward)
 
     fscore = cur_fscore
-    print("F-Score: {}".format(fscore))
+    # print("F-Score: {}".format(fscore))
   # End for t
 
   # print("rewards: {}".format(rewards))
   # print("actions: {}".format(action_seq))
 
-  return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
+  return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, \
+         attention_pred_seq, episode, beam_size_seq

@@ -70,7 +70,7 @@ class ActorCritic(torch.nn.Module):
     return self.critic_linear(x), self.actor_linear(x), (hx, cx)
 
 
-class AdativeActorCritic(torch.nn.Module):
+class AdaptiveActorCritic(torch.nn.Module):
   def __init__(self, max_beam_size, action_space=3):
     """ Format of a state (a vector): 
           1. accum_logP = state[0:self.max_beam_size]
@@ -80,7 +80,7 @@ class AdativeActorCritic(torch.nn.Module):
         max_beam_size
         action_space: number of possible actions, default is 3 
     """
-    super(AdativeActorCritic, self).__init__()
+    super(AdaptiveActorCritic, self).__init__()
     # self.max_beam_size = max_beam_size
     #
     # # RNN layer - for the whole sequence
@@ -121,6 +121,6 @@ if __name__ == "__main__":
   state = np.random.rand(21)
   print(state.shape)
 
-  ac = AdativeActorCritic(max_beam_size=10, action_space=3)
+  ac = AdaptiveActorCritic(max_beam_size=10, action_space=3)
   c, a = ac(state)
   print(a, c)

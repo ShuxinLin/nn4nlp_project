@@ -16,7 +16,7 @@ import torch.optim as optim
 
 from ner import ner
 from det_agent import det_agent
-from model import AdativeActorCritic
+from model import AdaptiveActorCritic
 
 import torch.multiprocessing as mp
 from my_optim import SharedAdam
@@ -230,7 +230,7 @@ def main():
                       help='use an optimizer without shared momentum.')
   args = parser.parse_args()
 
-  shared_model = AdativeActorCritic(max_beam_size=max_beam_size, action_space=3)
+  shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
   shared_model.share_memory()
 
   if args.no_shared:
@@ -257,6 +257,7 @@ def main():
   counter = mp.Value('i', 0)
   lock = mp.Lock()
 
+  # eval along with many processes of training RL
   p = mp.Process(target=test_adaptive,
                  args=(args.num_processes,
                        machine,
@@ -265,7 +266,7 @@ def main():
                        shared_model,
                        counter,
                        test_X, test_Y, index2word, index2label, "test",
-                       None, "adaptive", initial_beam_size,
+                       "./result", "adaptive", initial_beam_size,
                        reward_coef_beam_size, f_score_index_begin,
                        f_score_index_begin,
                        args))
@@ -284,7 +285,7 @@ def main():
                            lock,
                            optimizer,
                            val_X, val_Y, index2word, index2label, "val",
-                           None, "adaptive", initial_beam_size,
+                           "./result", "adaptive", initial_beam_size,
                            reward_coef_beam_size, f_score_index_begin,
                            f_score_index_begin,
                            args))
