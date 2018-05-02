@@ -36,24 +36,11 @@ def train_adaptive(rank,
 
   # create adative model
   model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
-
   if optimizer is None:
     optimizer = optim.Adam(shared_model.parameters(), lr=lr)
-
   model.train()
 
-  # ---------------------
-  fscore = None  # globalize this variable
-
   batch_num = len(eval_data_X)
-  if result_path:
-    f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
-    f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
-    f_label = open(result_path + "label_" + suffix + ".txt", 'w')
-    f_result_processed = open(
-      result_path + "result_processed_" + suffix + ".txt", 'w')
-    f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
-
   instance_num = 0
   beam_size_seqs = []
 
@@ -62,6 +49,14 @@ def train_adaptive(rank,
 
   for epoch in range(1, args.n_epochs + 1):
     print("Epoch: {}".format(epoch))
+
+    if result_path:
+      f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
+      f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
+      f_label = open(result_path + "label_" + suffix + ".txt", 'w')
+      f_result_processed = open(
+        result_path + "result_processed_" + suffix + ".txt", 'w')
+      f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
 
     true_pos_count = 0
     pred_pos_count = 0
