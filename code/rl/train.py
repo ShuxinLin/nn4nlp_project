@@ -211,9 +211,8 @@ def train_adaptive(rank,
     f_result_processed.close()
     f_beam_size.close()
 
-  avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for
-                    beam_size_seq in beam_size_seqs]
-  print("Avg beam size: {}".format(sum(avg_beam_sizes) / len(avg_beam_sizes)))
+  avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
+  print("Avg beam size: {}".format(avg_beam_sizes)
   print("Avg Fscore = {}".format(fscore))
 
 

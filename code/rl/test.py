@@ -204,10 +204,9 @@ def test_adaptive(rank,
     f_beam_size.close()
 
 
-  avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for
-                    beam_size_seq in beam_size_seqs]
-  print("Avg beam size: {}".format(sum(avg_beam_sizes) / len(avg_beam_sizes)))
-  print("Avg Fscore = {}".format(fscore))
+  avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
+  print("Avg TEST beam size: {}".format(avg_beam_sizes)
+  print("Avg TEST Fscore = {}".format(fscore))
 
 
 def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
