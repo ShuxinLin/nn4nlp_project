@@ -848,7 +848,6 @@ class ner(nn.Module):
     true_pred_pos_count = 0
 
     for batch_idx in range(batch_num):
-      print(batch_idx)
       sen = eval_data_X[batch_idx]
       label = eval_data_Y[batch_idx]
       current_batch_size = len(sen)
@@ -889,8 +888,8 @@ class ner(nn.Module):
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
+        beam_size_seqs.append(beam_size_seq)
         ### Debugging...
         #print("input sentence =", sen)
         #print("true label =", label)
@@ -1289,7 +1288,7 @@ class ner(nn.Module):
       fscore = cur_fscore
     # End for t
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq
 
 
   # make_state - generate the state for the RL agent
@@ -1359,7 +1358,7 @@ class ner(nn.Module):
     logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
     accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
   # Observe the beam size to determine the reward, because it is possible that the agent wants to decrease the beam size, but the beam size is already minimum, so the environment does not allow the beam size to decrease.

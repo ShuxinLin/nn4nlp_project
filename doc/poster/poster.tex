@@ -1,0 +1,171 @@
+\documentclass[a0paper,portrait]{baposter}
+
+
+
+\usepackage{wrapfig}
+\usepackage{lmodern}
+
+\usepackage[utf8]{inputenc} %unicode support
+\usepackage[T1]{fontenc}
+
+
+\selectcolormodel{cmyk}
+
+\graphicspath{{figures/}} % Directory in which figures are stored
+
+
+\newcommand{\compresslist}{%
+\setlength{\itemsep}{0pt}%
+\setlength{\parskip}{1pt}%
+\setlength{\parsep}{0pt}%
+}
+
+\newenvironment{boenumerate}
+  {\begin{enumerate}\renewcommand\labelenumi{\textbf\theenumi.}}
+  {\end{enumerate}}
+
+
+
+\begin{document}
+
+
+\definecolor{darkgreen}{cmyk}{0.8,0,0.8,0.45}
+\definecolor{lightgreen}{cmyk}{0.8,0,0.8,0.25}
+
+\begin{poster}
+{
+grid=false,
+headerborder=open, % Adds a border around the header of content boxes
+colspacing=1em, % Column spacing
+bgColorOne=white, % Background color for the gradient on the left side of the poster
+bgColorTwo=white, % Background color for the gradient on the right side of the poster
+borderColor=darkgreen, % Border color
+headerColorOne=lightgreen, % Background color for the header in the content boxes (left side)
+headerColorTwo=lightgreen, % Background color for the header in the content boxes (right side)
+headerFontColor=white, % Text color for the header text in the content boxes
+boxColorOne=white, % Background color of the content boxes
+textborder=rounded, %rectangle, % Format of the border around content boxes, can be: none, bars, coils, triangles, rectangle, rounded, roundedsmall, roundedright or faded
+eyecatcher=false, % Set to false for ignoring the left logo in the title and move the title left
+headerheight=0.11\textheight, % Height of the header
+headershape=rounded, % Specify the rounded corner in the content box headers, can be: rectangle, small-rounded, roundedright, roundedleft or rounded
+headershade=plain,
+headerfont=\Large\textsf, % Large, bold and sans serif font in the headers of content boxes
+%textfont={\setlength{\parindent}{1.5em}}, % Uncomment for paragraph indentation
+linewidth=2pt % Width of the border lines around content boxes
+}
+{}
+%
+%----------------------------------------------------------------------------------------
+%	TITLE AND AUTHOR NAME
+%----------------------------------------------------------------------------------------
+%
+{
+\textsf %Sans Serif
+{Dynamic Beam Search in\\Sequence-to-Sequence Models
+}
+} % Poster title
+% {\vspace{1em} Marta Stepniewska, Pawel Siedlecki\\ % Author names
+% {\small \vspace{0.7em} Department of Bioinformatics, Institute of Biochemistry and Biophysics, PAS, Warsaw, Pawinskiego 5a}} % Author email addresses
+{\sf\vspace{0.5em}\\
+Yu-Hsiang Lin, Shuxin Lin, Hai Pham
+\vspace{0.1em}\\
+\small{Language Technologies Institute, Carnegie Mellon University
+\vspace{0.2em}\\
+$\{$yuhsianl, shuxinl, htpham$\}$@andrew.cmu.edu}
+}
+{\includegraphics[width=6.5cm]{LTI-logo.png}} % University/lab logo
+
+
+\headerbox{1.~Introduction}{name=introduction,column=0,row=0, span=3}{
+In structured prediction tasks, the sequence-to-sequence models are typically trained by maximum likelihood estimation with the so-called ``teacher forcing'' technique, by which the true targets are used to guide the training process. To  Decoding in test time 
+}
+
+
+\headerbox{2.~Seq2Seq model}{name=model,column=0,below=introduction,span=1}{
+
+The encoder and decoder in Seq2seq model are both LSTM RNNs, except that the encoder is bi-directional. The encoder takes the word embeddings as input and outputs the last hidden state and cell state to the decoder as initial states. At every training step $t$ of decoding, the decoder is given input token $y_{t-1}$ and hidden states, and predicts the probability over the label space. We use the ``fixed'' attention, by which we attend at $h^{enc}_t$ when decoding for $h^{dec}_t$. In the test time $t$ of decoding, we use the label $\tilde{y}_{t-1}$ predicted at the previous time step instead.
+
+\begin{center}
+    \includegraphics[width=\linewidth]{fixed_attention.png}
+\end{center}
+%\vspace{-2pt}
+}
+
+
+\headerbox{3.~Search with Fixed Beam Size}{name=mcs,column=0,below=model,span=1}{
+In the test time, decoding the most likely output sequence involves searching through all the possible output sequences based on their likelihood. One popular heuristic is the beam search, which is an extension to the greedy search and returns a list of most likely output sequences by measuring accumulated log probability at each step. Larger beam size potentially results in better performance of a model as the multiple candidate sequences increase the likelihood of better matching a target sequence. However, this increased performance results in a decrease in decoding speed.
+\begin{center}
+    \includegraphics[width=\linewidth]{fix_beam.png}
+\end{center}
+
+}
+
+\headerbox{4.~Dynamical Beam Search:~Heuristic Pruning and Growing}{name=screen,span=2,column=1,below=introduction}{ % To reduce this block to 1 column width, remove 'span=2'
+
+Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing.
+
+%\vspace{-5pt}
+%\begin{center}
+%    \includegraphics[width=0.85\linewidth]{adapt.png}
+%\end{center}
+}
+
+
+\headerbox{5.~Reinforcement Learning for Dynamic Beam Search}{name=sea,span=2,column=1,below=screen}{ % To reduce this block to 1 column width, remove 'span=2'
+
+After the encoder-decoder model is trained using supervised learning, we further learn the policy that dynamically adjusts the beam size using reinforcement learning. We use the actor-critic model and policy gradient to train the policy network. The actor network is pre-trained by imitation learning using the experience generated by the heuristic pruning and growing rules.
+
+In the seq2seq environment, an episode consists of a sequence. Our state consists of the top-$k$ log probabilities and accumulated log probabilities, as well as the current beam size. The action space of the agent is 3:~increasing or decreasing the beam size by 1 (limited by maximum and minimum beam sizes), or remain the same beam size. The learning goal of the policy is to decrease the beam size as much as possible, while increase the decoding F-score as much as possible. The reward is therefore a combination of two factors:~if the beam size is decreased (increased) or the partial F-score is increased (decreased) at this $(s_t, a_t, s_{t+1})$ transition, the agent obtains a positive (negative) reward.
+
+
+\begin{center}
+    \includegraphics[width=0.85\linewidth]{adapt2.png}
+\end{center}
+
+
+
+%\hspace{0pt}\includegraphics[width=0.95\linewidth]{adapt2.png}
+
+%\begin{wrapfigure}{l}{0.3\textwidth}
+%    \vspace{10pt}
+%    \begin{center}
+%        \includegraphics[width=\linewidth]{adapt2.png}
+%    \end{center}
+%    %\vspace{-145pt}
+%\end{wrapfigure}
+
+}
+
+
+\headerbox{6.~Conclusions}{name=conclusion,column=1,below=sea,span=2,above=bottom}{
+% DeCAF is a chemoinformatical tool that can be helpful in ligand-based drug design.
+% It provides a comprehensive molecule description and a fast algorithms for comparing and aligning multiple ligands.
+Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions.
+
+
+
+%\begin{boenumerate}\compresslist
+%    \item DeCAF gives better results for 23 out of 35 receptors.
+%    \item For targets with easily separable active and inactive datasets, SEA and DeCAF give similar results.
+%    \item In cases in which SEA fails to identify active molecules, our method performs substantially better.
+%\end{boenumerate}
+% It can be also used in other [procedures], such as database screening or drug repositioning.
+% DeCAF is written in Python and freely available at \textbf{\color{darkgreen}http://bitbucket.org/marta-sd/decaf}. 
+}
+
+
+\headerbox{7. References}{name=references,column=0,span=1,below=mcs,above=bottom}{
+
+
+%\small % Reduce the font size in this block
+\renewcommand{\section}[2]{\vskip 0.05em} % Get rid of the default "References" section title
+%\nocite{*} % Insert publications even if they are not cited in the poster
+
+
+\bibliographystyle{unsrt}
+\bibliography{poster} % Use sample.bib as the bibliography file
+}
+
+\end{poster}
+
+\end{document}
