@@ -81,22 +81,42 @@ class AdaptiveActorCritic(torch.nn.Module):
         action_space: number of possible actions, default is 3 
     """
     super(AdaptiveActorCritic, self).__init__()
-    # self.max_beam_size = max_beam_size
-    #
-    # # RNN layer - for the whole sequence
-    # hidden_size = 32
-    # self.logp_lstm = nn.LSTM(max_beam_size, hidden_size)
-    # self.accum_lstm = nn.LSTM(max_beam_size, hidden_size)
-    #
+    self.max_beam_size = max_beam_size
+
+    # RNN layer - for the whole sequence
+    hidden_size = 32
+    self.logp_lstm = nn.LSTM(max_beam_size, hidden_size)
+    self.accum_lstm = nn.LSTM(max_beam_size, hidden_size)
+
+    self.critic_linear = nn.Linear(hidden_size*2 + 1, 1)
+    self.actor_linear = nn.Linear(hidden_size * 2 + 1, action_space)
+
     # # FC layers
-    hidden_size = max_beam_size * 2 + 1
-    self.critic_linear = nn.Linear(hidden_size, 1)
-    self.actor_linear = nn.Linear(hidden_size, action_space)
+    # hidden_size = max_beam_size * 2 + 1
+    # self.critic_linear = nn.Linear(hidden_size, 1)
+    # self.actor_linear = nn.Linear(hidden_size, action_space)
 
   def forward(self, state):
-    # accum_logP = state[0:self.max_beam_size].reshape(1, 1, -1)
-    # logP = state[self.max_beam_size:2 * self.max_beam_size].reshape(1, 1, -1)
-    #
+    state = state.astype(np.float32)
+
+    accum_logP = state[0:self.max_beam_size].reshape(1, 1, -1)
+    logP = state[self.max_beam_size:2 * self.max_beam_size].reshape(1, 1, -1)
+    beam_size = state[-1]
+
+    # to Variable
+    accum_logP = Variable(torch.FloatTensor(accum_logP)).view(1, 1, -1)
+    logP = Variable(torch.FloatTensor(logP)).view(1, 1, -1)
+    beam_size = Variable(torch.FloatTensor([int(beam_size)])).view(1, -1)
+
+
+    # LSTM now
+    h1, c1 = self.logp_lstm(accum_logP)
+    h2, c2 = self.logp_lstm(logP)
+
+    h1 = h1.view(1, -1)
+    h2 = h2.view(1, -1)
+    cat_output = torch.cat([h1, h2, beam_size], dim=1) # 1 x (2H + 1)
+
     # # concatenate 2 scores
     # cat_scores = np.concatenate([accum_logP, logP], axis=1)
     # print(cat_scores.shape)
@@ -112,9 +132,9 @@ class AdaptiveActorCritic(torch.nn.Module):
     # print(cx)
 
     # TODO: turn to RNN
-    state = Variable(torch.FloatTensor(state))
+    # state = Variable(torch.FloatTensor(state))
 
-    return self.critic_linear(state), self.actor_linear(state)
+    return self.critic_linear(cat_output), self.actor_linear(cat_output)
 
 
 if __name__ == "__main__":

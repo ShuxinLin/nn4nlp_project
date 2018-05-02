@@ -60,160 +60,163 @@ def train_adaptive(rank,
   for batch in eval_data_X:
     instance_num += len(batch)
 
-  true_pos_count = 0
-  pred_pos_count = 0
-  true_pred_pos_count = 0
+  for epoch in range(1, args.n_epochs + 1):
+    print("Epoch: {}".format(epoch))
 
-  for batch_idx in range(batch_num):
-    sen = eval_data_X[batch_idx]
-    label = eval_data_Y[batch_idx]
+    true_pos_count = 0
+    pred_pos_count = 0
+    true_pred_pos_count = 0
 
-    current_batch_size = len(sen)
-    current_sen_len = len(sen[0])
+    for batch_idx in range(batch_num):
+      sen = eval_data_X[batch_idx]
+      label = eval_data_Y[batch_idx]
 
-
-
-    # DEBUG
-    # print(batch_idx, current_sen_len)
-    if current_sen_len < 3:  # ignore sentence having tiny length
-      continue
+      current_batch_size = len(sen)
+      current_sen_len = len(sen[0])
 
 
 
-    sen_var = Variable(torch.LongTensor(sen))
-    label_var = Variable(torch.LongTensor(label))
-
-    if machine.gpu:
-      sen_var = sen_var.cuda()
-      label_var = label_var.cuda()
-
-    # Initialize the hidden and cell states
-    # The axes semantics are
-    # (num_layers * num_directions, batch_size, hidden_size)
-    # So 1 for single-directional LSTM encoder,
-    # 2 for bi-directional LSTM encoder.
-    init_enc_hidden = Variable(
-      torch.zeros((2, current_batch_size, machine.hidden_dim)))
-    init_enc_cell = Variable(
-      torch.zeros((2, current_batch_size, machine.hidden_dim)))
-
-    if machine.gpu:
-      init_enc_hidden = init_enc_hidden.cuda()
-      init_enc_cell = init_enc_cell.cuda()
-
-    enc_hidden_seq, (enc_hidden_out, enc_cell_out) = machine.encode(sen_var,
-                                                                 init_enc_hidden,
-                                                                 init_enc_cell)
-
-    # The semantics of enc_hidden_out is (num_layers * num_directions,
-    # batch, hidden_size), and it is "tensor containing the hidden state
-    # for t = seq_len".
-    #
-    # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hidden_dim vector, to use as the input of the decoder
-    init_dec_hidden = machine.enc2dec_hidden(
-      torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
-    init_dec_cell = machine.enc2dec_cell(
-      torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
-
-    # ===================================
-    if decode_method == "adaptive":
-      # the input argument "beam_size" serves as initial_beam_size here
-      # TODO: implement this here
-      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, \
-      attention_pred_seq, episode, sen_beam_size_seq = \
-        decode_one_sentence_adaptive_rl(machine,
-        current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq,
-        beam_size, max_beam_size, model, shared_model, reward_coef_fscore,
-        reward_coef_beam_size, label_var, f_score_index_begin, counter, lock,
-        optimizer, args)
-
-    else:
-      raise Exception("Not implemented!")
-    # ===================================
+      # DEBUG
+      # print(batch_idx, current_sen_len)
+      if current_sen_len < 3:  # ignore sentence having tiny length
+        continue
 
 
-    # update beam seq
-    beam_size_seqs += sen_beam_size_seq
 
-    ### Debugging...
-    # print("input sentence =", sen)
-    # print("true label =", label)
-    # print("predicted label =", label_pred_seq)
-    # print("episode =", episode)
+      sen_var = Variable(torch.LongTensor(sen))
+      label_var = Variable(torch.LongTensor(label))
 
-    for label_index in range(f_score_index_begin, machine.label_size):
-      true_pos = (label_var == label_index)
-      true_pos_count += true_pos.float().sum()
-
-      pred_pos = (label_pred_seq == label_index)
-      pred_pos_count += pred_pos.float().sum()
-
-      true_pred_pos = true_pos & pred_pos
-      true_pred_pos_count += true_pred_pos.float().sum()
-
-    # Write result into file
-    if result_path:
       if machine.gpu:
-        label_pred_seq = label_pred_seq.cpu()
+        sen_var = sen_var.cuda()
+        label_var = label_var.cuda()
 
-      label_pred_seq = label_pred_seq.data.numpy().tolist()
+      # Initialize the hidden and cell states
+      # The axes semantics are
+      # (num_layers * num_directions, batch_size, hidden_size)
+      # So 1 for single-directional LSTM encoder,
+      # 2 for bi-directional LSTM encoder.
+      init_enc_hidden = Variable(
+        torch.zeros((2, current_batch_size, machine.hidden_dim)))
+      init_enc_cell = Variable(
+        torch.zeros((2, current_batch_size, machine.hidden_dim)))
 
-      # Here label_pred_seq.shape = (batch size, sen len)
+      if machine.gpu:
+        init_enc_hidden = init_enc_hidden.cuda()
+        init_enc_cell = init_enc_cell.cuda()
 
-      # sen, label, label_pred_seq are list of lists,
-      # thus I would like to flatten them for iterating easier
+      enc_hidden_seq, (enc_hidden_out, enc_cell_out) = machine.encode(sen_var,
+                                                                   init_enc_hidden,
+                                                                   init_enc_cell)
 
-      sen = list(itertools.chain.from_iterable(sen))
-      label = list(itertools.chain.from_iterable(label))
-      label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
-      assert len(sen) == len(label) and len(label) == len(label_pred_seq)
-      for i in range(len(sen)):
-        f_sen.write(str(sen[i]) + '\n')
-        f_label.write(str(label[i]) + '\n')
-        f_pred.write(str(label_pred_seq[i]) + '\n')
+      # The semantics of enc_hidden_out is (num_layers * num_directions,
+      # batch, hidden_size), and it is "tensor containing the hidden state
+      # for t = seq_len".
+      #
+      # Here we use a linear layer to transform the two-directions of the dec_hidden_out's into a single hidden_dim vector, to use as the input of the decoder
+      init_dec_hidden = machine.enc2dec_hidden(
+        torch.cat([enc_hidden_out[0], enc_hidden_out[1]], dim=1))
+      init_dec_cell = machine.enc2dec_cell(
+        torch.cat([enc_cell_out[0], enc_cell_out[1]], dim=1))
 
-        # clean version (does not print <PAD>, print a newline instead of <EOS>)
-        # if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
-        # if sen[i] != 0: # not <PAD>
-
-        result_sen = index2word[sen[i]]
-        result_label = index2label[label[i]]
-        result_pred = index2label[label_pred_seq[i]]
-        f_result_processed.write(
-          "%s %s %s\n" % (result_sen, result_label, result_pred))
-
+      # ===================================
       if decode_method == "adaptive":
-        beam_size_seq_str = ' '.join(map(str, sen_beam_size_seq))
-        f_beam_size.write(beam_size_seq_str + '\n')
+        # the input argument "beam_size" serves as initial_beam_size here
+        # TODO: implement this here
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, \
+        attention_pred_seq, episode, sen_beam_size_seq = \
+          decode_one_sentence_adaptive_rl(machine,
+          current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq,
+          beam_size, max_beam_size, model, shared_model, reward_coef_fscore,
+          reward_coef_beam_size, label_var, f_score_index_begin, counter, lock,
+          optimizer, args)
 
-  # End for batch_idx
+      else:
+        raise Exception("Not implemented!")
+      # ===================================
 
-  if machine.gpu:
-    true_pos_count = true_pos_count.cpu()
-    pred_pos_count = pred_pos_count.cpu()
-    true_pred_pos_count = true_pred_pos_count.cpu()
 
-  true_pos_count = true_pos_count.data.numpy()[0]
-  pred_pos_count = pred_pos_count.data.numpy()[0]
-  true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
+      # update beam seq
+      beam_size_seqs += sen_beam_size_seq
 
-  precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
+      ### Debugging...
+      # print("input sentence =", sen)
+      # print("true label =", label)
+      # print("predicted label =", label_pred_seq)
+      # print("episode =", episode)
 
-  recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
-  fscore = 2 / (1 / precision + 1 / recall) if (
-    precision > 0 and recall > 0) else 0
-  fscore = fscore * 100
+      for label_index in range(f_score_index_begin, machine.label_size):
+        true_pos = (label_var == label_index)
+        true_pos_count += true_pos.float().sum()
 
-  if result_path:
-    f_sen.close()
-    f_pred.close()
-    f_label.close()
-    f_result_processed.close()
-    f_beam_size.close()
+        pred_pos = (label_pred_seq == label_index)
+        pred_pos_count += pred_pos.float().sum()
 
-  avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
-  print("Avg beam size: {}".format(avg_beam_sizes))
-  print("Avg Fscore = {}".format(fscore))
+        true_pred_pos = true_pos & pred_pos
+        true_pred_pos_count += true_pred_pos.float().sum()
+
+      # Write result into file
+      if result_path:
+        if machine.gpu:
+          label_pred_seq = label_pred_seq.cpu()
+
+        label_pred_seq = label_pred_seq.data.numpy().tolist()
+
+        # Here label_pred_seq.shape = (batch size, sen len)
+
+        # sen, label, label_pred_seq are list of lists,
+        # thus I would like to flatten them for iterating easier
+
+        sen = list(itertools.chain.from_iterable(sen))
+        label = list(itertools.chain.from_iterable(label))
+        label_pred_seq = list(itertools.chain.from_iterable(label_pred_seq))
+        assert len(sen) == len(label) and len(label) == len(label_pred_seq)
+        for i in range(len(sen)):
+          f_sen.write(str(sen[i]) + '\n')
+          f_label.write(str(label[i]) + '\n')
+          f_pred.write(str(label_pred_seq[i]) + '\n')
+
+          # clean version (does not print <PAD>, print a newline instead of <EOS>)
+          # if sen[i] != 0 and sen[i] != 2: # not <PAD> and not <EOS>
+          # if sen[i] != 0: # not <PAD>
+
+          result_sen = index2word[sen[i]]
+          result_label = index2label[label[i]]
+          result_pred = index2label[label_pred_seq[i]]
+          f_result_processed.write(
+            "%s %s %s\n" % (result_sen, result_label, result_pred))
+
+        if decode_method == "adaptive":
+          beam_size_seq_str = ' '.join(map(str, sen_beam_size_seq))
+          f_beam_size.write(beam_size_seq_str + '\n')
+
+    # End for batch_idx
+
+    if machine.gpu:
+      true_pos_count = true_pos_count.cpu()
+      pred_pos_count = pred_pos_count.cpu()
+      true_pred_pos_count = true_pred_pos_count.cpu()
+
+    true_pos_count = true_pos_count.data.numpy()[0]
+    pred_pos_count = pred_pos_count.data.numpy()[0]
+    true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
+
+    precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
+
+    recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
+    fscore = 2 / (1 / precision + 1 / recall) if (
+      precision > 0 and recall > 0) else 0
+    fscore = fscore * 100
+
+    if result_path:
+      f_sen.close()
+      f_pred.close()
+      f_label.close()
+      f_result_processed.close()
+      f_beam_size.close()
+
+    avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
+    print("Epoch {}: Avg beam size: {}".format(epoch, avg_beam_sizes))
+    print("Epoch {}: Avg Fscore = {}".format(epoch, fscore))
 
 
 def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
