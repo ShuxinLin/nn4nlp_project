@@ -403,8 +403,8 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
 
     # policy network showtime
     value, logit = model(state)
-    prob = F.softmax(logit)
-    log_prob = F.log_softmax(logit)
+    prob = F.softmax(logit, dim=-1)
+    log_prob = F.log_softmax(logit, dim=-1)
 
 
     # TODO: for naive MLP policy network only

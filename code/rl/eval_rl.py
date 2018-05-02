@@ -295,6 +295,33 @@ def main():
   for p in processes:
       p.join()
 
+
+  # =====================================
+  print("TESTING w SHARED MODEL")
+  processes = []
+  counter = mp.Value('i', 0)
+
+  # eval along with many processes of training RL
+  p = mp.Process(target=test_adaptive,
+                 args=(args.num_processes,
+                       machine,
+                       max_beam_size,
+                       learning_rate,
+                       shared_model,
+                       counter,
+                       test_X, test_Y, index2word, index2label, "test",
+                       "./result", "adaptive", initial_beam_size,
+                       reward_coef_beam_size, f_score_index_begin,
+                       f_score_index_begin,
+                       args))
+  p.start()
+  processes.append(p)
+
+  for p in processes:
+      p.join()
+
+
+
   # # =============================================
   #
   # agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)

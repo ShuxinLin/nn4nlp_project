@@ -114,6 +114,10 @@ def test_adaptive(rank,
   true_pred_pos_count = 0
 
   for batch_idx in range(batch_num):
+    if (batch_idx+1) % 100 == 0:
+      print("Batch {}/{}".format(batch_idx+1, len(batch_num)))
+
+
     sen = eval_data_X[batch_idx]
     label = eval_data_Y[batch_idx]
 
@@ -451,8 +455,8 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
 
     # policy network showtime
     value, logit = model(state)
-    prob = F.softmax(logit)
-    log_prob = F.log_softmax(logit)
+    prob = F.softmax(logit, dim=-1)
+    log_prob = F.log_softmax(logit, -1)
 
 
 
