@@ -191,7 +191,7 @@ def main():
   if gpu:
     machine = machine.cuda()
 
-  initial_beam_size = 3
+  initial_beam_size = 10
   # When you have only one beam, it does not make sense to consider
   # max_beam_size larger than the size of your label vocabulary
   max_beam_size = label_size
