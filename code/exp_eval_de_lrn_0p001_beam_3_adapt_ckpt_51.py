@@ -160,6 +160,7 @@ def main():
 
 
   epoch = 51
+  # load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
   load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
   batch_size = 1

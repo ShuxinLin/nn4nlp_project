@@ -35,7 +35,7 @@ def get_index2label(entity_file):
   return index2label
 
 def construct_df(data):
-  dataset_path = '../dataset/German/'
+  dataset_path = '../../dataset/German/'
 
   indexed_sentence_file = dataset_path + data + '.de-en.ids1.de'
   indexed_entity_file = dataset_path + data + '.de-en.ids1.en'
@@ -92,16 +92,16 @@ def main():
     torch.manual_seed(rnd_seed)
     np.random.seed(rnd_seed)
 
-  data_path = "../dataset/German/"
+  data_path = "../../dataset/German/"
 
-  result_path = "../result/"
+  result_path = "./result/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
 
   batch_size = 32
 
-  dict_file = "../dataset/German/vocab1.de"
-  entity_file = "../dataset/German/vocab1.en"
+  dict_file = "../../dataset/German/vocab1.de"
+  entity_file = "../../dataset/German/vocab1.en"
   index2word = get_index2word(dict_file)
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
@@ -142,7 +142,7 @@ def main():
   shuffle = True
 
   # Pure training, no evaluation shuffle, result_path, do_evaluation, beam_size
-  train_loss_list = machine.train(shuffle, result_path, True, None)
+  train_loss_list = machine.train(shuffle, result_path, False, None)
 
 
 if __name__ == "__main__":
