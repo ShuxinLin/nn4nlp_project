@@ -22,6 +22,7 @@ import torch.multiprocessing as mp
 from my_optim import SharedAdam
 
 from train import train_adaptive
+from test import test_adaptive
 
 
 def get_index2word(dict_file):
@@ -217,7 +218,7 @@ def main():
                       help='value loss coefficient (default: 50)')
   parser.add_argument('--seed', type=int, default=1,
                       help='random seed (default: 1)')
-  parser.add_argument('--num-processes', type=int, default=1,
+  parser.add_argument('--num-processes', type=int, default=4,
                       help='how many training processes to use (default: 4)')
   parser.add_argument('--num-steps', type=int, default=20,
                       help='number of forward steps in A3C (default: 20)')
@@ -256,10 +257,21 @@ def main():
   counter = mp.Value('i', 0)
   lock = mp.Lock()
 
-  # p = mp.Process(target=test,
-  #                args=(args.num_processes, args, shared_model, counter))
-  # p.start()
-  # processes.append(p)
+  p = mp.Process(target=test_adaptive,
+                 args=(args.num_processes,
+                       machine,
+                       max_beam_size,
+                       learning_rate,
+                       shared_model,
+                       counter,
+                       test_X, test_Y, index2word, index2label, "test",
+                       None, "adaptive", initial_beam_size,
+                       reward_coef_beam_size, f_score_index_begin,
+                       f_score_index_begin,
+                       args))
+
+  p.start()
+  processes.append(p)
 
   for rank in range(0, args.num_processes):
       p = mp.Process(target=train_adaptive,
