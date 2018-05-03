@@ -1,10 +1,10 @@
 import itertools
-
+import os
 import torch
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from model import AdaptiveActorCritic
+from torch.autograd import Variable
 
 
 def test_adaptive(rank,
@@ -33,15 +33,22 @@ def test_adaptive(rank,
     instance_num += len(batch)
 
   for epoch in range(1, args.n_epochs + 1):
-    print("Epoch: {}".format(epoch))
+    print("Epoch: {} of {} (rank{})".format(epoch, args.name, rank))
 
+    desc = result_path + '_process_' + args.name + '_' + str(epoch) + '_'
     if result_path:
-      f_sen = open(result_path + "sen_" + suffix + ".txt", 'w')
-      f_pred = open(result_path + "pred_" + suffix + ".txt", 'w')
-      f_label = open(result_path + "label_" + suffix + ".txt", 'w')
-      f_result_processed = open(
-        result_path + "result_processed_" + suffix + ".txt", 'w')
-      f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
+      f_sen = open(os.path.join(args.logdir,
+                                desc + "sen_" + suffix + ".txt", 'w'))
+      f_pred = open(os.path.join(args.logdir,
+                                 desc + "pred_" + suffix + ".txt", 'w'))
+      f_label = open(os.path.join(args.logdir,
+                                  desc + "label_" + suffix + ".txt", 'w'))
+      f_result_processed = \
+        open(os.path.join(args.logdir,
+                          desc + "result_processed_" + suffix + ".txt", 'w'))
+      f_beam_size = \
+        open(os.path.join(args.logdir,
+                          desc + 'beam_size_' + suffix + ".txt", 'w'))
 
     # for calculating F-SCORE
     true_pos_count = 0
@@ -200,8 +207,9 @@ def test_adaptive(rank,
 
 
     avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
-    print("Epoch {}: Avg TEST beam size: {}".format(epoch, avg_beam_sizes))
-    print("Epoch {}: Avg TEST Fscore = {}".format(epoch, fscore))
+    print("Epoch {}: Avg {} beam size: {}".format(epoch,
+                                                  args.name, avg_beam_sizes))
+    print("Epoch {}: Avg {} Fscore = {}".format(epoch, args.name, fscore))
 
 
 def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,

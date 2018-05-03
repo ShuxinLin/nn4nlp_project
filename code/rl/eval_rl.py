@@ -2,24 +2,21 @@
 
 import argparse
 import os
+from operator import itemgetter
 
 import matplotlib
 import numpy as np
+import pandas as pd
 import torch
+import torch.multiprocessing as mp
+
+from model import AdaptiveActorCritic
+from ner import ner
+from optim import SharedAdam
+from test import test_adaptive
+from train import train_adaptive
 
 matplotlib.use("Agg")
-
-import pandas as pd
-from operator import itemgetter
-
-from ner import ner
-from model import AdaptiveActorCritic
-
-import torch.multiprocessing as mp
-from my_optim import SharedAdam
-
-from train import train_adaptive
-from test import test_adaptive
 
 
 def get_index2word(dict_file):
@@ -125,6 +122,10 @@ def main():
     torch.manual_seed(rnd_seed)
     np.random.seed(rnd_seed)
 
+
+  # ---------------------------------------
+  #           DATA LOADING
+  # ---------------------------------------
   result_path = "./result/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
@@ -140,28 +141,34 @@ def main():
   val_X, val_Y = minibatch_of_one_de('valid')
   test_X, test_Y = minibatch_of_one_de('test')
 
+  # ---------------------------------------
+  #           HYPER PARAMETERS
+  # ---------------------------------------
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
   hidden_dim = 64
   label_embedding_dim = 8
-
   max_epoch = 100
-
   # 0.001 is a good value
   learning_rate = 0.001
 
   # attention = "fixed"
   attention = None
-
   pretrained = 'de64'
 
   if pretrained == 'de64':
     word_embedding_dim = 64
 
+  # ---------------------------------------
+  #           GPU OR NOT?
+  # ---------------------------------------
   gpu = False
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
 
+  # ---------------------------------------
+  #        MODEL INSTANTIATION
+  # ---------------------------------------
   ##################
   epoch = 2
   load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
@@ -209,11 +216,16 @@ def main():
                       help='number of forward steps in A3C (default: 20)')
   parser.add_argument('--max-episode-length', type=int, default=1000000,
                       help='maximum length of an episode (default: 1000000)')
-  parser.add_argument('--env-name', default='PongDeterministic-v4',
-                      help='environment to train on')
+  parser.add_argument('--name', default='train',
+                      help='name of the process')
+  parser.add_argument('--logdir', default='log',
+                      help='name of logging directory')
   parser.add_argument('--no-shared', default=False,
                       help='use an optimizer without shared momentum.')
   args = parser.parse_args()
+
+  if not os.path.exists(args.logdir):
+    os.mkdir(args.logdir)
 
   shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size,
                                      action_space=3)
@@ -233,35 +245,35 @@ def main():
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
   f_score_index_begin = 5
-
   # RL reward coefficient
   reward_coef_fscore = 1
   reward_coef_beam_size = 0.1
 
   processes = []
-
   counter = mp.Value('i', 0)
   lock = mp.Lock()
 
   # eval along with many processes of training RL
+  args.name = "val"
   p_val = mp.Process(target=test_adaptive,
-                      args=(args.num_processes,
-                            machine,
-                            max_beam_size,
-                            learning_rate,
-                            shared_model,
-                            counter,
-                            val_X, val_Y, index2word, index2label, "val",
-                            "", "adaptive", initial_beam_size,
-                            reward_coef_fscore, reward_coef_beam_size,
-                            f_score_index_begin,
-                            args))
+                     args=(args.num_processes,
+                           machine,
+                           max_beam_size,
+                           learning_rate,
+                           shared_model,
+                           counter,
+                           val_X, val_Y, index2word, index2label, "val",
+                           "", "adaptive", initial_beam_size,
+                           reward_coef_fscore, reward_coef_beam_size,
+                           f_score_index_begin,
+                           args))
 
   p_val.start()
   processes.append(p_val)
 
+  args.name = "test"
   p_test = mp.Process(target=test_adaptive,
-                      args=(args.num_processes+1,
+                      args=(args.num_processes + 1,
                             machine,
                             max_beam_size,
                             learning_rate,
@@ -276,6 +288,7 @@ def main():
   p_test.start()
   processes.append(p_test)
 
+  args.name = "train"
   for rank in range(0, args.num_processes):
     p = mp.Process(target=train_adaptive,
                    args=(rank,
@@ -304,16 +317,16 @@ def main():
 
   # test for only 1 epoch
   args.n_epoches = 1
-
+  args.name = "final_test"
   p = mp.Process(target=test_adaptive,
-                 args=(args.num_processes,
+                 args=(args.num_processes+2,
                        machine,
                        max_beam_size,
                        learning_rate,
                        shared_model,
                        counter,
                        test_X, test_Y, index2word, index2label, "test",
-                       "./result", "adaptive", initial_beam_size,
+                       args.name, "adaptive", initial_beam_size,
                        reward_coef_beam_size, f_score_index_begin,
                        f_score_index_begin,
                        args))

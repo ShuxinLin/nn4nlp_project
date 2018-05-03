@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from torch.autograd import Variable
+
 
 def normalized_columns_initializer(weights, std=1.0):
   out = torch.randn(weights.size())
