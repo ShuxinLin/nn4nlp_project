@@ -168,7 +168,6 @@ def main():
   # ---------------------------------------
   #        MODEL INSTANTIATION
   # ---------------------------------------
-
   attention = "fixed"
   attn_string = '_attention' if attention else ''
   load_model_filename = os.path.join(result_path, "ckpt" + attn_string + ".pth")

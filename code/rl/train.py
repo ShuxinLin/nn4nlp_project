@@ -52,17 +52,17 @@ def train_adaptive(rank,
     desc = result_path + '_process_' + str(rank) + '_' + str(epoch) + '_'
     if result_path:
       f_sen = open(os.path.join(args.logdir,
-                                desc + "sen_" + suffix + ".txt", 'w'))
+                                desc + "sen_" + suffix + ".txt"), 'w')
       f_pred = open(os.path.join(args.logdir,
-                                 desc + "pred_" + suffix + ".txt", 'w'))
+                                 desc + "pred_" + suffix + ".txt"), 'w')
       f_label = open(os.path.join(args.logdir,
-                                  desc + "label_" + suffix + ".txt", 'w'))
+                                  desc + "label_" + suffix + ".txt"), 'w')
       f_result_processed = \
         open(os.path.join(args.logdir,
-                          desc + "result_processed_" + suffix + ".txt", 'w'))
+                          desc + "result_processed_" + suffix + ".txt"), 'w')
       f_beam_size = \
         open(os.path.join(args.logdir,
-                          desc + 'beam_size_' + suffix + ".txt", 'w'))
+                          desc + 'beam_size_' + suffix + ".txt"), 'w')
 
     true_pos_count = 0
     pred_pos_count = 0
