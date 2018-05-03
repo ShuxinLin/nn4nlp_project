@@ -5,8 +5,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
-from envs import create_atari_env
-from model import ActorCritic
 from model import AdaptiveActorCritic
 
 

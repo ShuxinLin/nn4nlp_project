@@ -1,13 +1,9 @@
 import itertools
-import time
-from collections import deque
 
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from envs import create_atari_env
-from model import ActorCritic
 from model import AdaptiveActorCritic
 
 

@@ -11,10 +11,8 @@ import torch.nn as nn
 import torch.optim as optim
 
 from torch.autograd import Variable
-import torch.nn.functional as F
 
 from attention import Attention
-from model import AdaptiveActorCritic
 
 
 class ner(nn.Module):

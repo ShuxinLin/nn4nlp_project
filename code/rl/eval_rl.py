@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import time
 
 import matplotlib
 import numpy as np
@@ -12,10 +11,8 @@ matplotlib.use("Agg")
 
 import pandas as pd
 from operator import itemgetter
-import torch.optim as optim
 
 from ner import ner
-from det_agent import det_agent
 from model import AdaptiveActorCritic
 
 import torch.multiprocessing as mp
@@ -104,8 +101,6 @@ def minibatch_de(data, batch_size):
 
 def minibatch_of_one_de(data):
   print("Generate mini batches, each with only 1 instance.")
-  X_batch = []
-  Y_batch = []
   all_data = []
   indexed_data = construct_df(data)
   for index, row in indexed_data.iterrows():
@@ -130,8 +125,6 @@ def main():
     torch.manual_seed(rnd_seed)
     np.random.seed(rnd_seed)
 
-  data_path = "../../dataset/German/"
-
   result_path = "./result/"
   if not os.path.exists(result_path):
     os.makedirs(result_path)
@@ -143,14 +136,12 @@ def main():
   vocab_size = len(index2word)
   label_size = len(index2label)
 
+  train_X, train_Y = minibatch_of_one_de('train')
   val_X, val_Y = minibatch_of_one_de('valid')
   test_X, test_Y = minibatch_of_one_de('test')
 
-  # import pdb; pdb.set_trace()
-
   # Using word2vec pre-trained embedding
   word_embedding_dim = 300
-
   hidden_dim = 64
   label_embedding_dim = 8
 
@@ -172,15 +163,10 @@ def main():
     torch.cuda.manual_seed(rnd_seed)
 
   ##################
-
-  eval_output_file = open(os.path.join(result_path, "eval_pre_rl.txt"), "w+")
-
   epoch = 2
-  # load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
   load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
   batch_size = 1
-
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size,
                 label_size, learning_rate=learning_rate,
                 minibatch_size=batch_size, max_epoch=max_epoch, train_X=None,
@@ -195,9 +181,6 @@ def main():
   # When you have only one beam, it does not make sense to consider
   # max_beam_size larger than the size of your label vocabulary
   max_beam_size = label_size
-
-  accum_logP_ratio_low = 0.1
-  logP_ratio_low = 0.1
 
   # ============   INIT RL =====================
   os.environ['OMP_NUM_THREADS'] = '1'
@@ -218,8 +201,8 @@ def main():
                       help='value loss coefficient (default: 5)')
   parser.add_argument('--seed', type=int, default=1,
                       help='random seed (default: 1)')
-  parser.add_argument('--n_epochs', type=int, default=50,
-                      help='number of epochs for training agent(default: 50)')
+  parser.add_argument('--n_epochs', type=int, default=30,
+                      help='number of epochs for training agent(default: 30)')
   parser.add_argument('--num-processes', type=int, default=4,
                       help='how many training processes to use (default: 4)')
   parser.add_argument('--num-steps', type=int, default=20,
@@ -227,12 +210,13 @@ def main():
   parser.add_argument('--max-episode-length', type=int, default=1000000,
                       help='maximum length of an episode (default: 1000000)')
   parser.add_argument('--env-name', default='PongDeterministic-v4',
-                      help='environment to train on (default: PongDeterministic-v4)')
+                      help='environment to train on')
   parser.add_argument('--no-shared', default=False,
                       help='use an optimizer without shared momentum.')
   args = parser.parse_args()
 
-  shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
+  shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size,
+                                     action_space=3)
   shared_model.share_memory()
 
   if args.no_shared:
@@ -252,7 +236,7 @@ def main():
 
   # RL reward coefficient
   reward_coef_fscore = 1
-  reward_coef_beam_size = 1
+  reward_coef_beam_size = 0.1
 
   processes = []
 
@@ -260,50 +244,67 @@ def main():
   lock = mp.Lock()
 
   # eval along with many processes of training RL
-  p = mp.Process(target=test_adaptive,
-                 args=(args.num_processes,
-                       machine,
-                       max_beam_size,
-                       learning_rate,
-                       shared_model,
-                       counter,
-                       test_X, test_Y, index2word, index2label, "test",
-                       "./result", "adaptive", initial_beam_size,
-                       reward_coef_beam_size, f_score_index_begin,
-                       f_score_index_begin,
-                       args))
+  p_val = mp.Process(target=test_adaptive,
+                      args=(args.num_processes,
+                            machine,
+                            max_beam_size,
+                            learning_rate,
+                            shared_model,
+                            counter,
+                            val_X, val_Y, index2word, index2label, "val",
+                            "", "adaptive", initial_beam_size,
+                            reward_coef_fscore, reward_coef_beam_size,
+                            f_score_index_begin,
+                            args))
 
-  p.start()
-  processes.append(p)
+  p_val.start()
+  processes.append(p_val)
+
+  p_test = mp.Process(target=test_adaptive,
+                      args=(args.num_processes,
+                            machine,
+                            max_beam_size,
+                            learning_rate,
+                            shared_model,
+                            counter,
+                            test_X, test_Y, index2word, index2label, "test",
+                            "", "adaptive", initial_beam_size,
+                            reward_coef_fscore, reward_coef_beam_size,
+                            f_score_index_begin,
+                            args))
+
+  p_test.start()
+  processes.append(p_test)
 
   for rank in range(0, args.num_processes):
-      p = mp.Process(target=train_adaptive,
-                     args=(rank,
-                           machine,
-                           max_beam_size,
-                           learning_rate,
-                           shared_model,
-                           counter,
-                           lock,
-                           optimizer,
-                           val_X, val_Y, index2word, index2label, "val",
-                           "./result", "adaptive", initial_beam_size,
-                           reward_coef_beam_size, f_score_index_begin,
-                           f_score_index_begin,
-                           args))
-      p.start()
-      processes.append(p)
+    p = mp.Process(target=train_adaptive,
+                   args=(rank,
+                         machine,
+                         max_beam_size,
+                         learning_rate,
+                         shared_model,
+                         counter,
+                         lock,
+                         optimizer,
+                         train_X, train_Y, index2word, index2label, "train",
+                         "", "adaptive", initial_beam_size,
+                         reward_coef_fscore, reward_coef_beam_size,
+                         f_score_index_begin,
+                         args))
+    p.start()
+    processes.append(p)
 
   for p in processes:
-      p.join()
-
+    p.join()
 
   # =====================================
   print("TESTING w SHARED MODEL")
   processes = []
   counter = mp.Value('i', 0)
 
-  # eval along with many processes of training RL
+  # test for only 1 epoch
+  args.n_epoches = 1
+
   p = mp.Process(target=test_adaptive,
                  args=(args.num_processes,
                        machine,
@@ -320,43 +321,7 @@ def main():
   processes.append(p)
 
   for p in processes:
-      p.join()
-
-
-
-  # # =============================================
-  #
-  # agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
-  #
-  #
-  #
-  # # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-  # val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val",
-  #                               None, "adaptive", initial_beam_size,
-  #                               max_beam_size, agent, reward_coef_fscore,
-  #                               reward_coef_beam_size, f_score_index_begin)
-  #
-  # time_begin = time.time()
-  # test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label,
-  #                                "test", None, "adaptive", initial_beam_size,
-  #                                max_beam_size, agent, reward_coef_fscore,
-  #                                reward_coef_beam_size, f_score_index_begin)
-  # time_end = time.time()
-  #
-  # print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (
-  # epoch, val_fscore, test_fscore, time_end - time_begin)
-  # log_msg = "%d\t%f\t%f\t%f" % (
-  # epoch, val_fscore, test_fscore, time_end - time_begin)
-  # print(print_msg)
-  # print(log_msg, file=eval_output_file, flush=True)
-  #
-  # eval_output_file.close()
-
-
-  # Write out files
-  # train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  # val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
-  # test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
+    p.join()
 
 
 if __name__ == "__main__":
