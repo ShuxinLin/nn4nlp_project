@@ -1,0 +1,106 @@
+ %
+% File acl2018.tex
+%
+%% Based on the style files for ACL-2017, with some changes, which were, in turn,
+%% Based on the style files for ACL-2015, with some improvements
+%%  taken from the NAACL-2016 style
+%% Based on the style files for ACL-2014, which were, in turn,
+%% based on ACL-2013, ACL-2012, ACL-2011, ACL-2010, ACL-IJCNLP-2009,
+%% EACL-2009, IJCNLP-2008...
+%% Based on the style files for EACL 2006 by 
+%%e.agirre@ehu.es or Sergi.Balari@uab.es
+%% and that of ACL 08 by Joakim Nivre and Noah Smith
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[hyperref]{acl2018}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{amsmath}	% for \begin{align}
+\usepackage{graphicx}	% for \includegraphics{filename}
+\usepackage{subcaption}	% for \begin{subfigure}[t]{0.5\textwidth}
+\usepackage{courier}	% for \texttt{}
+
+\usepackage{amsmath,amssymb} % prevent misalignment tab character?
+
+\aclfinalcopy % Uncomment this line for the final submission
+%\def\aclpaperid{***} %  Enter the acl Paper ID here
+
+%\setlength\titlebox{5cm}
+% You can expand the titlebox if you need extra space
+% to show all the authors. Please do not make the titlebox
+% smaller than 5cm (the original size); we will check this
+% in the camera-ready version and ask you to change it back.
+
+\newcommand\BibTeX{B{\sc ib}\TeX}
+
+\title{Improving Sequence-to-Sequence with Adaptive Beam Search \newline \newline	
+		Assignment 2}
+
+\author{Yu-Hsiang Lin \quad Shuxin Lin \quad Hai Pham \\
+  Language Technologies Institute \\
+  Carnegie Mellon University \\
+%   Affiliation / Address line 3 \\
+{\tt\small $\left\{yuhsianl, shuxinl, htpham\right\}$@andrew.cmu.edu}
+%   {\tt email@domain} 
+%   \\\And
+%   Second Author \\
+%   Affiliation / Address line 1 \\
+%   Affiliation / Address line 2 \\
+%   Affiliation / Address line 3 \\
+%   {\tt email@domain} \\
+  }
+
+\date{}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+We plan to apply new techniques such as combining dynamical beam size with trainable beam search to boost up the training and test-time decoding of the sequence-to-sequence model. We review the related approaches, and report our work in replicating state-of-the-art results.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         INTRODUCTION              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction} \label{sec:introduction}
+Since its invention, sequence-to-sequence (Seq2Seq) model \cite{seq2seq_2014} has been a go-to model for many translation-related tasks,  % probably more examples needed 
+especially since the advent of attention model \cite{bahdanau2014neural,luong2015effective}. Despite its great successes in many domains, how to train and decode seq2seq model is still an open problem because of the drawback of traditional maximum likelihood training which is, most of the cases, unable to find the maximum-a-posteriori of a to-be-decoded single sentence over the whole corpus. 
+
+Amongst many heuristic approaches to remediate that problem, \textit{greedy search} and \textit{beam search} are probably the most popular. While greedy search is known for its lightweight, elegant characteristics, beam search is generally better in practice by considering not only the best-scored word at each time step but maintaining a window of best words. 
+In this project, we will be addressing the disadvantages of previous approaches for seq2seq using beam search and proposing an improvement for it in training and decoding phases. We also present our results on the Name Entity Recognition task.
+
+
+
+
+
+\begin{table*}[ht]
+\centering
+\caption{Comparison of the F-score between our experiment and \cite{goyal2017continuous} at the NER task. Fixed attention is used, and beam size is 3.}
+\label{tab:comp}
+\begin{tabular}{lccccccc}
+\toprule
+& Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 \\
+& & & Adaptive & & Adaptive & & Adaptive \\
+\midrule
+F-score & & & 57.71 & & & & \\
+Total beam \# & & & 92,727 & & & & \\
+Avg.~beam \# & & & 1.95 & & & & \\
+Time & & & 178 & & & & \\
+Goyal F-score & & & & & & & \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+
+
+
+
+
+
+% include your own bib file like this:
+%\bibliographystyle{acl}
+%\bibliography{acl2018}
+\bibliography{acl2018}
+\bibliographystyle{acl_natbib}
+
+\end{document}
