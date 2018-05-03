@@ -848,7 +848,6 @@ class ner(nn.Module):
     true_pred_pos_count = 0
 
     for batch_idx in range(batch_num):
-      print(batch_idx)
       sen = eval_data_X[batch_idx]
       label = eval_data_Y[batch_idx]
       current_batch_size = len(sen)
@@ -885,12 +884,15 @@ class ner(nn.Module):
 
       if decode_method == "greedy":
         label_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        beam_size_seqs.append([1] * (len(label_pred_seq[0]) - 1))
       elif decode_method == "beam":
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        beam_size_seqs.append([beam_size] * (len(label_pred_seq[0]) - 1))
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
+        beam_size_seqs.append(beam_size_seq)
 
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
         ### Debugging...
         #print("input sentence =", sen)
         #print("true label =", label)
@@ -965,11 +967,12 @@ class ner(nn.Module):
       f_result_processed.close()
       f_beam_size.close()
 
-    if decode_method == "adaptive":
-      avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for beam_size_seq in beam_size_seqs]
-      return fscore, sum(avg_beam_sizes) / len(avg_beam_sizes)
+    total_beam_number_in_dataset = sum([sum(beam_size_seq) for beam_size_seq in beam_size_seqs])
+    avg_beam_sizes = [(sum(beam_size_seq) / len(beam_size_seq) if len(beam_size_seq) else 0) for beam_size_seq in beam_size_seqs]
+    avg_beam_sizes = list(filter(lambda xx: xx > 0, avg_beam_sizes))
+    avg_beam_size = sum(avg_beam_sizes) / len(avg_beam_sizes)
 
-    return fscore
+    return fscore, total_beam_number_in_dataset, avg_beam_size
 
 
   # decode_beam_step - this function basically servers as the "env.step()" function in RL: (citing below)
@@ -1260,7 +1263,10 @@ class ner(nn.Module):
         beam_size -= 1
       elif action == agent.INCREASE and beam_size < max_beam_size:
         beam_size += 1
-      beam_size_seq.append(beam_size)
+
+      # Fix in the future: We actually don't utilize the beam generated in the last time step---we only use top-1 to do backtracking. So here we don't include the beam size at the last step.
+      if t <= seq_len - 2:
+        beam_size_seq.append(beam_size)
 
       accum_logP_beam, index_beam = \
         torch.topk(accum_logP_matrix, beam_size, dim=1)
@@ -1289,7 +1295,7 @@ class ner(nn.Module):
       fscore = cur_fscore
     # End for t
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq
 
 
   # make_state - generate the state for the RL agent
@@ -1359,7 +1365,7 @@ class ner(nn.Module):
     logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
     accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
   # Observe the beam size to determine the reward, because it is possible that the agent wants to decrease the beam size, but the beam size is already minimum, so the environment does not allow the beam size to decrease.

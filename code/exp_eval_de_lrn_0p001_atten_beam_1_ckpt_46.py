@@ -117,6 +117,8 @@ def main():
   data_path = "../dataset/German/"
 
   result_path = "../result_lrn_0p001_atten/"
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
 
   dict_file = "../dataset/German/vocab1.de"
   entity_file = "../dataset/German/vocab1.en"
@@ -154,10 +156,10 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_3_adapt_ckpt_16.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_beam_1_ckpt_46.txt"), "w+")
 
 
-  epoch = 16
+  epoch = 46
   load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
 
   batch_size = 1
@@ -166,26 +168,27 @@ def main():
   if gpu:
     machine = machine.cuda()
 
-  decode_method = "adaptive"
-
-  beam_size = 3
+  beam_size = 1
   # When you have only one beam, it does not make sense to consider max_beam_size larger than the size of your label vocabulary
-  max_beam_size = label_size
+  max_beam_size = None
 
-  accum_logP_ratio_low = 0.1
-  logP_ratio_low = 0.1
+  #accum_logP_ratio_low = 0.1
+  #logP_ratio_low = 0.1
 
-  agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
+  agent = None
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
   f_score_index_begin = 5
 
+  reward_coef_fscore = 1
+  reward_coef_beam_size = 0.1
+
   # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
+  val_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, "beam", beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
 
   time_begin = time.time()
-  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, f_score_index_begin)
+  test_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, "beam", beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
   time_end = time.time()
 
   print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
