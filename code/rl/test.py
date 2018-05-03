@@ -212,9 +212,14 @@ def test_adaptive(rank,
 
 
     avg_beam_sizes = sum(beam_size_seqs) / float(len(beam_size_seqs))
-    print("Epoch {}: Avg {} beam size: {}".format(epoch,
-                                                  args.name, avg_beam_sizes))
-    print("Epoch {}: Avg {} Fscore = {}".format(epoch, args.name, fscore))
+    print("Epoch {}: Avg {} beam size: {} (rank{})".format(epoch,
+                                                           args.name,
+                                                           avg_beam_sizes,
+                                                           rank ))
+    print("Epoch {}: Avg {} Fscore = {} (rank{})".format(epoch,
+                                                         args.name,
+                                                         fscore,
+                                                         rank))
 
 
 def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
