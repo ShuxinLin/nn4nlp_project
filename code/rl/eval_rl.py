@@ -152,8 +152,7 @@ def main():
   # 0.001 is a good value
   learning_rate = 0.001
 
-  # attention = "fixed"
-  attention = None
+
   pretrained = 'de64'
 
   if pretrained == 'de64':
@@ -169,9 +168,10 @@ def main():
   # ---------------------------------------
   #        MODEL INSTANTIATION
   # ---------------------------------------
-  ##################
-  epoch = 2
-  load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
+
+  attention = "fixed"
+  attn_string = '_attention' if attention else ''
+  load_model_filename = os.path.join(result_path, "ckpt" + attn_string + ".pth")
 
   batch_size = 1
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size,
