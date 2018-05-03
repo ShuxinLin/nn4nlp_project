@@ -154,7 +154,7 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_3_adapt_ckpt_46.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_beam_6_adapt_ckpt_46.txt"), "w+")
 
 
   epoch = 46
@@ -168,7 +168,7 @@ def main():
 
   decode_method = "adaptive"
 
-  beam_size = 3
+  beam_size = 6
   # When you have only one beam, it does not make sense to consider max_beam_size larger than the size of your label vocabulary
   max_beam_size = label_size
 
@@ -185,10 +185,10 @@ def main():
   reward_coef_beam_size = 0.1
 
   # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-  val_fscore, val_beam_number, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False)
+  val_fscore, val_beam_number, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
 
   time_begin = time.time()
-  test_fscore, test_beam_number, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False)
+  test_fscore, test_beam_number, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
   time_end = time.time()
 
   print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)

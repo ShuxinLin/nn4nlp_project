@@ -823,7 +823,7 @@ class ner(nn.Module):
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin):
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=True):
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -890,7 +890,7 @@ class ner(nn.Module):
         beam_size_seqs.append([beam_size] * (len(label_pred_seq[0]) - 1))
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin, generate_episode=generate_episode)
         beam_size_seqs.append(beam_size_seq)
 
         ### Debugging...
@@ -1099,7 +1099,7 @@ class ner(nn.Module):
   ###############################
   #
   # This function is like generate_episode() for RL
-  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_true_seq, f_score_index_begin):
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_true_seq, f_score_index_begin, generate_episode=True):
     # Currently, batch size can only be 1
     batch_size = 1
 
@@ -1281,18 +1281,22 @@ class ner(nn.Module):
       logP_seq.append(logP_output_beam)
       accum_logP_seq.append(accum_logP_output_beam)
 
-      # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
-      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
-      cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
+      if generate_episode:
+        # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+        cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
 
-      # If t >= 2, compute the reward,
-      # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
-      if t >= 2:
-        reward = self.get_reward(cur_fscore, fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size)
-        experience_tuple = (prev_state, prev_action, reward, cur_state)
-        episode.append(experience_tuple)
+        # If t >= 2, compute the reward,
+        # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
+        if t >= 2:
+          reward = self.get_reward(cur_fscore, fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size)
+          experience_tuple = (prev_state, prev_action, reward, cur_state)
+          episode.append(experience_tuple)
 
-      fscore = cur_fscore
+        fscore = cur_fscore
+      else:
+        if t == seq_len - 1:
+          label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
     # End for t
 
     return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq
