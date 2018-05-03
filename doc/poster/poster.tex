@@ -8,6 +8,9 @@
 \usepackage[utf8]{inputenc} %unicode support
 \usepackage[T1]{fontenc}
 
+% \usepackage[showframe=true]{geometry}
+\usepackage{enumitem}  % for zero indentation of itemizes 
+\usepackage{xcolor}  % for equation 
 
 \selectcolormodel{cmyk}
 
@@ -73,54 +76,91 @@ Yu-Hsiang Lin, Shuxin Lin, Hai Pham
 \vspace{0.2em}\\
 $\{$yuhsianl, shuxinl, htpham$\}$@andrew.cmu.edu}
 }
-{\includegraphics[width=6.5cm]{LTI-logo.png}} % University/lab logo
+	{\includegraphics[width=6.5cm]{LTI-logo.png}} % University/lab logo
 
 
 \headerbox{1.~Introduction}{name=introduction,column=0,row=0, span=3}{
-In structured prediction tasks, the sequence-to-sequence models are typically trained by maximum likelihood estimation with the so-called ``teacher forcing'' technique, by which the true targets are used to guide the training process. To  Decoding in test time 
+Sequence-to-sequence (seq2seq) models are typically trained by the maximum likelihood estimation with the ``teacher forcing'' technique, and beam search is used to accelerate the test-time decoding. While beam search has an advantage over greedy search for accuracy, it is time consuming as the beam size increases. We aim to address this problem and propose two methods of adapting the beam size for decoding: (1) \textbf{deterministic (heuristic) agent} with a fixed threshold and (2) \textbf{dynamic asynchronous actor-critic agent}. 
 }
 
 
-\headerbox{2.~Seq2Seq model}{name=model,column=0,below=introduction,span=1}{
+\headerbox{2.~Seq2Seq with Fixed Attention}{name=model,column=0,below=introduction,span=1}{
 
-The encoder and decoder in Seq2seq model are both LSTM RNNs, except that the encoder is bi-directional. The encoder takes the word embeddings as input and outputs the last hidden state and cell state to the decoder as initial states. At every training step $t$ of decoding, the decoder is given input token $y_{t-1}$ and hidden states, and predicts the probability over the label space. We use the ``fixed'' attention, by which we attend at $h^{enc}_t$ when decoding for $h^{dec}_t$. In the test time $t$ of decoding, we use the label $\tilde{y}_{t-1}$ predicted at the previous time step instead.
+\begin{itemize}[leftmargin=*]
+\item Seq2seq model are both LSTM RNNs, except that the encoder is \textit{bi-directional}
+\item Input augmentation with GLoVe word embedding 
+\item We use the ``fixed'' attention, by which we attend at $h^{enc}_t$ when decoding for $h^{dec}_t$. 
+  \[
+      p_{y_{\textcolor{red}{t}}} = softmax(W_{s} \cdot attn(h^{dec}_{\textcolor{red}{t}}, h^{enc}) + b_{s}) \label{eq:pt_attn}
+  \]
+where attention is: 
+  \[
+      attn(h^{dec}_{\textcolor{red}{t}}, h^{enc}) = h^{enc}_{\textcolor{red}{t}}
+  \]
 
+\end{itemize}
+
+  
 \begin{center}
     \includegraphics[width=\linewidth]{fixed_attention.png}
-\end{center}
-%\vspace{-2pt}
-}
-
-
-\headerbox{3.~Search with Fixed Beam Size}{name=mcs,column=0,below=model,span=1}{
-In the test time, decoding the most likely output sequence involves searching through all the possible output sequences based on their likelihood. One popular heuristic is the beam search, which is an extension to the greedy search and returns a list of most likely output sequences by measuring accumulated log probability at each step. Larger beam size potentially results in better performance of a model as the multiple candidate sequences increase the likelihood of better matching a target sequence. However, this increased performance results in a decrease in decoding speed.
-\begin{center}
-    \includegraphics[width=\linewidth]{fix_beam.png}
+	\small{Fixed attention architecture}
 \end{center}
 
 }
 
-\headerbox{4.~Dynamical Beam Search:~Heuristic Pruning and Growing}{name=screen,span=2,column=1,below=introduction}{ % To reduce this block to 1 column width, remove 'span=2'
 
-Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing. Dynamical Beam Search:~Heuristic Pruning and Growing.
+\headerbox{3.~Search with Fixed Beam Size}{name=beam,column=0,below=model,span=1}{
+% In the test time, decoding the most likely output sequence involves searching through all the possible output sequences based on their likelihood. One popular heuristic is the beam search, which is an extension to the greedy search and returns a list of most likely output sequences by measuring accumulated log probability at each step. Larger beam size potentially results in better performance of a model as the multiple candidate sequences increase the likelihood of better matching a target sequence. However, this increased performance results in a decrease in decoding speed.
 
-%\vspace{-5pt}
+\begin{itemize}[leftmargin=*]
+	\item Beam search is the traditional way to handle search in decode time 
+    \item Trade processing time with the accuracy compared to greedy search; it always process $|B| * |V_{label}|$ tokens at each time step
+    \item Time and resource hungry if the label size is big 
+\end{itemize}
+
 %\begin{center}
-%    \includegraphics[width=0.85\linewidth]{adapt.png}
+%    \includegraphics[width=\linewidth]{hard_beam_2.png}
+%    \small{Hard Beam Search with Size=2}
 %\end{center}
+
+}
+
+\headerbox{4.~Heuristic Pruning and Growing for Dynamic Beam Search}{name=heuristic,span=2,column=1,below=introduction}{ % To reduce this block to 1 column width, remove 'span=2'
+
+\begin{itemize}[leftmargin=*]
+\item Current beam size $B$ at step $t$
+\item $B \rightarrow B-1$ $\;$ if $\;$ $\sum_t \log P(y^{B}_t) - \sum_t \log P(y^{0}_t) \leq \log r^{sen}_{low}$ $\;$ or $\;$ $\log P(y^{B}_t) - \log P(y^{0}_t) \leq \log r^{word}_{low}$
+\item $B \rightarrow B+1$ $\;$ if $\;$ $\sum_t \log P(y^{B+1}_t) - \sum_t \log P(y^{0}_t) > \log r^{sen}_{low}$ $\;$ or $\;$ $\log P(y^{B+1}_t) - \log P(y^{0}_t) > \log r^{word}_{low}$
+\end{itemize}
+
 }
 
 
-\headerbox{5.~Reinforcement Learning for Dynamic Beam Search}{name=sea,span=2,column=1,below=screen}{ % To reduce this block to 1 column width, remove 'span=2'
+\headerbox{5.~Reinforcement Learning for Dynamic Beam Search}{name=env,span=2,column=1,below=heuristic}{ % To reduce this block to 1 column width, remove 'span=2'
 
-After the encoder-decoder model is trained using supervised learning, we further learn the policy that dynamically adjusts the beam size using reinforcement learning. We use the actor-critic model and policy gradient to train the policy network. The actor network is pre-trained by imitation learning using the experience generated by the heuristic pruning and growing rules.
-
-In the seq2seq environment, an episode consists of a sequence. Our state consists of the top-$k$ log probabilities and accumulated log probabilities, as well as the current beam size. The action space of the agent is 3:~increasing or decreasing the beam size by 1 (limited by maximum and minimum beam sizes), or remain the same beam size. The learning goal of the policy is to decrease the beam size as much as possible, while increase the decoding F-score as much as possible. The reward is therefore a combination of two factors:~if the beam size is decreased (increased) or the partial F-score is increased (decreased) at this $(s_t, a_t, s_{t+1})$ transition, the agent obtains a positive (negative) reward.
-
+\begin{itemize}[leftmargin=*]
+\item Design the states, actions, and rewards for dynamic beam decoding
+\end{itemize}
 
 \begin{center}
-    \includegraphics[width=0.85\linewidth]{adapt2.png}
+    \includegraphics[width=0.7\linewidth]{adapt2.png}
 \end{center}
+
+}
+
+
+
+\headerbox{6.~Training Decoder with Asynchronous Actor-Critic}{name=a3c,span=2,column=1,below=env}{ % To reduce this block to 1 column width, remove 'span=2'
+
+% After the encoder-decoder model is trained using supervised learning, we further learn the policy that dynamically adjusts the beam size using reinforcement learning. We use the actor-critic model and policy gradient to train the policy network. The actor network is pre-trained by imitation learning using the experience generated by the heuristic pruning and growing rules.
+
+% In the seq2seq environment, an episode consists of a sequence. Our state consists of the top-$k$ log probabilities and accumulated log probabilities, as well as the current beam size. The action space of the agent is 3:~increasing or decreasing the beam size by 1 (limited by maximum and minimum beam sizes), or remain the same beam size. The learning goal of the policy is to decrease the beam size as much as possible, while increase the decoding F-score as much as possible. The reward is therefore a combination of two factors:~if the beam size is decreased (increased) or the partial F-score is increased (decreased) at this $(s_t, a_t, s_{t+1})$ transition, the agent obtains a positive (negative) reward.
+\begin{center}
+    \includegraphics[width=\linewidth]{figures/actor_critic.png}
+	\small{Asynchronous Actor-Critic (A3C) REINFORCE \cite{mnih2016asynchronous} with many shared-weights training agents}
+\end{center}
+
+
 
 
 
@@ -137,12 +177,42 @@ In the seq2seq environment, an episode consists of a sequence. Our state consist
 }
 
 
-\headerbox{6.~Conclusions}{name=conclusion,column=1,below=sea,span=2,above=bottom}{
+
+\headerbox{7.~Experiment Results}{name=result,column=1,below=a3c,span=2}
+{
+\begin{itemize}[leftmargin=*]
+%\item To evaluate the efficacy of proposed dynamic beam search, we perform experiments on Named Entity Recognition (NER) tagging task. We use the CoNLL-2003 dataset (German).
+%\item We compare our experimental results with the paper baseline from \cite{goyal2017continuous}.
+%\item We also use Asynchronous Actor Critic \cite{mnih2016asynchronous} to learn to adapt the beam size. % maybe remove this, only keep the table of there's no space left 
+\item Named Entity Recognition tagging task with CoNLL-2003 dataset (German)
+\vspace{-0.5mm}
+\item Compare with baseline Goyal 2017 \cite{goyal2017continuous}
+\vspace{-0.5mm}
+\item Results of Heuristic Pruning and Growing (adapt from given initial beam size):
+\end{itemize}
+
+\begin{center}
+    \includegraphics[width=0.9\linewidth]{det.png}
+\end{center}
+
+\begin{itemize}[leftmargin=*]
+\item Results of Asynchronous Actor-Critic (adapt from given initial beam size):
+\end{itemize}
+
+\begin{center}
+    \includegraphics[width=0.5\linewidth]{rl.png}
+\end{center}
+
+}
+
+
+\headerbox{8.~Future work}{name=conclusion,column=0,below=beam,span=1}{
 % DeCAF is a chemoinformatical tool that can be helpful in ligand-based drug design.
 % It provides a comprehensive molecule description and a fast algorithms for comparing and aligning multiple ligands.
-Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions.
-
-
+\begin{itemize}[leftmargin=*]
+\item Refine reinforcement learning techniques
+\item Pre-train the Actor-Critic model with Deterministic Agent (using Imitation Learning)
+\end{itemize}
 
 %\begin{boenumerate}\compresslist
 %    \item DeCAF gives better results for 23 out of 35 receptors.
@@ -154,7 +224,7 @@ Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Co
 }
 
 
-\headerbox{7. References}{name=references,column=0,span=1,below=mcs,above=bottom}{
+\headerbox{9.~References}{name=references,column=0,span=1,below=conclusion,above=bottom}{
 
 
 %\small % Reduce the font size in this block
@@ -163,7 +233,11 @@ Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Conclusions. Co
 
 
 \bibliographystyle{unsrt}
-\bibliography{poster} % Use sample.bib as the bibliography file
+
+% \small{
+\bibliography{posterbib} % Use sample.bib as the bibliography file
+% }
+
 }
 
 \end{poster}

@@ -83,11 +83,27 @@ In this project, we will be addressing the disadvantages of previous approaches 
 & Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 & Soft Beam \\
 & & & Adaptive & & Adaptive & & Adaptive & \\
 \midrule
-F-score & & 57.69 & 57.71 & & & & & \\
-Total beam \# & & 145,713 & 92,727 & & & & & \\
-Avg.~beam \# & & 3 & 1.95 & & & & & \\
-Time & & 76 & 61 & & & & & \\
+F-score & 58.09 & 57.69 & 57.71 & 57.76 & 57.71 & 57.76 & 57.71 & \\
+Total beam \# & 48,571 & 145,713 & 92,727 & 291,426 & 126,759 & 437,139 & 182,785 & \\
+Avg.~beam \# & 1 & 3 & 1.95 & 6 & 3.16 & 9 & 4.86 & \\
+Time (sec) & 22 & 76 & 61 & 132 & 73 & 178 & 92 & \\
+\midrule
 Goyal F-score & 54.92 & 51.34 & & & & & & 56.38 \\ \bottomrule
+\end{tabular}
+\end{table*}
+
+
+\begin{table*}[ht]
+\centering
+\caption{Comparison of the F-score between our experiment and \cite{goyal2017continuous} at the NER task. Fixed attention is used, and beam size is 3.}
+\label{tab:comp}
+\begin{tabular}{lccc}
+\toprule
+& RL Beam 3 & RL Beam 6 & RL Beam 9 \\
+\midrule
+F-score & 57.66 & 57.61 & 57.52 \\
+Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
+\bottomrule
 \end{tabular}
 \end{table*}
 

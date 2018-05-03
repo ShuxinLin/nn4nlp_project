@@ -301,7 +301,8 @@
 \define@cmdkey [ba]{poster}[baposter@]{columns}              [{}]          {}
 \define@cmdkey [ba]{poster}[baposter@]{colspacing}           [1em]         {}
 \define@cmdkey [ba]{poster}[baposter@]{bgColorOne}           [baposter@silver]{}
-\define@cmdkey [ba]{poster}[baposter@]{bgColorTwo}           [green]       {}
+\define@cmdkey [ba]{poster}[baposter@]{bgColorTwo}           [green]       
+{}
 
 % background can be one of: shadeLR, shadeTB, plain, user, none
 \define@choicekey*+[ba]{poster}{background}%
