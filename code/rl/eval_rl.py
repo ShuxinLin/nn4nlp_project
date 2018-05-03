@@ -261,7 +261,7 @@ def main():
   processes.append(p_val)
 
   p_test = mp.Process(target=test_adaptive,
-                      args=(args.num_processes,
+                      args=(args.num_processes+1,
                             machine,
                             max_beam_size,
                             learning_rate,
