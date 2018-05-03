@@ -154,7 +154,7 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_6_adapt_ckpt_46.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_beam_9_adapt_ckpt_46.txt"), "w+")
 
 
   epoch = 46
@@ -168,7 +168,7 @@ def main():
 
   decode_method = "adaptive"
 
-  beam_size = 6
+  beam_size = 9
   # When you have only one beam, it does not make sense to consider max_beam_size larger than the size of your label vocabulary
   max_beam_size = label_size
 

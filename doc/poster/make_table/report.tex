@@ -78,16 +78,16 @@ In this project, we will be addressing the disadvantages of previous approaches 
 \centering
 \caption{Comparison of the F-score between our experiment and \cite{goyal2017continuous} at the NER task. Fixed attention is used, and beam size is 3.}
 \label{tab:comp}
-\begin{tabular}{lccccccc}
+\begin{tabular}{lcccccccc}
 \toprule
-& Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 \\
-& & & Adaptive & & Adaptive & & Adaptive \\
+& Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 & Soft Beam \\
+& & & Adaptive & & Adaptive & & Adaptive & \\
 \midrule
-F-score & & & 57.71 & & & & \\
-Total beam \# & & & 92,727 & & & & \\
-Avg.~beam \# & & & 1.95 & & & & \\
-Time & & & 141 & & & & \\
-Goyal F-score & & & & & & & \\ \bottomrule
+F-score & & 57.69 & 57.71 & & & & & \\
+Total beam \# & & 145,713 & 92,727 & & & & & \\
+Avg.~beam \# & & 3 & 1.95 & & & & & \\
+Time & & 76 & 61 & & & & & \\
+Goyal F-score & 54.92 & 51.34 & & & & & & 56.38 \\ \bottomrule
 \end{tabular}
 \end{table*}
 
