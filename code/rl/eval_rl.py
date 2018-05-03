@@ -263,7 +263,7 @@ def main():
                            shared_model,
                            counter,
                            val_X, val_Y, index2word, index2label, "val",
-                           "", "adaptive", initial_beam_size,
+                           "log_", "adaptive", initial_beam_size,
                            reward_coef_fscore, reward_coef_beam_size,
                            f_score_index_begin,
                            args))
@@ -280,7 +280,7 @@ def main():
                             shared_model,
                             counter,
                             test_X, test_Y, index2word, index2label, "test",
-                            "", "adaptive", initial_beam_size,
+                            "log_", "adaptive", initial_beam_size,
                             reward_coef_fscore, reward_coef_beam_size,
                             f_score_index_begin,
                             args))
@@ -300,7 +300,7 @@ def main():
                          lock,
                          optimizer,
                          train_X, train_Y, index2word, index2label, "train",
-                         "", "adaptive", initial_beam_size,
+                         "log_", "adaptive", initial_beam_size,
                          reward_coef_fscore, reward_coef_beam_size,
                          f_score_index_begin,
                          args))
