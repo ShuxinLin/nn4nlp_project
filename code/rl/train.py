@@ -190,9 +190,15 @@ def train_adaptive(rank,
           f_result_processed.write(
             "%s %s %s\n" % (result_sen, result_label, result_pred))
 
+          f_sen.flush()
+          f_label.flush()
+          f_pred.flush()
+          f_result_processed.flush()
+
         if decode_method == "adaptive":
           beam_size_seq_str = ' '.join(map(str, sen_beam_size_seq))
           f_beam_size.write(beam_size_seq_str + '\n')
+          f_beam_size.flush()
 
     # End for batch_idx
 
