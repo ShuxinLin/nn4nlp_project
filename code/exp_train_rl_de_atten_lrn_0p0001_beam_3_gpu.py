@@ -193,7 +193,7 @@ def main():
 
   parser.add_argument('--logdir', default='../result_lrn_0p001_atten_rl_gpu',
                       help='name of logging directory')
-  parser.add_argument('--lr', type=float, default=0.0001,
+  parser.add_argument('--lr', type=float, default=0.001,
                       help='learning rate (default: 0.0001)')
   parser.add_argument('--gamma', type=float, default=0.99,
                       help='discount factor for rewards (default: 0.99)')
@@ -201,7 +201,7 @@ def main():
                       help='number of epochs for training agent(default: 30)')
   parser.add_argument('--entropy-coef', type=float, default=0.01,
                       help='entropy term coefficient (default: 0.01)')
-  parser.add_argument('--num-processes', type=int, default=4,
+  parser.add_argument('--num-processes', type=int, default=1,
                       help='how many training processes to use (default: 4)')
   parser.add_argument('--num-steps', type=int, default=20,
                       help='number of forward steps in A3C (default: 20)')
@@ -248,30 +248,18 @@ def main():
   reward_coef_fscore = 1
   reward_coef_beam_size = 0.1
 
-  processes = []
-  counter = mp.Value('i', 0)
-  lock = mp.Lock()
-
-  args.name = "train"
-  for rank in range(0, args.num_processes):
-    p = mp.Process(target=train_adaptive,
-                   args=(rank,
-                         machine,
-                         max_beam_size,
-                         shared_model,
-                         counter,
-                         lock,
-                         shared_optimizer,
-                         train_X, train_Y, index2word, index2label,
-                         "train", "adaptive", initial_beam_size,
-                         reward_coef_fscore, reward_coef_beam_size,
-                         f_score_index_begin,
-                         args))
-    p.start()
-    processes.append(p)
-
-  for p in processes:
-    p.join()
+  train_adaptive(0,
+                 machine,
+                 max_beam_size,
+                 shared_model,
+                 counter,
+                 lock,
+                 shared_optimizer,
+                 train_X, train_Y, index2word, index2label,
+                 "train", "adaptive", initial_beam_size,
+                 reward_coef_fscore, reward_coef_beam_size,
+                 f_score_index_begin,
+                 args)
 
 
 if __name__ == "__main__":
