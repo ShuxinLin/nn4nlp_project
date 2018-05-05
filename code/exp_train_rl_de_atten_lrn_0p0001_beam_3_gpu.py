@@ -184,7 +184,7 @@ def main():
   max_beam_size = label_size
 
   # ============   INIT RL =====================
-  os.environ['OMP_NUM_THREADS'] = '4'
+  os.environ['OMP_NUM_THREADS'] = '8'
   os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
 
