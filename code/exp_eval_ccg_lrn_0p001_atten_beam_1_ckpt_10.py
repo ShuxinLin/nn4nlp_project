@@ -145,16 +145,16 @@ def main():
   gpu = True
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
-  gpu_no = 0
+  gpu_no = 1
   cuda_dev = torch.device("cuda:" + str(gpu_no))
 
   ##################
 
   os.environ['OMP_NUM_THREADS'] = '4'
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt_ckpt_10.txt"), "w+")
 
-  for epoch in range(10, 13):
+  for epoch in range(10, 11):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
     batch_size = 1
 
