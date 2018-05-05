@@ -187,7 +187,7 @@ def main():
     test_fscore, test_total_beam_number_in_dataset, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
     time_end = time.time()
 
-   print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+    print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
     log_msg = "%d\t%f\t%f\t%d\t%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, val_beam_number, test_beam_number, val_avg_beam_size, test_avg_beam_size, time_end - time_begin)
     print(print_msg)
     print(log_msg, file=eval_output_file, flush=True)
