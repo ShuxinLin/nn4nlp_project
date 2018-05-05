@@ -129,7 +129,7 @@ def main():
   label_size = len(index2label)
   #print("label_size=",label_size)
 
-  val_X, val_Y = minibatch_of_one_de('valid')
+  val_X, val_Y = minibatch_of_one_de('val')
   test_X, test_Y = minibatch_of_one_de('test')
 
   # Using word2vec pre-trained embedding
