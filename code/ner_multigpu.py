@@ -1390,7 +1390,7 @@ class ner(nn.Module):
     logP_pred_seq = logP_pred_seq.view(batch_size * seq_len, self.label_size)
     accum_logP_pred_seq = accum_logP_pred_seq.view(batch_size * seq_len, self.label_size)
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, beam_size_seq, action_seq
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq
 
 
   # Observe the beam size to determine the reward, because it is possible that the agent wants to decrease the beam size, but the beam size is already minimum, so the environment does not allow the beam size to decrease.
