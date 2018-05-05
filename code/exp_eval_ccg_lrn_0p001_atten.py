@@ -86,6 +86,27 @@ def minibatch_de(data, batch_size):
   return list(X_batch), list(Y_batch)
 
 
+def minibatch_of_one_de(data):
+  print("Generate mini batches, each with only 1 instance.")
+  X_batch = []
+  Y_batch = []
+  all_data = []
+  indexed_data = construct_df(data)
+  for index, row in indexed_data.iterrows():
+    splitted_sentence = list(map(int, row['SENTENCE'].split()))
+    splitted_entities = list(map(int, row['ENTITY'].split()))
+    assert len(splitted_entities) == len(splitted_sentence)
+    all_data.append((len(splitted_sentence), splitted_sentence, splitted_entities))
+
+  # Does not have to sort if each minibatch has only 1 instance
+
+  X_batch = [[data[1]] for data in all_data]
+  Y_batch = [[data[2]] for data in all_data]
+  assert len(X_batch) == len(Y_batch)
+
+  return list(X_batch), list(Y_batch)
+
+
 def main():
   rnd_seed = None
   if rnd_seed:
