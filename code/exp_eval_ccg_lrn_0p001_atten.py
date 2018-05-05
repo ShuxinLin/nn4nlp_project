@@ -158,7 +158,7 @@ def main():
 
   ##################
 
-  os.environ['OMP_NUM_THREADS'] = '2'
+  #os.environ['OMP_NUM_THREADS'] = '2'
 
   eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt.txt"), "w+")
 
