@@ -162,7 +162,7 @@ def main():
 
   eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt.txt"), "w+")
 
-  for epoch in range(0, 60):
+  for epoch in range(0, max_epoch):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
     batch_size = 1
 
@@ -185,11 +185,14 @@ def main():
     # For CCG dataset, f_score_index_begin = 2
     f_score_index_begin = 2
 
+    reward_coef_fscore = 1
+    reward_coef_beam_size = 0.02
+
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+    val_fscore, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
 
     time_begin = time.time()
-    test_fscore, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, f_score_index_begin)
+    test_fscore, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
     time_end = time.time()
 
     print_msg = "epoch %d, val F = %.6f, test F = %.6f, val b = %.6f, test b = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, val_avg_beam_size, test_avg_beam_size, time_end - time_begin)
