@@ -117,8 +117,6 @@ def main():
   data_path = "../dataset/German/"
 
   result_path = "../result_lrn_0p001_atten/"
-  if not os.path.exists(result_path):
-    os.makedirs(result_path)
 
   dict_file = "../dataset/German/vocab1.de"
   entity_file = "../dataset/German/vocab1.en"
@@ -127,6 +125,7 @@ def main():
   vocab_size = len(index2word)
   label_size = len(index2label)
 
+  train_X, train_Y = minibatch_of_one_de('train')
   val_X, val_Y = minibatch_of_one_de('valid')
   test_X, test_Y = minibatch_of_one_de('test')
 
@@ -156,8 +155,8 @@ def main():
 
   ##################
 
-  eval_output_file = open(os.path.join(result_path, "eval_greedy_ckpt_16.txt"), "w+")
-
+  experience_file_train = os.path.join(result_path, "beam_1_adapt_ckpt_16_episode_train.txt")
+  experience_file_val = os.path.join(result_path, "beam_1_adapt_ckpt_16_episode_val.txt")
 
   epoch = 16
   load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
@@ -168,14 +167,16 @@ def main():
   if gpu:
     machine = machine.cuda()
 
-  initial_beam_size = None
+  decode_method = "adaptive"
+
+  beam_size = 1
   # When you have only one beam, it does not make sense to consider max_beam_size larger than the size of your label vocabulary
-  max_beam_size = None
+  max_beam_size = label_size
 
-  #accum_logP_ratio_low = 0.1
-  #logP_ratio_low = 0.1
+  accum_logP_ratio_low = 0.1
+  logP_ratio_low = 0.1
 
-  agent = None
+  agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
@@ -185,25 +186,10 @@ def main():
   reward_coef_beam_size = 0.1
 
   # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-  val_fscore, val_beam_number, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, "greedy", initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False)
 
-  time_begin = time.time()
-  test_fscore, test_beam_number, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, "greedy", initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False)
-  time_end = time.time()
+  machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=True, episode_save_path=experience_file_val)
 
-  print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
-  log_msg = "%d\t%f\t%f\t%d\t%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, val_beam_number, test_beam_number, val_avg_beam_size, test_avg_beam_size, time_end - time_begin)
-  print(print_msg)
-  print(log_msg, file=eval_output_file, flush=True)
-
-
-  eval_output_file.close()
-
-
-  # Write out files
-  #train_eval_loss, train_eval_fscore = machine.evaluate(train_X, train_Y, index2word, index2label, "train", result_path, beam_size)
-  #val_eval_loss, val_eval_fscore = machine.evaluate(val_X, val_Y, index2word, index2label, "val", result_path, beam_size)
-  #test_eval_loss, test_eval_fscore = machine.evaluate(test_X, test_Y, index2word, index2label, "test", result_path, beam_size)
+  #machine.evaluate(train_X, train_Y, index2word, index2label, "train", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=True, episode_save_path=experience_file_train)
 
 
 if __name__ == "__main__":
