@@ -163,11 +163,11 @@ def main():
   # ---------------------------------------
   #        MODEL INSTANTIATION
   # ---------------------------------------
-  attention = None
-  #attention = "fixed"
+  #attention = None
+  attention = "fixed"
 
-  load_model_dir = "../result_lrn_0p001/"
-  load_model_filename = os.path.join(load_model_dir, "ckpt_51.pth")
+  load_model_dir = "../result_lrn_0p001_atten/"
+  load_model_filename = os.path.join(load_model_dir, "ckpt_46.pth")
 
   batch_size = 1
   machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size,
@@ -192,7 +192,7 @@ def main():
 
   parser = argparse.ArgumentParser(description='A3C')
 
-  parser.add_argument('--logdir', default='../result_lrn_0p001_rl',
+  parser.add_argument('--logdir', default='../result_lrn_0p001_atten_rl',
                       help='name of logging directory')
   parser.add_argument('--lr', type=float, default=0.0001,
                       help='learning rate (default: 0.0001)')
