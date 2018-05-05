@@ -1,5 +1,5 @@
-(((S[dcl]\NP)/S[em])/NP)/NP	0
-(((S[ng]\NP)/(S[to]\NP))/(S[adj]\NP))/NP[expl]	1
+_PAD	0
+_SOS	1
 (PP/(S[b]\NP))/NP	2
 S[wq]/(S[adj]\NP)	3
 (((S[adj]\NP)\(S[adj]\NP))/((S[adj]\NP)\(S[adj]\NP)))\(S[adj]\NP)	4
@@ -1319,3 +1319,5 @@ PP/S[qem]	1308
 ((S[dcl]\S[dcl])\NP)/(S[pt]\NP)	1318
 ((S[pt]\NP)/(S[to]\NP))/NP	1319
 (S[b]\NP)/S[poss]	1320
+(((S[dcl]\NP)/S[em])/NP)/NP	1321
+(((S[ng]\NP)/(S[to]\NP))/(S[adj]\NP))/NP[expl]	1322
