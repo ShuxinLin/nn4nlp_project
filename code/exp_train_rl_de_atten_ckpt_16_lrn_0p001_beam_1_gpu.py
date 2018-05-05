@@ -133,7 +133,7 @@ def main():
   vocab_size = len(index2word)
   label_size = len(index2label)
 
-  train_X, train_Y = minibatch_of_one_de('train')
+  #train_X, train_Y = minibatch_of_one_de('train')
   val_X, val_Y = minibatch_of_one_de('valid')
   test_X, test_Y = minibatch_of_one_de('test')
 
@@ -252,8 +252,8 @@ def main():
                  max_beam_size,
                  shared_model,
                  shared_optimizer,
-                 train_X, train_Y, index2word, index2label,
-                 "train", "adaptive", initial_beam_size,
+                 val_X, val_Y, index2word, index2label,
+                 "val", "adaptive", initial_beam_size,
                  reward_coef_fscore, reward_coef_beam_size,
                  f_score_index_begin,
                  args)
