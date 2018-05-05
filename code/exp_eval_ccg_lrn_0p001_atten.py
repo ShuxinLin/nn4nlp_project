@@ -181,7 +181,7 @@ def main():
     reward_coef_beam_size = 0.02
 
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore, val_total_beam_number_in_dataset, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
+    val_fscore, val_total_beam_number_in_dataset, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
 
     time_begin = time.time()
     test_fscore, test_total_beam_number_in_dataset, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
