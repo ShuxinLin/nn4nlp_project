@@ -1342,6 +1342,8 @@ class ner(nn.Module):
       .view(batch_size, 1)
     input_beam = beta_seq[seq_len - 1][:, 0]
 
+    print("attention_seq=",attention_seq)
+
     if self.attention:
       # Now attention_seq is
       # in the shape of (output seq len, batch size, beam size, input seq len)
@@ -1351,6 +1353,7 @@ class ner(nn.Module):
       #
       # Here we initialize the first element
       attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
+      print("t=",seq_len-1,",attention_pred_seq=",attention_pred_seq)
 
     logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
     accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
@@ -1365,13 +1368,14 @@ class ner(nn.Module):
 
       if self.attention:
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
+        print("t=",t,",attention_pred_seq=",attention_pred_seq)
 
       logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
       accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
     # End for t
 
     if self.attention:
-      print(attention_pred_seq)
+      print("attention_pred_seq=",attention_pred_seq)
       attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
     else:
       attention_pred_seq = None
