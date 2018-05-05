@@ -226,22 +226,6 @@ def main():
   if not os.path.exists(args.logdir):
     os.mkdir(args.logdir)
 
-  shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size,
-                                     action_space=3)
-  shared_model.share_memory()
-
-  if args.no_shared:
-    shared_optimizer = None
-  # default here (False)
-  else:
-    shared_optimizer = SharedAdam(params=shared_model.parameters(),
-                                  lr=args.lr)
-    # optimizer = optim.Adam(shared_model.parameters(), lr=learning_rate)
-    shared_optimizer.share_memory()
-
-  # --------------------------------------------
-  #                 RL TRAINING
-  # --------------------------------------------
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
   f_score_index_begin = 5
@@ -249,31 +233,35 @@ def main():
   reward_coef_fscore = 1
   reward_coef_beam_size = 0.1
 
-  processes = []
-  counter = mp.Value('i', 0)
-  lock = mp.Lock()
+  logfile = open(os.path.join(args.logdir, "eval_val.txt"), "w+")
 
-  args.name = "train"
-  for rank in range(0, args.num_processes):
-    p = mp.Process(target=train_adaptive,
-                   args=(rank,
-                         machine,
-                         max_beam_size,
-                         shared_model,
-                         counter,
-                         lock,
-                         shared_optimizer,
-                         #train_X, train_Y, index2word, index2label,
-                         val_X, val_Y, index2word, index2label,
-                         "train", "adaptive", initial_beam_size,
-                         reward_coef_fscore, reward_coef_beam_size,
-                         f_score_index_begin,
-                         args))
-    p.start()
-    processes.append(p)
+  model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
+  # Marking as for evaluation
+  model.eval()
 
-  for p in processes:
-    p.join()
+  load_map_location = "cpu"
+
+  for epoch in range(0, args.n_epochs):
+    load_model_filename = os.path.join(args.logdir, "ckpt_" + str(epoch) + ".pth")
+    checkpoint = torch.load(load_model_filename, map_location=load_map_location)
+    model.load_state_dict(checkpoint["state_dict"])
+
+    fscore, total_beam_number_in_dataset, avg_beam_size, time_used = \
+      eval_adaptive(machine,
+                    max_beam_size,
+                    model,
+                    val_X, val_Y, index2word, index2label,
+                    "val", False, "adaptive", initial_beam_size,
+                    reward_coef_fscore, reward_coef_beam_size,
+                    f_score_index_begin,
+                    args)
+
+    log_msg = "%d\t%f\t%d\t%f\t%f" % (epoch, fscore, total_beam_number_in_dataset, avg_beam_size, time_used)
+    print(log_msg)
+    print(log_msg, file=logfile, flush=True)
+  # End for epoch
+
+  logfile.close()
 
 
 if __name__ == "__main__":
