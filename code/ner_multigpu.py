@@ -826,7 +826,7 @@ class ner(nn.Module):
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin):
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=True, episode_save_path=None):
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -836,6 +836,8 @@ class ner(nn.Module):
       f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
       f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
 
+    if generate_episode:
+      episode_file = open(episode_save_path, "w+")
 
     instance_num = 0
     correctness = 0
@@ -850,8 +852,11 @@ class ner(nn.Module):
     pred_pos_count = 0
     true_pred_pos_count = 0
 
+    # train_memory = [(action, state vector), ...]
+    if generate_episode:
+      train_memory = []
+
     for batch_idx in range(batch_num):
-      print(batch_idx)
       sen = eval_data_X[batch_idx]
       label = eval_data_Y[batch_idx]
       current_batch_size = len(sen)
@@ -888,12 +893,22 @@ class ner(nn.Module):
 
       if decode_method == "greedy":
         label_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_greedy(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq)
+        beam_size_seqs.append([1] * (len(label_pred_seq[0]) - 1))
       elif decode_method == "beam":
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.decode_beam(current_batch_size, current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size)
+        beam_size_seqs.append([beam_size] * (len(label_pred_seq[0]) - 1))
       elif decode_method == "adaptive":
         # the input argument "beam_size" serves as initial_beam_size here
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin, generate_episode=generate_episode)
+        beam_size_seqs.append(beam_size_seq)
 
-        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin)
+        if generate_episode:
+          for experience_tuple in episode:
+            episode_file.write("%d" % experience_tuple[1])
+            for state_element in experience_tuple[0]:
+              episode_file.write("\t%f" % state_element)
+            episode_file.write("\n")
+
         ### Debugging...
         #print("input sentence =", sen)
         #print("true label =", label)
@@ -968,11 +983,15 @@ class ner(nn.Module):
       f_result_processed.close()
       f_beam_size.close()
 
-    if decode_method == "adaptive":
-      avg_beam_sizes = [sum(beam_size_seq) / len(beam_size_seq) for beam_size_seq in beam_size_seqs]
-      return fscore, sum(avg_beam_sizes) / len(avg_beam_sizes)
+    if generate_episode:
+      episode_file.close()
 
-    return fscore
+    total_beam_number_in_dataset = sum([sum(beam_size_seq) for beam_size_seq in beam_size_seqs])
+    avg_beam_sizes = [(sum(beam_size_seq) / len(beam_size_seq) if len(beam_size_seq) else 0) for beam_size_seq in beam_size_seqs]
+    avg_beam_sizes = list(filter(lambda xx: xx > 0, avg_beam_sizes))
+    avg_beam_size = sum(avg_beam_sizes) / len(avg_beam_sizes)
+
+    return fscore, total_beam_number_in_dataset, avg_beam_size
 
 
   # decode_beam_step - this function basically servers as the "env.step()" function in RL: (citing below)
@@ -1099,7 +1118,7 @@ class ner(nn.Module):
   ###############################
   #
   # This function is like generate_episode() for RL
-  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_true_seq, f_score_index_begin):
+  def decode_beam_adaptive(self, seq_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_true_seq, f_score_index_begin, generate_episode=True):
     # Currently, batch size can only be 1
     batch_size = 1
 
@@ -1263,7 +1282,10 @@ class ner(nn.Module):
         beam_size -= 1
       elif action == agent.INCREASE and beam_size < max_beam_size:
         beam_size += 1
-      beam_size_seq.append(beam_size)
+
+      # Fix in the future: We actually don't utilize the beam generated in the last time step---we only use top-1 to do backtracking. So here we don't include the beam size at the last step.
+      if t <= seq_len - 2:
+        beam_size_seq.append(beam_size)
 
       accum_logP_beam, index_beam = \
         torch.topk(accum_logP_matrix, beam_size, dim=1)
@@ -1278,21 +1300,25 @@ class ner(nn.Module):
       logP_seq.append(logP_output_beam)
       accum_logP_seq.append(accum_logP_output_beam)
 
-      # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
-      label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
-      cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
+      if generate_episode:
+        # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
+        label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
+        cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
 
-      # If t >= 2, compute the reward,
-      # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
-      if t >= 2:
-        reward = self.get_reward(cur_fscore, fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size)
-        experience_tuple = (prev_state, prev_action, reward, cur_state)
-        episode.append(experience_tuple)
+        # If t >= 2, compute the reward,
+        # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
+        if t >= 2:
+          reward = self.get_reward(cur_fscore, fscore, cur_beam_size_in, prev_beam_size_in, reward_coef_fscore, reward_coef_beam_size)
+          experience_tuple = (prev_state, prev_action, reward, cur_state)
+          episode.append(experience_tuple)
 
-      fscore = cur_fscore
+        fscore = cur_fscore
+      else:
+        if t == seq_len - 1:
+          label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
     # End for t
 
-    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode
+    return label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq
 
 
   # make_state - generate the state for the RL agent

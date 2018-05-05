@@ -14,7 +14,7 @@ import pandas as pd
 from operator import itemgetter
 import collections
 
-from ner import ner
+from ner_multigpu import ner
 from det_agent import det_agent
 
 
@@ -114,13 +114,7 @@ def main():
     torch.manual_seed(rnd_seed)
     np.random.seed(rnd_seed)
 
-  #data_path = "../dataset/German/"
-
   result_path = "../result_ccg_lrn_0p001_atten/"
-  if not os.path.exists(result_path):
-    os.makedirs(result_path)
-
-  batch_size = 32
 
   dict_file = "../dataset/CCGbank/dict_word"
   entity_file = "../dataset/CCGbank/dict_tag"
@@ -128,7 +122,6 @@ def main():
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
-  #print("label_size=",label_size)
 
   val_X, val_Y = minibatch_of_one_de('val')
   test_X, test_Y = minibatch_of_one_de('test')
@@ -149,16 +142,15 @@ def main():
 
   pretrained = None
 
-  if pretrained == 'de64':
-    word_embedding_dim = 64
-
-  gpu = False
+  gpu = True
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
+  gpu_no = 0
+  cuda_dev = torch.device("cuda:" + str(gpu_no))
 
   ##################
 
-  #os.environ['OMP_NUM_THREADS'] = '2'
+  os.environ['OMP_NUM_THREADS'] = '4'
 
   eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt.txt"), "w+")
 
@@ -166,9 +158,9 @@ def main():
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
     batch_size = 1
 
-    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, pretrained=pretrained, load_model_filename=load_model_filename, load_map_location="cpu")
+    machine = ner(word_embedding_dim, hidden_dim, label_embedding_dim, vocab_size, label_size, learning_rate=learning_rate, minibatch_size=batch_size, max_epoch=max_epoch, train_X=None, train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X, test_Y=test_Y, attention=attention, gpu=gpu, gpu_no=gpu_no, pretrained=pretrained, load_model_filename=load_model_filename)
     if gpu:
-      machine = machine.cuda()
+      machine = machine.cuda(cuda_dev)
 
     decode_method = "adaptive"
 
@@ -182,21 +174,21 @@ def main():
 
     # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
     # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-    # For CCG dataset, f_score_index_begin = 2
+    # For CCG dataset, f_score_index_begin = 2 (because {0: _PAD, 1: _SOS, ...})
     f_score_index_begin = 2
 
     reward_coef_fscore = 1
     reward_coef_beam_size = 0.02
 
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
+    val_fscore, val_total_beam_number_in_dataset, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin)
 
     time_begin = time.time()
-    test_fscore, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
+    test_fscore, test_total_beam_number_in_dataset, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
     time_end = time.time()
 
-    print_msg = "epoch %d, val F = %.6f, test F = %.6f, val b = %.6f, test b = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, val_avg_beam_size, test_avg_beam_size, time_end - time_begin)
-    log_msg = "%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+   print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
+    log_msg = "%d\t%f\t%f\t%d\t%d\t%f\t%f\t%f" % (epoch, val_fscore, test_fscore, val_beam_number, test_beam_number, val_avg_beam_size, test_avg_beam_size, time_end - time_begin)
     print(print_msg)
     print(log_msg, file=eval_output_file, flush=True)
   # End for epoch
