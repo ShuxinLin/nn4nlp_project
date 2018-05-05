@@ -1377,6 +1377,7 @@ class ner(nn.Module):
     if self.attention:
       #print("attention_pred_seq=",attention_pred_seq)
       #attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+      pass
     else:
       attention_pred_seq = None
 
