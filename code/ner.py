@@ -962,9 +962,14 @@ class ner(nn.Module):
       pred_pos_count = pred_pos_count.cpu()
       true_pred_pos_count = true_pred_pos_count.cpu()
 
+    """
     true_pos_count = true_pos_count.data.numpy()[0]
     pred_pos_count = pred_pos_count.data.numpy()[0]
     true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
+    """
+    true_pos_count = true_pos_count.data.numpy()
+    pred_pos_count = pred_pos_count.data.numpy()
+    true_pred_pos_count = true_pred_pos_count.data.numpy()
 
     precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
 
