@@ -8,12 +8,11 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import torch
-import torch.multiprocessing as mp
 
 from model import AdaptiveActorCritic
 from ner import ner
 from optim import SharedAdam
-from rl_trainer import train_adaptive, eval_adaptive
+from rl_trainer_single import train_adaptive, eval_adaptive
 
 matplotlib.use("Agg")
 
@@ -252,8 +251,6 @@ def main():
                  machine,
                  max_beam_size,
                  shared_model,
-                 counter,
-                 lock,
                  shared_optimizer,
                  train_X, train_Y, index2word, index2label,
                  "train", "adaptive", initial_beam_size,
