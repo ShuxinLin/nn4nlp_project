@@ -823,7 +823,7 @@ class ner(nn.Module):
 
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=True):
+  def evaluate(self, eval_data_X, eval_data_Y, index2word, index2label, suffix, result_path, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=True, episode_save_path=None):
     batch_num = len(eval_data_X)
 
     if result_path:
@@ -833,6 +833,8 @@ class ner(nn.Module):
       f_result_processed = open(result_path + "result_processed_" + suffix + ".txt", 'w')
       f_beam_size = open(result_path + 'beam_size_' + suffix + ".txt", 'w')
 
+    if generate_episode:
+      episode_file = open(episode_save_path, "w+")
 
     instance_num = 0
     correctness = 0
@@ -846,6 +848,10 @@ class ner(nn.Module):
     true_pos_count = 0
     pred_pos_count = 0
     true_pred_pos_count = 0
+
+    # train_memory = [(action, state vector), ...]
+    if generate_episode:
+      train_memory = []
 
     for batch_idx in range(batch_num):
       sen = eval_data_X[batch_idx]
@@ -892,6 +898,13 @@ class ner(nn.Module):
         # the input argument "beam_size" serves as initial_beam_size here
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq, episode, beam_size_seq = self.decode_beam_adaptive(current_sen_len, init_dec_hidden, init_dec_cell, enc_hidden_seq, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, label_var, f_score_index_begin, generate_episode=generate_episode)
         beam_size_seqs.append(beam_size_seq)
+
+        if generate_episode:
+          for experience_tuple in episode:
+            episode_file.write("%d" % experience_tuple[1])
+            for state_element in experience_tuple[0]:
+              episode_file.write("\t%f" % state_element)
+            episode_file.write("\n")
 
         ### Debugging...
         #print("input sentence =", sen)
@@ -966,6 +979,9 @@ class ner(nn.Module):
       f_label.close()
       f_result_processed.close()
       f_beam_size.close()
+
+    if generate_episode:
+      episode_file.close()
 
     total_beam_number_in_dataset = sum([sum(beam_size_seq) for beam_size_seq in beam_size_seqs])
     avg_beam_sizes = [(sum(beam_size_seq) / len(beam_size_seq) if len(beam_size_seq) else 0) for beam_size_seq in beam_size_seqs]
