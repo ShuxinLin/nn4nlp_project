@@ -15,6 +15,7 @@ from operator import itemgetter
 import collections
 
 from ner import ner
+from det_agent import det_agent
 
 
 def get_index2word(dict_file):
