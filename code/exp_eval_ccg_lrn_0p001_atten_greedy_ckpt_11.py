@@ -145,16 +145,16 @@ def main():
   gpu = True
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
-  gpu_no = 2
+  gpu_no = 0
   cuda_dev = torch.device("cuda:" + str(gpu_no))
 
   ##################
 
-  os.environ['OMP_NUM_THREADS'] = '4'
+  os.environ['OMP_NUM_THREADS'] = '1'
 
-  eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt_ckpt_12.txt"), "w+")
+  eval_output_file = open(os.path.join(result_path, "eval_greedy_ckpt_11.txt"), "w+")
 
-  for epoch in range(12, 13):
+  for epoch in range(11, 12):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
     batch_size = 1
 
@@ -162,15 +162,19 @@ def main():
     if gpu:
       machine = machine.cuda(cuda_dev)
 
-    decode_method = "adaptive"
+    decode_method = "greedy"
 
-    initial_beam_size = 1
-    max_beam_size = label_size
+    beam_size = None
+    #max_beam_size = label_size
+    max_beam_size = None
 
-    accum_logP_ratio_low = 0.1
-    logP_ratio_low = 0.1
+    #accum_logP_ratio_low = 0.1
+    #logP_ratio_low = 0.1
+    accum_logP_ratio_low = None
+    logP_ratio_low = None
 
-    agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
+    #agent = det_agent(max_beam_size, accum_logP_ratio_low, logP_ratio_low)
+    agent = None
 
     # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
     # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
@@ -181,10 +185,10 @@ def main():
     reward_coef_beam_size = 0.02
 
     # We don't evaluate on training set simply because it is too slow since we can't use mini-batch in adaptive beam search
-    val_fscore, val_beam_number, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
+    val_fscore, val_beam_number, val_avg_beam_size = machine.evaluate(val_X, val_Y, index2word, index2label, "val", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
 
     time_begin = time.time()
-    test_fscore, test_beam_number, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, initial_beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
+    test_fscore, test_beam_number, test_avg_beam_size = machine.evaluate(test_X, test_Y, index2word, index2label, "test", None, decode_method, beam_size, max_beam_size, agent, reward_coef_fscore, reward_coef_beam_size, f_score_index_begin, generate_episode=False, episode_save_path=None)
     time_end = time.time()
 
     print_msg = "epoch %d, val F = %.6f, test F = %.6f, test time = %.6f" % (epoch, val_fscore, test_fscore, time_end - time_begin)
