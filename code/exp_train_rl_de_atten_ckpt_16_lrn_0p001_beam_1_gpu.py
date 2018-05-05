@@ -245,7 +245,7 @@ def main():
   f_score_index_begin = 5
   # RL reward coefficient
   reward_coef_fscore = 1
-  reward_coef_beam_size = 0.1
+  reward_coef_beam_size = 0.05
 
   train_adaptive(0,
                  machine,
