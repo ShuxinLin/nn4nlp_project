@@ -241,7 +241,7 @@ class ner(nn.Module):
     return dec_hidden_seq, score_seq, logP_seq, attention_seq
 
 
-  def train(self, shuffle, result_path, do_evaluation, beam_size):
+  def train(self, shuffle, result_path, do_evaluation, beam_size, data="ner"):
     # Will manually average over (sentence_len * instance_num)
     #loss_function = nn.CrossEntropyLoss(size_average=False)
 
@@ -332,17 +332,16 @@ class ner(nn.Module):
         label_var_for_loss = label_var.permute(1, 0) \
           .contiguous().view(-1)
 
-        O_INDEX = 4
-        gold_not_O_mask = (label_var_for_loss > O_INDEX).float()
-        #print("label_var_for_loss=",label_var_for_loss)
-        #print("gold_not_O_mask=",gold_not_O_mask[:10])
-        #time.sleep(1)
-        PENALTY = 1.5
-        gold_not_O_mask = gold_not_O_mask * PENALTY
-        #print("before: score_seq=",score_seq[:10, 3:6])
-        score_seq[:, O_INDEX] = score_seq[:, O_INDEX] + gold_not_O_mask
-        #print("after: score_seq=",score_seq[:10, 3:6])
-        #time.sleep(1)
+        if data == "ner":
+          O_INDEX = 4
+          gold_not_O_mask = (label_var_for_loss > O_INDEX).float()
+          PENALTY = 1.5
+          gold_not_O_mask = gold_not_O_mask * PENALTY
+          score_seq[:, O_INDEX] = score_seq[:, O_INDEX] + gold_not_O_mask
+        elif data == "ccg":
+          pass
+        else:
+          print("Warning: ner.train(): Check special penalty for this dataset")
 
         logP_seq = self.score2logP(score_seq)
 

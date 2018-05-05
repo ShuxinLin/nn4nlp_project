@@ -144,7 +144,7 @@ def main():
   shuffle = True
 
   # Pure training, no evaluation
-  train_loss_list = machine.train(shuffle, result_path, False, None)
+  train_loss_list = machine.train(shuffle, result_path, False, None, data="ccg")
 
 
 if __name__ == "__main__":
