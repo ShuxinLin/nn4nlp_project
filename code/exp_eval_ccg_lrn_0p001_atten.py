@@ -154,7 +154,7 @@ def main():
 
   eval_output_file = open(os.path.join(result_path, "eval_beam_1_adapt.txt"), "w+")
 
-  for epoch in range(0, max_epoch):
+  for epoch in range(10, 13):
     load_model_filename = os.path.join(result_path, "ckpt_" + str(epoch) + ".pth")
     batch_size = 1
 
