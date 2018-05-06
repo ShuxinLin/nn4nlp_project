@@ -201,7 +201,8 @@ def main():
 
   parser = argparse.ArgumentParser(description='A3C')
 
-  parser.add_argument('--logdir', default='../result_ccg_atten_ckpt_11_rl_lrn_0p001_reward_0p02_beam_1_gpu',
+  parser.add_argument('--logdir',
+                      default='../result_ccg_atten_ckpt_11_rl_lrn_0p001_reward_0p02_beam_3_gpu',
                       help='name of logging directory')
   parser.add_argument('--lr', type=float, default=0.001,
                       help='learning rate (default: 0.0001)')
