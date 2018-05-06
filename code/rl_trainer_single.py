@@ -133,7 +133,7 @@ def train_adaptive(rank,
     reward_std = np.std(reward_list)
     log_msg = "%d\t%f\t%f\t%f" % (epoch, reward_mean, reward_std, time_used)
     print(log_msg)
-    print(log_msg, file=logfile, flush=True)
+    #print(log_msg, file=logfile, flush=True)
 
     # Save shared model and (supposedly) shared optimizer
     # Purposely possibly over-writing other threads' model for the same epoch
