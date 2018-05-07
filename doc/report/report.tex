@@ -302,7 +302,7 @@ The primed summation $\prod'_t$ notation is used to indicate that the product is
 
 Using the heuristic rules to prune or grow the beam size has a downside that the thresholds of pruning or growing (the parameters $r^{\textrm{sen}}_{\textrm{low}}$ and $r^{\textrm{word}}_{\textrm{low}}$ in our case) are set by hand, which may require some tuning to find the suitable values. Moreover, the thresholds suitable for one task is generally different from those for another task, so additional human labor is needed to identify the suitable thresholds for each new task.
 
-To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn the  reinforcement learning
+To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn learn when to increase or decrease the beam size.
 
 ... Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions
 
