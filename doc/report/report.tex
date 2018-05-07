@@ -291,20 +291,23 @@ In detail, consider that at time step $t$ of the decoding, there are $B_{t-1}$ i
 We propose the following heuristic rules to dynamically change the beam size at each step.
 \begin{itemize}
 \item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} \leq r^{\textrm{word}}_{\textrm{low}}$, then decrease the beam size: $B_t = B_{t-1} - 1$.
-\item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} > r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} > r^{\textrm{word}}_{\textrm{low}}$, then increase the beam size: $B_t = B_{t-1} + 1$.
+\item If $\displaystyle{\frac{\prod'_t P_{B_{t-1} + 1}}{\prod'_t P_1}} > r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1} + 1}}{P_1}} > r^{\textrm{word}}_{\textrm{low}}$, then increase the beam size: $B_t = B_{t-1} + 1$.
 \end{itemize}
 The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. Note that to avoid numerical underflow, we work in the logarithmic space as we implement the rules.
-
-%HERE...
-
-
 
 
 
 \section{Adaptive Beam Search by Reinforcement Learning}
 \label{sec:RL}
 
+Using the heuristic rules to prune or grow the beam size has a downside that the thresholds of pruning or growing (the parameters $r^{\textrm{sen}}_{\textrm{low}}$ and $r^{\textrm{word}}_{\textrm{low}}$ in our case) are set by hand, which may require some tuning to find the suitable values. Moreover, the thresholds suitable for one task is generally different from those for another task, so additional human labor is needed to identify the suitable thresholds for each new task.
+
+To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn the  reinforcement learning
+
 ... Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions
+
+%HERE...
+
 
 
 
