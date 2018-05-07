@@ -239,6 +239,7 @@ def main():
                                      action_space=3)
   #shared_model.share_memory()
   
+  shared_mode.eval()
 
   if args.no_shared:
     shared_optimizer = None
