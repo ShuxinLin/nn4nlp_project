@@ -27,7 +27,7 @@ class ner(nn.Module):
                val_X=None, val_Y=None,
                test_X=None, test_Y=None,
                attention="fixed",
-               gpu=False,
+               gpu=False, gpu_no=0,
                pretrained=None,
                load_model_filename=None, load_map_location=None):
 
@@ -52,6 +52,9 @@ class ner(nn.Module):
     self.BEG_INDEX = 1
 
     self.gpu = gpu
+    self.gpu_no = gpu_no
+    if self.gpu:
+      self.cuda_dev = torch.device("cuda:" + str(self.gpu_no))
 
     # Attention
     if attention:
@@ -146,7 +149,7 @@ class ner(nn.Module):
       init_label_emb = \
         self.label_embedding(
         Variable(torch.LongTensor(current_batch_size, 1).zero_() \
-        + self.BEG_INDEX).cuda()) \
+        + self.BEG_INDEX).cuda(self.cuda_dev)) \
         .view(current_batch_size, self.label_embedding_dim)
     else:
       init_label_emb = \
@@ -292,8 +295,8 @@ class ner(nn.Module):
         label_var = Variable(torch.LongTensor(label))
 
         if self.gpu:
-          sen_var = sen_var.cuda()
-          label_var = label_var.cuda()
+          sen_var = sen_var.cuda(self.cuda_dev)
+          label_var = label_var.cuda(self.cuda_dev)
 
         # Initialize the hidden and cell states
         # The axes semantics are
@@ -306,8 +309,8 @@ class ner(nn.Module):
           torch.zeros(2, current_batch_size, self.hidden_dim))
 
         if self.gpu:
-          init_enc_hidden = init_enc_hidden.cuda()
-          init_enc_cell = init_enc_cell.cuda()
+          init_enc_hidden = init_enc_hidden.cuda(self.cuda_dev)
+          init_enc_cell = init_enc_cell.cuda(self.cuda_dev)
 
         enc_hidden_seq, (enc_hidden_out, enc_cell_out) = \
           self.encode(sen_var, init_enc_hidden, init_enc_cell)
@@ -346,6 +349,7 @@ class ner(nn.Module):
         logP_seq = self.score2logP(score_seq)
 
         # Input: (N,C) where C = number of classes
+        # Target: (N) where each value is 0 <= targets[i] <= C−1
         #loss = loss_function(score_seq, label_var_for_loss)
 
         # We now use logSoftmax -> NLLLoss
@@ -356,7 +360,8 @@ class ner(nn.Module):
           loss_value = loss.cpu()
         else:
           loss_value = loss
-        loss_sum += loss_value.data.numpy()[0] * current_batch_size
+        #print(loss_value.data.numpy())
+        loss_sum += loss_value.data.numpy() * current_batch_size
 
         loss.backward()
         optimizer.step()
@@ -431,7 +436,7 @@ class ner(nn.Module):
     if self.gpu:
       init_label_emb = \
         self.label_embedding(
-        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda_dev) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
     else:
@@ -576,7 +581,7 @@ class ner(nn.Module):
     if self.gpu:
       init_label_emb = \
         self.label_embedding(
-        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda_dev) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
     else:
@@ -805,7 +810,9 @@ class ner(nn.Module):
     # End for t
 
     if self.attention:
-      attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+      # BUG: fix later
+      #attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
+      pass
     else:
       attention_pred_seq = None
 
@@ -860,8 +867,8 @@ class ner(nn.Module):
       label_var = Variable(torch.LongTensor(label))
 
       if self.gpu:
-        sen_var = sen_var.cuda()
-        label_var = label_var.cuda()
+        sen_var = sen_var.cuda(self.cuda_dev)
+        label_var = label_var.cuda(self.cuda_dev)
 
       # Initialize the hidden and cell states
       # The axes semantics are
@@ -872,8 +879,8 @@ class ner(nn.Module):
       init_enc_cell = Variable(torch.zeros((2, current_batch_size, self.hidden_dim)))
 
       if self.gpu:
-        init_enc_hidden = init_enc_hidden.cuda()
-        init_enc_cell = init_enc_cell.cuda()
+        init_enc_hidden = init_enc_hidden.cuda(self.cuda_dev)
+        init_enc_cell = init_enc_cell.cuda(self.cuda_dev)
 
       enc_hidden_seq, (enc_hidden_out, enc_cell_out) = self.encode(sen_var, init_enc_hidden, init_enc_cell)
 
@@ -1132,7 +1139,7 @@ class ner(nn.Module):
     if self.gpu:
       init_label_emb = \
         self.label_embedding(
-        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda() \
+        Variable(torch.LongTensor(batch_size, 1).zero_()).cuda(self.cuda_dev) \
         + self.BEG_INDEX) \
         .view(batch_size, self.label_embedding_dim)
     else:
@@ -1332,8 +1339,6 @@ class ner(nn.Module):
       .view(batch_size, 1)
     input_beam = beta_seq[seq_len - 1][:, 0]
 
-    #print("attention_seq=",attention_seq)
-
     if self.attention:
       # Now attention_seq is
       # in the shape of (output seq len, batch size, beam size, input seq len)
@@ -1343,7 +1348,6 @@ class ner(nn.Module):
       #
       # Here we initialize the first element
       attention_pred_seq = (attention_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
-      #print("t=",seq_len-1,",attention_pred_seq=",attention_pred_seq)
 
     logP_pred_seq = (logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
     accum_logP_pred_seq = (accum_logP_seq[seq_len - 1][range(batch_size), input_beam, :])[None, :, :]
@@ -1358,15 +1362,13 @@ class ner(nn.Module):
 
       if self.attention:
         attention_pred_seq = torch.cat([(attention_seq[t][range(batch_size), input_beam, :])[None, :, :], attention_pred_seq], dim = 0)
-        #print("t=",t,",attention_pred_seq=",attention_pred_seq)
 
       logP_pred_seq = torch.cat([(logP_seq[t][range(batch_size), input_beam, :])[None, :, :], logP_pred_seq], dim = 0)
       accum_logP_pred_seq = torch.cat([(accum_logP_seq[t][range(batch_size), input_beam, :])[None, :, :], accum_logP_pred_seq], dim = 0)
     # End for t
 
     if self.attention:
-      #print("attention_pred_seq=",attention_pred_seq)
-      # BUG: The following line has bug. Will delay fix later.
+      # BUG: to fix later
       #attention_pred_seq = torch.stack(attention_pred_seq, dim = 0)
       pass
     else:
