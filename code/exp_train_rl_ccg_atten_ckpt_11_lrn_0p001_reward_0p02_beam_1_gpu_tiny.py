@@ -24,7 +24,9 @@ except AttributeError:
 from model import AdaptiveActorCritic
 from ner import ner
 from optim import SharedAdam
-from rl_trainer_single import train_adaptive, eval_adaptive
+from rl_trainer_single_pytorch0p3p0 import train_adaptive, eval_adaptive
+
+
 
 matplotlib.use("Agg")
 
