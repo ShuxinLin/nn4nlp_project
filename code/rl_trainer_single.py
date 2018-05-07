@@ -133,7 +133,7 @@ def train_adaptive(rank,
     reward_std = np.std(reward_list)
     log_msg = "%d\t%f\t%f\t%f" % (epoch, reward_mean, reward_std, time_used)
     print(log_msg)
-    print(log_msg, file=logfile, flush=True)
+    #print(log_msg, file=logfile, flush=True)
 
     # Save shared model and (supposedly) shared optimizer
     # Purposely possibly over-writing other threads' model for the same epoch
@@ -344,7 +344,7 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
     if t <= seq_len - 2:
       entropies.append(entropy)
 
-    print("prob=",prob)
+    # print("prob=",prob)
     action = prob.multinomial().data
     log_prob = log_prob.gather(1, Variable(action))
 

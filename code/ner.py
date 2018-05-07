@@ -346,7 +346,6 @@ class ner(nn.Module):
         logP_seq = self.score2logP(score_seq)
 
         # Input: (N,C) where C = number of classes
-        # Target: (N) where each value is 0 <= targets[i] <= C−1
         #loss = loss_function(score_seq, label_var_for_loss)
 
         # We now use logSoftmax -> NLLLoss

@@ -189,7 +189,7 @@ def main():
   if gpu:
     machine = machine.cuda()
 
-  initial_beam_size = 1
+  initial_beam_size = 3
   # When you have only one beam, it does not make sense to consider
   # max_beam_size larger than the size of your label vocabulary
   max_beam_size = 10
@@ -201,7 +201,8 @@ def main():
 
   parser = argparse.ArgumentParser(description='A3C')
 
-  parser.add_argument('--logdir', default='../result_ccg_atten_ckpt_11_rl_lrn_0p001_reward_0p02_beam_1_gpu',
+  parser.add_argument('--logdir',
+                      default='../result_ccg_atten_ckpt_11_rl_lrn_0p001_reward_0p02_beam_3_gpu',
                       help='name of logging directory')
   parser.add_argument('--lr', type=float, default=0.001,
                       help='learning rate (default: 0.0001)')
