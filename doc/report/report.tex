@@ -123,13 +123,11 @@ Seq2Seq \cite{seq2seq_2014} has been a well-known model for machine translation 
 % Word embedding is the vector representation of a word and the outputs of word embedding layer is the input of encoder. In the previous assignment, word embeddings of words in the vocabulary are initialized as vectorized numbers randomly sampled from normal distribution and not learnable. In this assignment, pretrained word embeddings are used, so that words that have similar meaning can be made to correspond to close vector and obtain meaningful results in our experiments. For English datasets, we tried two widely used pretrained word embeddings - Word2Vec \cite{mikolov2013distributed} and GloVe \cite{pennington2014glove}. For German datasets, we tried fastText \cite{joulin2016fasttext} and the other version provided by Kartik \cite{goyal2017continuous}. 
 
 \subsection{Seq2Seq Encoder}
-The encoder introduces latent variable $Z$ which is intermediate connection between $X$ and $Y$, and models the probability $P(Z|X)$. But there is an inherent major problem specific to text domain is that the dimensionality of $X$ is usually too high to model efficiently. The popular solution is to learn an non-linear embedding space $E_X$ that shares the similarity of word relation with $X$, but in much smaller dimension. Such popular solution is referred to as word embedding. 
-% such as using word2vec \cite{mikolov2013distributed} or GLoVe \cite{pennington2014glove}. 
-
-Word embedding is the vector representation of a word and the outputs of word embedding layer is the input of encoder. In the previous assignment, word embeddings of words in the vocabulary are initialized as vectorized numbers randomly sampled from normal distribution and not learnable. In this assignment, pretrained word embeddings are used, so that words that have similar meaning can be made to correspond to close vector and obtain meaningful results in our experiments. For English datasets, we tried two widely used pretrained word embeddings - Word2Vec \cite{mikolov2013distributed} and GloVe \cite{pennington2014glove}. For German datasets, we tried fastText \cite{joulin2016fasttext} and the other version provided by Kartik \cite{goyal2017continuous}. 
-
-In common, those embedding methods try to minimize the Kullbark-Leiber divergence objective $D_{KL}(P(E_X) || P(X))$ where $dim(E_X) << dim(|X|)$. Each word in the vocabulary, instead of being a long one-hot vector, will become a short vector with the same length $D_X$. 
-
+The encoder introduces latent variable $Z$ which is intermediate connection between $X$ and $Y$, and models the probability $P(Z|X)$ where   
+\begin{equation}
+	P(Y|X) = \sum P(Z|X)P(Y|Z,X).
+  \end{equation}
+But there is an inherent problem specific to text domain is that the dimensionality of $X$ is too high to model efficiently. A popular solution is to learn an non-linear word embedding space $E_X$ that shares the similarity of word relation with $X$ but in much smaller dimension. Word embedding is the vector representation of a word and served as the input of encoder. In order to capture the syntactic and semantic relations among words, pre-trained word embeddings are used. For English datasets, we researched two widely used pretrained word embeddings - Word2Vec \cite{mikolov2013distributed} and GloVe \cite{pennington2014glove}. For German datasets, we tried fastText \cite{joulin2016fasttext} and the other version provided by \citep{goyal2017continuous}. 
 % The encoder and decoder each consists of a single-layer long short-term memory (LSTM) network. The input sequence $X = \{x_1, x_2, \dots, x_{T_x}\}$ is first fed into an embedding layer $E^x$, and the resulting embeddings of $X$ are then feed into the encoding LSTM. The initial cell and hidden states are set as
 % \begin{align}
 % 	\overrightarrow{c}_0 = 0, \\
@@ -298,7 +296,7 @@ Consider that at time step $t$ of the decoding, there are $B_{t-1}$ inputs, $\ha
 
 We propose the following heuristic rules to dynamically change the beam size at each step.
 \begin{itemize}
-\item If $\displaystyle{\frac{\sum'_t P(\hat{y}_t^{(B_{t-1})})}{\sum'_t P(\hat{y}_t^{(0)})}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P(\hat{y}_t^{(B_{t-1})})}{P(\hat{y}_t^{(0)})}} \leq r^{\textrm{word}}_{\textrm{low}}$, then $B_t = B_{t-1} - 1$.
+\item If $\displaystyle{\frac{\sum'_t P_{B_{t-1}}}{\sum'_t P_{B_1}}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_{B_1}}} \leq r^{\textrm{word}}_{\textrm{low}}$, then $B_t = B_{t-1} - 1$.
 \end{itemize}
 
 
