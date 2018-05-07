@@ -8,7 +8,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 import torch
-import torch.multiprocessing as mp
 
 import torch._utils
 try:
@@ -25,7 +24,7 @@ except AttributeError:
 from model import AdaptiveActorCritic
 from ner import ner
 from optim import SharedAdam
-from rl_trainer import train_adaptive, eval_adaptive
+from rl_trainer_single import train_adaptive, eval_adaptive
 
 matplotlib.use("Agg")
 
@@ -50,10 +49,10 @@ def get_index2label(entity_file):
 
 
 def construct_df(data):
-  dataset_path = '../dataset/German/'
+  dataset_path = '../dataset/CCGbank/'
 
-  indexed_sentence_file = dataset_path + data + '.de-en.ids1.de'
-  indexed_entity_file = dataset_path + data + '.de-en.ids1.en'
+  indexed_sentence_file = dataset_path + data + '_x'
+  indexed_entity_file = dataset_path + data + '_y'
   with open(indexed_sentence_file) as f:
     indexed_sentences = f.readlines()
   with open(indexed_entity_file) as f:
@@ -139,15 +138,15 @@ def main():
   # ---------------------------------------
   #result_path = "../result_lrn_0p001_rl/"
 
-  dict_file = "../dataset/German/vocab1.de"
-  entity_file = "../dataset/German/vocab1.en"
+  dict_file = "../dataset/CCGbank/dict_word"
+  entity_file = "../dataset/CCGbank/dict_tag"
   index2word = get_index2word(dict_file)
   index2label = get_index2label(entity_file)
   vocab_size = len(index2word)
   label_size = len(index2label)
 
-  train_X, train_Y = minibatch_of_one_de('train')
-  val_X, val_Y = minibatch_of_one_de('valid')
+  #train_X, train_Y = minibatch_of_one_de('train')
+  val_X, val_Y = minibatch_of_one_de('val')
   test_X, test_Y = minibatch_of_one_de('test')
 
   # ---------------------------------------
@@ -163,12 +162,11 @@ def main():
   ner_learning_rate = 0.001
 
   pretrained = None
-#  pretrained = 'de64'
 
   # ---------------------------------------
   #           GPU OR NOT?
   # ---------------------------------------
-  gpu = False
+  gpu = True
   if gpu and rnd_seed:
     torch.cuda.manual_seed(rnd_seed)
 
@@ -187,26 +185,25 @@ def main():
                 minibatch_size=batch_size, max_epoch=max_epoch, train_X=None,
                 train_Y=None, val_X=val_X, val_Y=val_Y, test_X=test_X,
                 test_Y=test_Y, attention=attention, gpu=gpu,
-                pretrained=pretrained, load_model_filename=load_model_filename,
-                load_map_location="cpu")
+                pretrained=pretrained, load_model_filename=load_model_filename)
   if gpu:
     machine = machine.cuda()
 
-  initial_beam_size = 1 
+  initial_beam_size = 3
   # When you have only one beam, it does not make sense to consider
   # max_beam_size larger than the size of your label vocabulary
-  max_beam_size = label_size
+  max_beam_size = 10
 
   # ============   INIT RL =====================
-  os.environ['OMP_NUM_THREADS'] = '1'
-  os.environ['CUDA_VISIBLE_DEVICES'] = ""
+  os.environ['OMP_NUM_THREADS'] = '4'
+  #os.environ['CUDA_VISIBLE_DEVICES'] = ""
 
 
   parser = argparse.ArgumentParser(description='A3C')
 
-  parser.add_argument('--logdir', default='../result_ccg_atten_ckpt_11_rl_lrn_0p001_reward_0p02_beam_1_gpu',
+  parser.add_argument('--logdir', default='../result_ccg_atten_ckpt_11_rl_lrn_0p001_reward_0p02_beam_3_gpu',
                       help='name of logging directory')
-  parser.add_argument('--lr', type=float, default=0.0001,
+  parser.add_argument('--lr', type=float, default=0.001,
                       help='learning rate (default: 0.0001)')
   parser.add_argument('--gamma', type=float, default=0.99,
                       help='discount factor for rewards (default: 0.99)')
@@ -214,10 +211,11 @@ def main():
                       help='number of epochs for training agent(default: 30)')
   parser.add_argument('--entropy-coef', type=float, default=0.01,
                       help='entropy term coefficient (default: 0.01)')
-  parser.add_argument('--num-processes', type=int, default=2,
+  parser.add_argument('--num-processes', type=int, default=1,
                       help='how many training processes to use (default: 4)')
   parser.add_argument('--num-steps', type=int, default=20,
                       help='number of forward steps in A3C (default: 20)')
+
   parser.add_argument('--tau', type=float, default=1.00,
                       help='parameter for GAE (default: 1.00)')
   parser.add_argument('--value-loss-coef', type=float, default=0.5,
@@ -228,7 +226,7 @@ def main():
                       help='random seed (default: 1)')
   parser.add_argument('--max-episode-length', type=int, default=1000000,
                       help='maximum length of an episode (default: 1000000)')
-  parser.add_argument('--name', default='train',
+  parser.add_argument('--name', default='test',
                       help='name of the process')
   parser.add_argument('--no-shared', default=False,
                       help='use an optimizer without shared momentum.')
@@ -237,45 +235,57 @@ def main():
   if not os.path.exists(args.logdir):
     os.mkdir(args.logdir)
 
+  shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size,
+                                     action_space=3)
+  #shared_model.share_memory()
+  
+
+  if args.no_shared:
+    shared_optimizer = None
+  # default here (False)
+  else:
+    shared_optimizer = SharedAdam(params=shared_model.parameters(),
+                                  lr=args.lr)
+    # optimizer = optim.Adam(shared_model.parameters(), lr=learning_rate)
+    shared_optimizer.share_memory()
+
+  # --------------------------------------------
+  #                 RL TRAINING
+  # --------------------------------------------
   # For German dataset, f_score_index_begin = 5 (because O_INDEX = 4)
   # For toy dataset, f_score_index_begin = 4 (because {0: '<s>', 1: '<e>', 2: '<p>', 3: '<u>', ...})
-  f_score_index_begin = 5
+  # For CCG dataset, f_score_index_begin = 2 (because {0: _PAD, 1: _SOS, ...})
+  f_score_index_begin = 2
   # RL reward coefficient
   reward_coef_fscore = 1
-  reward_coef_beam_size = 0.1
-
-  logfile = open(os.path.join(args.logdir, "eval_test.txt"), "w+")
-
-  model = AdaptiveActorCritic(max_beam_size=max_beam_size, action_space=3)
-  # Marking as for evaluation
-  model.eval()
+  reward_coef_beam_size = 0.02
 
   load_map_location = "cpu"
 
+  logfile = open(os.path.join(args.logdir, "eval_test.txt"), "w+")
   for epoch in range(0, args.n_epochs):
+    print("Eval for epoch {}".format(epoch))
     load_model_filename = os.path.join(args.logdir, "ckpt_" + str(epoch) + ".pth")
     checkpoint = torch.load(load_model_filename, map_location=load_map_location)
-    model.load_state_dict(checkpoint["state_dict"])
-
+    shared_model.load_state_dict(checkpoint["state_dict"])
+   
+    print("\tEval now...")
     fscore, total_beam_number_in_dataset, avg_beam_size, time_used = \
-      eval_adaptive(machine,
-                    max_beam_size,
-                    model,
-                    test_X, test_Y, index2word, index2label,
-                    "test", False, "adaptive", initial_beam_size,
-                    reward_coef_fscore, reward_coef_beam_size,
-                    f_score_index_begin,
-                    args)
-
+        eval_adaptive(
+                 machine,
+                 max_beam_size,
+                 shared_model,
+                 test_X, test_Y, index2word, index2label,
+                 "test", args.name, "adaptive", initial_beam_size,
+                 reward_coef_fscore, reward_coef_beam_size,
+                 f_score_index_begin,
+                 args)
     log_msg = "%d\t%f\t%d\t%f\t%f" % (epoch, fscore, total_beam_number_in_dataset, avg_beam_size, time_used)
     print(log_msg)
-    #print(log_msg, file=logfile, flush=True)
     logfile.write(log_msg + '\n')
     logfile.flush()
-  # End for epoch
 
-  logfile.close()
-
+  logfile.close() 
 
 if __name__ == "__main__":
   main()
