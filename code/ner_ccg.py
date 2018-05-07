@@ -843,9 +843,8 @@ class ner(nn.Module):
     for batch in eval_data_X:
       instance_num += len(batch)
 
-    true_pos_count = 0
-    pred_pos_count = 0
-    true_pred_pos_count = 0
+    correct_count = 0
+    total_count = 0
 
     # train_memory = [(action, state vector), ...]
     if generate_episode:
@@ -910,15 +909,8 @@ class ner(nn.Module):
         #print("predicted label =", label_pred_seq)
         #print("episode =", episode)
 
-      for label_index in range(f_score_index_begin, self.label_size):
-        true_pos = (label_var == label_index)
-        true_pos_count += true_pos.float().sum()
-
-        pred_pos = (label_pred_seq == label_index)
-        pred_pos_count += pred_pos.float().sum()
-
-        true_pred_pos = true_pos & pred_pos
-        true_pred_pos_count += true_pred_pos.float().sum()
+      correct_count += (label_pred_seq == label_var).sum()
+      total_count += label_var.shape[1]
 
       # Write result into file
       if result_path:
@@ -957,24 +949,18 @@ class ner(nn.Module):
     # End for batch_idx
 
     if self.gpu:
-      true_pos_count = true_pos_count.cpu()
-      pred_pos_count = pred_pos_count.cpu()
-      true_pred_pos_count = true_pred_pos_count.cpu()
+      correct_count = correct_count.cpu()
+      total_count = total_count.cpu()
 
     """
     true_pos_count = true_pos_count.data.numpy()[0]
     pred_pos_count = pred_pos_count.data.numpy()[0]
     true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
     """
-    true_pos_count = true_pos_count.data.numpy()
-    pred_pos_count = pred_pos_count.data.numpy()
-    true_pred_pos_count = true_pred_pos_count.data.numpy()
+    correct_count = correct_count.data.numpy()
+    total_count = total_count.data.numpy()
 
-    precision = true_pred_pos_count / pred_pos_count if pred_pos_count > 0 else 0
-
-    recall = true_pred_pos_count / true_pos_count if true_pos_count > 0 else 0
-    fscore = 2 / ( 1/precision + 1/recall ) if (precision > 0 and recall > 0) else 0
-    fscore = fscore * 100
+    accuracy = float(correct_count) / total_count
 
     if result_path:
       f_sen.close()
@@ -991,7 +977,7 @@ class ner(nn.Module):
     avg_beam_sizes = list(filter(lambda xx: xx > 0, avg_beam_sizes))
     avg_beam_size = sum(avg_beam_sizes) / len(avg_beam_sizes)
 
-    return fscore, total_beam_number_in_dataset, avg_beam_size
+    return accuracy, total_beam_number_in_dataset, avg_beam_size
 
 
   # decode_beam_step - this function basically servers as the "env.step()" function in RL: (citing below)
