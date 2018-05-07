@@ -149,16 +149,16 @@ As usual for text sequence, the encoder employs an RNN, which model output at ea
 	({h^{enc}_t}, {c^{enc}_t}) = RNN(h^{enc}_{t-1}, x_t)
   \end{equation}
 where $h_i$ and $c_i$ denotes the hidden and cell state at time step $t$ respectively. Thus the encoder output $Z$ is the last hidden state $h_T$ and cell state $c_T$ as:
-  \begin{equation}
+  \begin{equation} \label{eq:z}
       {Z} = ({h^{enc}_T}, {c^{enc}_T}) = RNN(h^{enc}_{T-1}, x^{enc}_T)	
   \end{equation}
 
 \subsection{Seq2Seq Decoder}
-As mentioned, the decoder will take encoder's output Z, and then try to decode each token $\tilde{y_t}$ corresponding to $x_t$. It models the conditional probability: 
+As mentioned, the decoder will take encoder's output $Z$, and try to decode each token $\tilde{y_t}$ corresponding to $x_t$. It models the conditional probability: 
   \begin{equation}
       P(Y|Z,X) = \prod_{t=1}^{T} p(Y_t|{Z}, Y_1, ..., Y_{t-1})
   \end{equation}
-with a note that $Y_0$ is the special token that denotes the start of a sentence (more detail in the same section below). 
+with a note that $Y_0$ is the special token that denotes the start of a sentence. 
 
 The Seq2Seq training target is to find the best translation sequence which is as close to the ground truth Y as possible, or formally:
   \begin{equation}
@@ -168,20 +168,20 @@ This is the phase where we employ the searching algorithm such as greedy search 
   \begin{equation}
       (h^{dec}_t, c^{dec}_t) = RNN(h^{dec}_{t-1}, y_t) \label{eq:rnn_dec}
   \end{equation}
-where the initial hidden and cell state is set from the encoder, as $(h^{enc}_1, c^{enc}_1) = Z$ (while that of the encoder can be initialized as zeros or random numbers). 
+where the initial hidden and cell state is set from the encoder by Equation \ref{eq:z}.
 
-Similar to what happens in the encoder, the golden label sequence $Y = \{y_1, y_2, \dots, y_{T}\}$ is also first casted into an embedding created by the target-space embedding layer $E_Y$, and then fed into the decoding RNN network. Note that, slightly different from the encoder, here it is $y_{t-1}$ that is fed into the RNN cell at step $t$ (hence actually the last label $y_{T}$ is not fed as the input of the decoder; the input sequence is $\{y_0, y_1, \dots, y_{T-1}\}$). For the initial input at step $t = 1$, we use a special token $y^* =$ \texttt{<BEG>} to denote the beginning of the label sequence.
+Similar to the encoder, the golden label sequence $Y$ is also first casted into an embedding $E_Y$, and then fed into the decoding RNN network. Note that, slightly different from the encoder, here it is $y_{t-1}$ that is fed into the RNN cell at step $t$ (hence the last label $y_{T}$ is not fed; the input sequence is $\{y_0, y_1, \dots, y_{T-1}\}$). For the initial input at step $t = 1$, we use a special token $y^* =$ \texttt{<BEG>} to denote the beginning of the label sequence.
 
-The second phase is to convert a hidden state of each token to the probability over the whole vocabulary: 
+The second phase is to convert the hidden state of tokens to the probability over the entire label space: 
   \begin{equation}
       p_{y_t} = softmax(W_{s} h^{dec}_t + b_{s}) \label{eq:pt}
   \end{equation}
-where $W_{s}$ and $b_{s}$ are the shared weight matrix and bias vector on top of the decoder's hidden layer in the computational graph. 
+where $W_{s}$ and $b_{s}$ are the shared weight and bias vector on top of the decoder's hidden layer. 
 
 \subsection{Fixed Attention}
-Attention model \cite{bahdanau2014neural,luong2015effective} is one of the most useful tricks in training Seq2Seq models. The idea is, instead of solely using the RNN function as in \ref{eq:rnn_dec} in which every output only depends on current input token and the previous hidden state, we augment this output by giving it a chance to look back and calculate the similarity with each token in the encoder \textit{output} sequence. These similarity functions are varied in practice. 
+Attention model \cite{bahdanau2014neural,luong2015effective} is one of the useful tricks in training Seq2Seq models. The idea is, instead of using the RNN function as in Equation \ref{eq:rnn_dec} in which every output only depends on current input token and the previous hidden state, we augment this by giving it a chance to look back and calculate the similarity with each token in the encoder \textit{output} sequence. The similarity functions are varied in practice. 
 
-Formally, the equation \ref{eq:pt} for decoder output at time step $t$ is transformed into (we omit T in the encoder part for simplicity): 
+Then the Equation \ref{eq:pt} for decoder output at step $t$ is transformed to: 
   \begin{equation}
       p_{y_t} = softmax(W_{s} \cdot attn(h^{dec}_t, h^{enc}) + b_{s}) \label{eq:pt_attn}
   \end{equation}
@@ -202,7 +202,7 @@ can be a as simple as a dot product $sim_i = h^{dec}_t \cdot h^{encT}_i $ \cite{
   	sim_i = (h^{dec}_t \cdot W^{dec} + h^{enc}_i \cdot W^{enc}) \cdot V
   \end{equation}
   
-In our Tagging problems, we have a valuable prior that at every time step $t$, the output $h^{dec}_t$ is absolutely similar to $h^{enc}_t$, i.e. they have the same time step. Consequently, equation \ref{eq:a} will give the probability 1.0 to $sim_t$ and zero to the rest, leading to the change of equation \ref{eq:attn} into a simple form:
+In our Tagging problems, we have a valuable prior that at every time step $t$: the output $h^{dec}_t$ is absolutely similar to $h^{enc}_t$, i.e. they have the same time step. Consequently, equation \ref{eq:a} will give the probability 1.0 to $sim_t$ and zero to the rest, leading to the change of equation \ref{eq:attn} into a simple form:
   \begin{equation}
 	  attn(h^{dec}_t, h^{enc}) = h^{enc}_t
   \end{equation}
@@ -215,9 +215,9 @@ Finally, to train the model, we use the canonical cross-entropy loss:
       \mathcal{L} = -log(P(Y|X)) = - \sum^T_{t=2} log(p_{y_t})
   \end{equation}
   
-In detail, the traditional training approach which uses the teacher-forcing algorithm will feed the correct label $y_t$ to each time step $t$. But this oftentimes leads to an unwanted behavior where an error in will propagate severely at test time, when the model has no idea about the gold labels. The main reason is that, by using this training scheme, the model is not able to learn about how to handle a wrong prediction properly. 
+In detail, the traditional training which uses the teacher-forcing algorithm will feed the correct label $y_t$ to each time step $t$. But this oftentimes leads to an unwanted behavior where an error in will propagate severely at test time, when the model has no idea about the gold labels. By using this training scheme, the model is not able to learn about how to handle a wrong prediction properly. 
 
-One popular method is to employ a schedule where teacher-forcing is used at a random chance at each step, and the other chance is to feed the predicted token $\tilde{y_t}$ instead of the gold label $y_t$ and let the model learn to penalize and correct wrong predictions appropriately. 
+One popular method is to employ a schedule where teacher-forcing is used at a random chance at each step, and the other chance is to feed the predicted $\tilde{y_t}$ instead of the gold label $y_t$ and let the model learn to penalize and correct wrong predictions appropriately. 
 
 % \subsection{Training-time decoding}
 
@@ -252,26 +252,28 @@ One popular method is to employ a schedule where teacher-forcing is used at a ra
 
 \subsection{Test-time decoding}
 
-In test time, as in training time, the decoder receives the last hidden and cell states from the encoder as the initial hidden and cell states. The initial input at step $t = 1$ is also the universal special token $y^* =$ \texttt{<BEG>} or \texttt{<s>} in Figure \ref{fig:attention}. But, different from training time, the inputs at time steps $t = 2, \dots, T - 1$ depend on the predicted label at the previous step. Roughly speaking, we would ``replace'' the input $y_{t-1}$ in training time by $\hat{y}_{t-1}$ at test time. The exact way to do so is determined by the decoding algorithm.
+In test time, as in training time, the decoder receives the last hidden and cell states from the encoder as initial states. The initial input at step $t = 1$ is also the universal special token $y^* =$ \texttt{<BEG>} or \texttt{<s>}. But, different from training time, the inputs at time steps $t = 2, \dots, T - 1$ depend on the predicted label at the previous step. Roughly speaking, we would $replace$ the input $y_{t-1}$ by $\hat{y}_{t-1}$ at test time. The exact way to do so is determined by the decoding algorithm.
 
 Note that, similar to the case of attention, we can have a much simpler decoding algorithm since we know beforehand the (equal) length of output given an input, so we will not take care of the difficulty of handling stopping criteria for this phase.  
 
 \subsubsection{Greedy Search}
-In this assignment, we use the greedy decoding at test time which will greedily pick the best prediction (that has the highest probability) at each time step as the only selection criterion. 
+Greedy decoding at test time is to greedily pick the best prediction (with the highest probability) at each time step as the only selection criterion. 
 
 Formally, at step $t=1$, we compute $p_{y_1}$ using \eqref{eq:pt}, and pick the token $\hat{y}_1$ that has the highest probability $p_1 = max(p_{y_1})$ as our predicted label. 
 
 Next, we keep an accumulated probability $P_t$ initialized as $P_1 = p_1$. At step $t = 2, 3, \dots, T_y$, after computing $p_t$, we first compute the accumulated probability $P_t = p_t * P_{t-1} = \prod_{i=1}^{t-1} p_i$, and then pick the label $\hat{y}_t$ which has the highest probability $P_t$ as our predicted label at step $t$. 
 
-In practice, we often consider $log(P_t)$ instead of $P_t$ to prevent the well-known numeric underflow issue in computer. 
+In practice, we consider $log(P_t)$ instead of $P_t$ to prevent the common numeric underflow issue. 
 
 \subsubsection{Hard Beam Search}
 Extended from greedy search, hard beam search, although more architecturally and hence computationally expensive, is more widely, and traditionally used \cite{seq2seq_2014} for it is able to prevent the label bias problem in Seq2Seq models. It is also known as \textit{TopK} searching algorithm because at every step, instead of considering the maximum value, it always maintains a window of size $K$ for the best $K$ options. For this reason, greedy search is just its special case where $K=1$. 
 
-Formally, at step 1, instead of picking the only $\hat{y}_1$, we keep the K best labels $\{ \hat{y}^{(1)}_{1}, \hat{y}^{(1)}_{2}, \dots, \hat{y}^{(1)}_{K} \}$. Note that we need a tracking tabular mapping the words in vocabulary to those labels at each time step. And similar to greedy search, we keep the accumulated probabilities $\{ P_1, P_2, ..., P_K \}$, which are initialized as 
+For example, at step $t=1$, instead of picking the only $\hat{y}_1$, we keep the $K$ best labels $\{ \hat{y}^{(1)}_{1}, \hat{y}^{(1)}_{2}, \dots, \hat{y}^{(1)}_{K} \}$. Note that we need a tracking table mapping the words in vocabulary to those labels. Similar to greedy search, we keep the accumulated probabilities $\{ P_1, P_2, ..., P_K \}$, which are initialized as 
 $\{ p(y^{(1)}_{1}), p(y^{(1)}_{2}), \dots, p(y^{(1)}_{K}) \}$. We start to build a tree with K branches. 
 
-In detail, later at time step $t$, we have K options of inputs $\{ y^{(t)}_k\}^{k=1}_K$, and for each input $y^{(t-1)}_{k}$, we also calculate K best probabilities $\{ p({y}^{(t)}_{k1}), p({y}^{(t)}_{k2}), \dots, p({y}^{(t)}_{kK}) \}$. Note that this time step, we still only keep K branches in total, so for this input, we keep only the best global cases, i.e. across all beams (also based on the accumulated log probabilities), along with recording the mapped label associated with that probability, and so on. Finally, the highest accumulated sum-log will be chosen and the sequence of predicted labels are pulled out by back tracking the tabular. 
+In detail, later at time step $t$, we have $K$ options of inputs $\{ y^{(t)}_k\}^{k=1}_K$, and for each input $y^{(t-1)}_{k}$, we also calculate K best probabilities $\{ p({y}^{(t)}_{k1}), p({y}^{(t)}_{k2}), \dots, p({y}^{(t)}_{kK}) \}$. Note that this time step, we still only keep $K$ branches in total, i.e. we keep only the best global cases across all beams (also based on the accumulated log probabilities) along with recording the mapped label associated with that probability. Finally, the highest accumulated sum-log will be chosen and the predicted label sequence is pulled out by backtracking the mapping table. 
+
+Compared with greedy search, hard beam search with fixed beam size trades processing time with the accuracy since best scoring sequence will eventually be captured as the beam size grows. However, it always process $|B| * |V_{label}|$ tokens where $|B|$ is beam size at each time step, which consumes not only a a large amount of time but memory as well. 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -280,11 +282,11 @@ In detail, later at time step $t$, we have K options of inputs $\{ y^{(t)}_k\}^{
 \section{Adaptive Beam Search by Heuristic Pruning and Growing}
 \label{sec:Heuristic}
 
-To increase the search efficiency as well as the optimality of the resulting sequence, we propose the heuristic rules to prune or grow the beam size of the search tree space during the test-time decoding. The intuition behind the design is that, if we predict that some branches are much more probable than the rest of the branches, it may be reasonable to skip searching through the less probable branches. Furthermore, unlike using some fixed beam size, we should also include as many beams as possible if they are comparably probable candidates.
+To increase the search efficiency as well as the optimality of the resulting sequence, we propose the heuristic rules to prune or grow the beam size of the search tree space during the test-time decoding. The intuition behind the design is that, if we predict that some branches are much more probable than the rest of the branches, it might be reasonable to skip searching through the less probable branches. Furthermore, unlike fixing the beam size, we should also include as many beams as possible if they are comparably probable candidates at each time step.
 
-In this work, we adopt the approach that we only incrementally increase or decrease the beam size during the search process. Such design choice facilitates the comparison between the performance of the heuristic rules and the reinforcement learning agent we will be discussing later in Sec.~\ref{sec:RL}.
+In this work, we adopt the novel approach that we only incrementally increase or decrease the beam size during the search process. Such design choice facilitates the comparison between the performance of the heuristic rules and the reinforcement learning agent we will be discussing later in Section ~\ref{sec:RL}.
 
-Consider that at time step $t$ of the decoding, there are $B_{t-1}$ inputs, $\hat{y}_{t-1}^{(b)}$, $b = 1, \dots, B_{t-1}$, from the $B_{t-1}$ previous step of the decoder output. By decoding these $B_{t-1}$ inputs, we obtain $B_{t-1} \times |V^y|$ probability predictions for the $|V^y|$ possible targets in $B_{t-1}$ beams. We sort the $B_{t-1} \times |V^y|$ probabilities into a sorted list $\{ P_1, \dots, P_{B_{t-1} |V^y|} \}$, with $P_1$ being the highest probability. We then pick the first $B_t$ elements from the list to form the new beam produced by this decoding step, with the corresponding target words $\{ \hat{y}_{t}^{(1)}, \dots, \hat{y}_{t}^{(B_t)} \}$. In the standard beam search where the beam size is kept fixed, we have $B_t = B_{t-1}$ at each step.
+In detail, consider that at time step $t$ of the decoding, there are $B_{t-1}$ inputs, $\hat{y}_{t-1}^{(b)}$, $b = 1, \dots, B_{t-1}$, from the $B_{t-1}$ previous step of the decoder output. By decoding these $B_{t-1}$ inputs, we obtain $B_{t-1} \times |V^y|$ probability predictions for the $|V^y|$ possible targets in $B_{t-1}$ beams. We sort the $B_{t-1} \times |V^y|$ probabilities into a sorted list $\{ P_1, \dots, P_{B_{t-1} |V^y|} \}$, with $P_1$ being the highest probability. We then pick the first $B_t$ elements from the list to form the new beam produced by this decoding step, with the corresponding target words $\{ \hat{y}_{t}^{(1)}, \dots, \hat{y}_{t}^{(B_t)} \}$. In the standard beam search where the beam size is kept fixed, we have $B_t = B_{t-1}$ at each step.
 
 We propose the following heuristic rules to dynamically change the beam size at each step.
 \begin{itemize}

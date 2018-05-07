@@ -344,11 +344,11 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
     if t <= seq_len - 2:
       entropies.append(entropy)
 
-    print("prob=",prob)
+    #print("prob=",prob)
     #action = prob.multinomial().data
     action = torch.distributions.Categorical(prob).sample()
-    print("action=",action)
-    print("then... => ", Variable(action[None, :]))
+    #print("action=",action)
+    #print("then... => ", Variable(action[None, :]))
     log_prob = log_prob.gather(1, Variable(action[None, :]))
 
     # state, reward, done, _ = env.step(action.numpy())
