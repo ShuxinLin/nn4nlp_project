@@ -139,22 +139,22 @@ But there is an inherent problem specific to text domain is that the dimensional
 %%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.7\linewidth]{fig_architecture}
-\caption{Architecture of Neural Seq2Seq model.}
+\includegraphics[width=1.0\linewidth]{archi.png}
+\caption{Architecture of Seq2Seq model with fixed attention. The special token that denotes a beginning of a sentence is denoted as \texttt{<s>}. At each time step, the output $h^{dec}_t$ only looks back the corresponding input of the same time step $h^{enc}_t$ (denoted as $o_t$ in this figure).}
 \label{fig:fig_architecture}
 \end{figure}
 %%%%%%%%%%%%%%%%%%%%%%%%%
-As usual for text sequence, the encoder employs an RNN, which can model output at each time step as: 
+As usual for text sequence, the encoder employs an RNN, which model output at each time step as: 
   \begin{equation}
 	({h^{enc}_t}, {c^{enc}_t}) = RNN(h^{enc}_{t-1}, x_t)
   \end{equation}
-where $h_i$ and $c_i$ denotes the hidden and cell state at time step $t$ respectively. The encoder output is the last hidden state $h_T$ and cell state $c_T$, which is the intermediate representation for input $X$. 
+where $h_i$ and $c_i$ denotes the hidden and cell state at time step $t$ respectively. Thus the encoder output $Z$ is the last hidden state $h_T$ and cell state $c_T$ as:
   \begin{equation}
       {Z} = ({h^{enc}_T}, {c^{enc}_T}) = RNN(h^{enc}_{T-1}, x^{enc}_T)	
   \end{equation}
 
 \subsection{Seq2Seq Decoder}
-As mentioned, the decoder will take encoder's output Z, and then try to decode each token $\tilde{y_t}$ corresponding to $x_t$. Formally it models the conditional probability: 
+As mentioned, the decoder will take encoder's output Z, and then try to decode each token $\tilde{y_t}$ corresponding to $x_t$. It models the conditional probability: 
   \begin{equation}
       P(Y|Z,X) = \prod_{t=1}^{T} p(Y_t|{Z}, Y_1, ..., Y_{t-1})
   \end{equation}
@@ -179,14 +179,6 @@ The second phase is to convert a hidden state of each token to the probability o
 where $W_{s}$ and $b_{s}$ are the shared weight matrix and bias vector on top of the decoder's hidden layer in the computational graph. 
 
 \subsection{Fixed Attention}
-%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.9\linewidth]{fixed_attention}
-\caption{Architecture of the fixed attention model. At each time step, the output $h^{dec}_t$ only looks back the corresponding input of the same time step $h^{enc}_t$ (denoted as $o_t$ in this figure). The special token that denotes a beginning of a sentence is denoted as \texttt{<s>}.}
-\label{fig:attention}
-\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%%
 Attention model \cite{bahdanau2014neural,luong2015effective} is one of the most useful tricks in training Seq2Seq models. The idea is, instead of solely using the RNN function as in \ref{eq:rnn_dec} in which every output only depends on current input token and the previous hidden state, we augment this output by giving it a chance to look back and calculate the similarity with each token in the encoder \textit{output} sequence. These similarity functions are varied in practice. 
 
 Formally, the equation \ref{eq:pt} for decoder output at time step $t$ is transformed into (we omit T in the encoder part for simplicity): 
@@ -215,7 +207,7 @@ In our Tagging problems, we have a valuable prior that at every time step $t$, t
 	  attn(h^{dec}_t, h^{enc}) = h^{enc}_t
   \end{equation}
 
-For implementation, we keep this "fixed" setting with Bahdanau attention, and so we only need to learn the parameters $W^{dec},W^{enc}, V$ before passing the decoder output into softmax in \ref{eq:pt_attn} for decoding. Figure \ref{fig:attention} illustrates our attention setting. And as a trick, we can concatenate $h^{dec}_t$ and $h^{enc}$ so that we only need learn only one matrix $W$ whose output dimension is the concatenated hidden sizes of both the encoder and decoder combined. 
+For implementation, we keep this "fixed" setting with Bahdanau attention, and so we only need to learn the parameters $W^{dec},W^{enc}, V$ before passing the decoder output into softmax in \ref{eq:pt_attn} for decoding. Figure \ref{fig:fig_architecture} illustrates our attention setting. And as a trick, we can concatenate $h^{dec}_t$ and $h^{enc}$ so that we only need learn only one matrix $W$ whose output dimension is the concatenated hidden sizes of both the encoder and decoder combined. 
 
 \subsection{Seq2Seq Training}
 Finally, to train the model, we use the canonical cross-entropy loss: 
@@ -296,9 +288,12 @@ Consider that at time step $t$ of the decoding, there are $B_{t-1}$ inputs, $\ha
 
 We propose the following heuristic rules to dynamically change the beam size at each step.
 \begin{itemize}
-\item If $\displaystyle{\frac{\sum'_t P_{B_{t-1}}}{\sum'_t P_{B_1}}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_{B_1}}} \leq r^{\textrm{word}}_{\textrm{low}}$, then $B_t = B_{t-1} - 1$.
+\item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} \leq r^{\textrm{word}}_{\textrm{low}}$, then decrease the beam size: $B_t = B_{t-1} - 1$.
+\item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} > r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} > r^{\textrm{word}}_{\textrm{low}}$, then increase the beam size: $B_t = B_{t-1} + 1$.
 \end{itemize}
+The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. Note that to avoid numerical underflow, we work in the logarithmic space as we implement the rules.
 
+%HERE...
 
 
 
