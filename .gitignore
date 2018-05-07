@@ -19,14 +19,10 @@ dataset/CoNLL-2003/processed_*
 dataset/CoNLL-2003/vocab_dict
 
 gitignore
-
 result
-
 code/fig_exp1.pdf
-
 result_*
-
 doc/checkpoint2/acl2018.pdf
-
 code/rl_beam_*
+doc/report/report.pdf
 
