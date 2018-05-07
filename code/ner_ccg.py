@@ -950,7 +950,7 @@ class ner(nn.Module):
 
     if self.gpu:
       correct_count = correct_count.cpu()
-      total_count = total_count.cpu()
+      #total_count = total_count.cpu()
 
     """
     true_pos_count = true_pos_count.data.numpy()[0]
@@ -958,7 +958,7 @@ class ner(nn.Module):
     true_pred_pos_count = true_pred_pos_count.data.numpy()[0]
     """
     correct_count = correct_count.data.numpy()
-    total_count = total_count.data.numpy()
+    #total_count = total_count.data.numpy()
 
     accuracy = float(correct_count) / total_count
 
