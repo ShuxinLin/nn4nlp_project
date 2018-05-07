@@ -919,11 +919,11 @@ class ner(nn.Module):
       correct_count += (label_pred_seq == label_var).sum()
       total_count += label_var.shape[1]
 
-      print("input sentence =", sen)
-      print("true label =", label)
-      print("predicted label =", label_pred_seq)
-      print("correct_count=",(label_pred_seq == label_var).sum())
-      print("total_count=",label_var.shape[1])
+      #print("input sentence =", sen)
+      #print("true label =", label)
+      #print("predicted label =", label_pred_seq)
+      #print("correct_count=",(label_pred_seq == label_var).sum())
+      #print("total_count=",label_var.shape[1])
 
       # Write result into file
       if result_path:
