@@ -348,7 +348,8 @@ def decode_one_sentence_adaptive_rl(machine, seq_len, init_dec_hidden,
     #action = prob.multinomial().data
     action = torch.distributions.Categorical(prob).sample()
     print("action=",action)
-    log_prob = log_prob.gather(1, Variable(action))
+    print("then... => ", Variable(action[None, :]))
+    log_prob = log_prob.gather(1, Variable(action[None, :]))
 
     # state, reward, done, _ = env.step(action.numpy())
     # done = done or episode_length >= args.max_episode_length
