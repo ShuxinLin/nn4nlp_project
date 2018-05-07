@@ -826,7 +826,10 @@ def decode_one_sentence_adaptive_rl_eval( \
     # TODO: for naive MLP policy network only
     prob = prob.view(1, -1)
 
-    action = prob.multinomial().data
+    # action = prob.multinomial().data
+
+    # deterministic prediction
+    action = prob.max(1, keepdim=True)[1].data
 
     # state, reward, done, _ = env.step(action.numpy())
     # done = done or episode_length >= args.max_episode_length
