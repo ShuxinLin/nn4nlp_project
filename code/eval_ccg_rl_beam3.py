@@ -238,7 +238,7 @@ def main():
   shared_model = AdaptiveActorCritic(max_beam_size=max_beam_size,
                                      action_space=3)
   #shared_model.share_memory()
-  
+  shared_model.eval()  
 
   if args.no_shared:
     shared_optimizer = None
