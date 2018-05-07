@@ -1289,7 +1289,7 @@ class ner(nn.Module):
       if generate_episode:
         # Compute the F-score for the sequence [0, 1, ..., t] (length t+1) using y_seq, betq_seq we got so far. This is the ("partial", so to speak) F-score at this t.
         label_pred_seq, accum_logP_pred_seq, logP_pred_seq, attention_pred_seq = self.backtracking(t + 1, batch_size, y_seq, beta_seq, attention_seq, logP_seq, accum_logP_seq)
-        cur_fscore = self.get_fscore(label_pred_seq, label_true_seq, f_score_index_begin)
+        cur_fscore = self.get_accuracy(label_pred_seq, label_true_seq, f_score_index_begin)
 
         # If t >= 2, compute the reward,
         # and generate the experience tuple ( s_{t-1}, a_{t-1}, r_{t-1}, s_t )
