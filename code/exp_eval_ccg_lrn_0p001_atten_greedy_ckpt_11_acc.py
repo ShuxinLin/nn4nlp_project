@@ -123,7 +123,7 @@ def main():
   vocab_size = len(index2word)
   label_size = len(index2label)
 
-  val_X, val_Y = minibatch_of_one_de('valtiny')
+  val_X, val_Y = minibatch_of_one_de('val')
   test_X, test_Y = minibatch_of_one_de('test')
 
   # Using word2vec pre-trained embedding
