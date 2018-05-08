@@ -311,8 +311,7 @@ Because our setting is very specific, it is difficult to inherit from the tradit
 
 In particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step $t$ of the decoder output, and then determines to take an action among three possible options towards the beam size, which are \textit{\{decrease, keep, increase \}}. Likewise, our action space is 3. 
 
-%
-
+%HERE...
 
 \begin{figure}[ht]
 \centering
@@ -323,7 +322,7 @@ In particularly, we consider the scenario that there is an agent observing the p
 
 To determine which action is taken, we introduce the reward, by combining 3 different numbers given a time step $t$: 
 \begin{itemize}
-	\item Cumulative log probability of the beams from timestep $0$. This criterion is traditionally used in beam search for Seq2Seq model. 
+	\item Cumulative log probability of the beams from time step $t=0$. This criterion is traditionally used in beam search for Seq2Seq model. 
     \item Current log probability of top words in the beams. 
     \item Current beam size 
 \end{itemize}
@@ -347,7 +346,37 @@ Actor-Critic RL \cite{sutton1998reinforcement} is known to be a popular method t
 
 Our A3C architecture is shown in Figure \ref{fig:a3c}. From the environment defined above, we use a shared model and initialize many training agents which share the same optimizer as well, to asynchronously update the model policy network during training. Each episode stands for each sentence containing the tagging task for each token in the sentence. 
 
-Formally, we have a main actor which aims to learn the policy function $\pi()$
+Formally, we have a main actor which aims to learn the policy function $\pi(a_t | s_t; \theta)$ where $\theta$ is the parameter of this policy deep network. We oftentimes approximate this function by a deep neural network where an input is the state, which in our case is a flattened vector of length $l$ and outputs a logits vector of size 3 (action space). To reduce the variance and high sample complexity, we have a critic agent which acts like an adaptive baseline network, which co-progress with the actor to push its accuracy in choosing more precise actions. The critic network leans a value function $V(s_t; \theta_v)$, which outputs a single scalar. 
+
+The reward for each time step is traditionally calculated as the cumulative discounted rewards, with the last term is the value of critic network at that time: 
+\[
+% 	R_t = r(a_0, s_0) + \gamma r(a_{1}, s_{1}) + \cdots + \gamma^{T-1} r(a_{T-1}, s_{T-1}) + \gamma^T V() \\
+    R_t = \sum_{i=0}^{T-1} \gamma^i r(s_{t+i}, a_{t+i}) + \gamma^T V(s_{t+T; \theta_t})
+\]
+where T is the episode length, which is the sentence's length being considered and $t$ is the current timestep. Here the sentence is always limited, so we don't have to bound the episode length as in such cases as game playing. 
+
+The advantage at each time step is the difference between the discounted reward and the critic value: 
+\[
+	A(s_t, a_t) = R_t - V(s_t; \theta_v)
+\]
+
+The policy (actor) loss will be: 
+\begin{equation}
+\begin{aligned}
+	L_{actor} = \\
+    \sum_{i=1}^{N} \sum_{t=0}^{T} log \, \pi(a_t | s_t; \theta) \gamma^t (R_t - V(s_t; \theta_v)) + \\ 
+    \beta \, H(\pi \, (s_t; \theta))  
+\end{aligned}
+\end{equation}
+where $H$ is the entropy of a state with the coefficient $\beta$. The critic network has its separate loss which is: 
+\begin{equation}
+\begin{aligned}
+	L_{critic} = \sum_{i=1}^{N} \sum_{t=0}^{T} (R_t - V(s_t; \theta_v))^2
+\end{aligned}
+\end{equation}
+
+In terms of implementation, both parameter sets of actor and critic are updated using Adam optimizer after each episode. As noted above, this optimizer is shared between many training agents, each agent has both actor and critic in it. We also clip gradient L2 norm aggressively at the value of 5.0 to make the training more stable. 
+
 
 \section{Experiments}
 
@@ -439,7 +468,7 @@ In the CCG dataset, we observe the following:
 
 The possible reason for the more effective learning with the CCG dataset is that the learning signals coming from improving the accuracy is dense in this case. Unlike in the case of NER dataset, every label counts for the accuracy in CCG dataset, therefore the agent constantly obtains incremental reward at every step of decoding, and learns a better correlation between their choice of adjusting beam size and its impact on the accuracy.
 
-\item Larger beam size does not always lead to higher accuracy. Although this phenomenon can also be observed by comparing the greedy search and the beam search, here the situation is more subtle. For example, both starting with initial beam size 3, the fixed-size beam search uses more total beams and obtains higher accuracy than the agent does, while the heuristic beam search uses fewer total beams to also obtain the higher accuracy. This indicates that, in addition to the total number of beams explored, the quality of the decision of when to change the beam size indeed matters. In our case, the agent has not learned the decisions as good as the heuristic ones.
+\item Larger beam size does not always lead to higher accuracy. Although this phenomenon can also be observed by comparing the greedy search and the beam search, here the situation is more subtle. For example, both starting with initial beam size 3, the fixed-size beam search uses more total beams and obtains higher accuracy than the agent does, while the heuristic beam search uses fewer total beams to also obtain the higher accuracy. This indicates that, in addition to the total number of beams explored, the quality of the decision of when to change the beam size indeed matters. In our case, the agent has not learned the decisions as good as the heuristic ones. 
 
 \item The learning of the agent is not stable. The experiment of training the agent with initial beam size 2 is not successful and is significantly worse than the other two cases.
 \end{enumerate}
@@ -458,6 +487,8 @@ The possible reason for the more effective learning with the CCG dataset is that
 & Beam 3 & Beam 6 & Beam 9 \\
 \midrule
 F-score & 57.66 & 57.61 & 57.52 \\
+Total~beam \# & 65,619 & 105,076 & 155,466 \\
+
 Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 \bottomrule
 \end{tabular}
@@ -474,19 +505,10 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 \midrule
 Accuracy & 90.56 & 90.50 & 90.59 \\
 Total beam \# & 100,573 & 55,372 & 151,832 \\
+Avg. beam \# &1.80&0.99& 2.73 \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-
-
-
-
-
-
-
-
-
 % The data consists of three files per language: one training file and two test files, testa and testb. We use testa as the development data, testb as the final test data. In the current development phase, only the train data and the development data are used for finding good parameters for the seq2seq model.
 
 % We perform minimum preprocessing on the data, since the best performance is not our ultimate goal of this project, but the effectiveness of the improvement we propose. The label has 9 possible values: 8 NER tags and an additional tag denoting the beginning of the sentence ($\langle$BEG$\rangle$).
@@ -825,9 +847,7 @@ Total beam \# & 100,573 & 55,372 & 151,832 \\
 %          CONCLUSION           
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusion} \label{sec:conclusion}
-In this report we have demonstrated our improved seq2seq model with many new features, e.g. pre-trained word embeddings, bi-directional LSTM, beam search, attention and extra penalization. We have conducted experiments on NER tasks using our model, and the results of each experiments are shown and compared to the baseline as well. All the code is now made available in our github repository. 
-
-In this paper, we propose the novel strategies for optimizing the beam search for Seq2Seq model. We implement the two dynamic beam search methods - heuristic rules and reinforcement l
+In this paper, we propose a novel strategy for optimizing the beam search for Seq2Seq model. We implement two adaptive beam search methods - heuristic rules and reinforcement learning - for reducing search space and runtime by changing beam size dynamically in the decoding phase. We have conducted experiments on the NER and CCG Supertagging tasks using our models. Results demonstrate that our method is able to speed up the decoder without losing any quality. All the code is now made available in our Github repository. 
 
 
 
