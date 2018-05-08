@@ -311,7 +311,8 @@ Because our setting is very specific, it is difficult to inherit from the tradit
 
 In particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step $t$ of the decoder output, and then determines to take an action among three possible options towards the beam size, which are \textit{\{decrease, keep, increase \}}. Likewise, our action space is 3. 
 
-%HERE...
+%
+
 
 \begin{figure}[ht]
 \centering
@@ -435,6 +436,12 @@ In the CCG dataset, we observe the following:
 \begin{enumerate}
 \item In general the agent is able to learn to dynamically adjust the beam size to obtain the accuracy that is higher than that using the greedy search. In the worst case (initial beam size 2), the accuracy is the same as using greedy search. Nevertheless, the accuracy obtained by the agent is still lower than that obtained using the heuristic adaptive beam search.
 \item Unlike in the case of NER dataset, the agent here is able to learn to increase the beam size to raise the accuracy. We observe that as the total number of beams explored increases, the accuracy obtained by the agent increases as well. In the worst case (initial beam size 2), the agent does not learn to increase the beam size to get higher accuracy effectively, and the total number of beam size stays at the similar level of that of the greedy search. In that case, it obtains the same accuracy as that obtained by the greedy search as well.
+
+The possible reason for the more effective learning with the CCG dataset is that the learning signals coming from improving the accuracy is dense in this case. Unlike in the case of NER dataset, every label counts for the accuracy in CCG dataset, therefore the agent constantly obtains incremental reward at every step of decoding, and learns a better correlation between their choice of adjusting beam size and its impact on the accuracy.
+
+\item Larger beam size does not always lead to higher accuracy. Although this phenomenon can also be observed by comparing the greedy search and the beam search, here the situation is more subtle. For example, both starting with initial beam size 3, the fixed-size beam search uses more total beams and obtains higher accuracy than the agent does, while the heuristic beam search uses fewer total beams to also obtain the higher accuracy. This indicates that, in addition to the total number of beams explored, the quality of the decision of when to change the beam size indeed matters. In our case, the agent has not learned the decisions as good as the heuristic ones.
+
+\item The learning of the agent is not stable. The experiment of training the agent with initial beam size 2 is not successful and is significantly worse than the other two cases.
 \end{enumerate}
 
 
