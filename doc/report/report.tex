@@ -57,7 +57,7 @@
 \maketitle
 \begin{abstract}
 % We plan to apply new techniques such as combining dynamical beam size with trainable beam search to boost up the training and test-time decoding of the sequence-to-sequence model. We review the related approaches, and report our work in replicating state-of-the-art results.
-Natural language processing tasks usually require to decode the most likely output sequence which involves searching through all the possible output sequences based on their likelihood. Beam search is a heuristic search algorithm used in the test-time decoding of sequence-to-sequence model. While it might have an advantage over greedy search for accuracy, it leads to time and resource hunger due to keeping and searching through a fixed amount of beams at each step as the beam size increases. We aim to address this problem and propose methods of adapting the beam size for decoding with help of deterministic agent and reinforcement learning, in particular for the decoding phase in Seq2Seq model. In the experiments we show that the proposed adaptive beam search strategies yield better results on two NLP tasks compared with baseline models.
+Natural language processing tasks usually require to decode the most likely output sequence which involves searching through all the possible output sequences based on their likelihood. Beam search is a heuristic search algorithm used in the test-time decoding of sequence-to-sequence model. While it might have an advantage over greedy search for accuracy, it leads to time and resource hunger due to keeping and searching through a fixed amount of beams at each step as the beam size increases. We aim to address this problem and propose methods of adapting the beam size for decoding with help of deterministic agent and reinforcement learning, in particular for the \textit{decoding phase} in Seq2Seq model. In the experiments we show that the proposed adaptive beam search strategies yield better results on two NLP tasks compared with baseline models.
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -308,7 +308,7 @@ Using the heuristic rules to prune or grow the beam size has a downside that the
 
 To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn when to increase or decrease the beam size, using reinfor
 
-\subsection{Reinforcement learning environment design}
+\subsection{Reinforcement learning environment}
 Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions towards the beam size, which are \textit{\{decrease, keep, increase \}}.
 
 %HERE...
@@ -338,12 +338,13 @@ For implementation, we flatten out those numbers and thus obtain a vector of len
 \label{fig:a3c}
 \end{figure}
 
+Actor-Critic RL \cite{sutton1998reinforcement} is known to be a popular method to effectively training a RL agent using REINFORCE \cite{williams1992simple} because it allows to end the episode early. But we choose Asynchronous Advantage Actor-Critic (A3C) \cite{mnih2016asynchronous} to implement our algorithm for simplicity (compared with other state-of-the-art methods), ability to resolve high variance and high sample complexity in training of Actor-Critic and parallelism which helps speed up the training. 
 
-
+Our A3C architecture is shown in Figure \ref{fig:a3c}. From the environment defined above, we use a shared model and initialize many training agents which share the same optimizer as well, to asynchronously update the model policy network during training. Each episode stands for each sentence containing the tagging task for each token in the sentence. 
 
 \section{Experiments}
 
-Our implementation\footnote{The Github repository can be accessed at: https://github.com/ShuxinLin/nn4nlp\_project/.} is built based on PyTorch \cite{paszke2017automatic}. We conducted all experiments on AWS EC2 as well as private computers. As it is discussed in Section \ref{ssec:model}, the current Seq2Seq model is built on the encoder-decoder architecture. For encoder, we use one-layer bi-directional LSTM, and for the decoder we use one-layer single-directional LSTM with a fixed attention mechanism. We perform the training using mini-batch stochastic gradient descent with Adam optimizer and use different beam search strategies in testing time. The task we are trying to solve is two common natural language processing tasks, the named entity recognition (NER) and CCG Supertagging.
+Our implementation\footnote{The Github repository is accessible at: https://github.com/ShuxinLin/nn4nlp\_project/.} is built based on PyTorch \cite{paszke2017automatic}. We conducted all experiments on AWS EC2 as well as private computers. As it is discussed in Section \ref{ssec:model}, the current Seq2Seq model is built on the encoder-decoder architecture. For encoder, we use one-layer bi-directional LSTM, and for the decoder we use one-layer single-directional LSTM with a fixed attention mechanism. We perform the training using mini-batch stochastic gradient descent with Adam optimizer and use different beam search strategies in testing time. The task we are trying to solve is two common natural language processing tasks, the named entity recognition (NER) and CCG Supertagging.
 
 \subsection{Datasets}
 In order to make our experimental results comparable to the baseline \cite{goyal2017continuous}, we use the same datasets as well as evaluation metrics. 
@@ -357,13 +358,12 @@ As can be noticed above, CCG Supertagging task have larger label size (search sp
 
 
 
-
 \subsection{Results and Analysis}
 
 The results of the heuristic pruning and growing adaptive beam search on the NER and CCG datasets are shown in Table \ref{tab:NERHeuristic} and \ref{tab:CCGHeuristic}, respectively. From the results of NER dataset, we observe that using heuristic adaptive beam search effectively reduces the search space and the search time, while not sacrificing the F-score. In the case of initial beam size 9, the total number of beams explored during decoding in the adaptive case is only $42\%$ of that in the case of fixed beam size, while the F-score using adaptive search only decreases by less than $0.1\%$; measured in time, the decoding time is reduced to $52\%$ when using adaptive method. Note that in the NER dataset, greedy search gives higher F-score than the beam search methods do. This is consistent with the results from the baseline.
 
 
-\begin{table*}
+\begin{table*}[ht]
 \centering
 \caption{Heuristic pruning and growing rules results. NER.}
 \label{tab:NERHeuristic}
@@ -385,7 +385,7 @@ F-score \\
 
 
 
-\begin{table*}
+\begin{table*}[ht]
 \centering
 \caption{Heuristic pruning and growing rules results. CCG.}
 \label{tab:CCGHeuristic}
@@ -404,6 +404,7 @@ Accuracy \\
 \bottomrule
 \end{tabular}
 \end{table*}
+
 
 The performance of the adaptive search is better on the CCG dataset. We observe the following:
 \begin{enumerate}
@@ -432,9 +433,6 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-
-
 
 
 
@@ -636,7 +634,7 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 %Before we start to experiment on the new search algorithms to improve the training and decoding of the seq2seq model, we first explore the effect of the choices of the hyperparameters on the performance of the neural networks. The hyperparameters we investigate are the batch size, the learning rate, the dimension of the word embeddings, and the number of the hidden units of the encoder. Once the parameter tuning is done, we plan to use pre-trained model for transfer learning and further fine tuning.
 
 
-\subsection{Comparison with the paper baseline}
+%\subsection{Comparison with the paper baseline}
 
 % We compare our experimental result with the paper baseline from \cite{goyal2017continuous}. In particular, we compare with the Greedy Search and Hard Beam Search F-score of the NER task in Table 2 in \cite{goyal2017continuous}. Our experiment that is used for comparison uses beam size 3 and fixed attention. The result is given in Table \ref{tab:comp}.
 
@@ -731,7 +729,7 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 %          DISCUSSION           
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % results 
-\section{Improvement Directions for Future Work} \label{sec:discussion}% of baseline 
+%\section{Improvement Directions for Future Work} \label{sec:discussion}% of baseline 
 % discussion of results 
 
 % \begin{figure}[ht]
@@ -762,7 +760,7 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 %     \item \emph{Experiment on different optimizers.} We use the vanilla SGD optimizer in this assignment. Without suitably adjusting the learning rate dynamically, it is likely that our training saturates at some point during the training process, and cannot improve the F-score or accuracy. We can try to dynamically adjust the learning rate or use different optimizers to see whether the training process would improve.
 %     \item \emph{Be aware of the exploding gradient (or also the vanishing gradient) problem.} We noticed the instability of the training loss curve. We plan to check whether it is caused by the exploding gradient problem.
 % \end{enumerate}
-\subsection{Error Analysis} \label{sec:improve}
+%\subsection{Error Analysis} \label{sec:improve}
 
 % From the results in Table \ref{tab:comp}, Figures \ref{fig:no_attn_losses_fscore} and \ref{fig:attn_losses_fscore} we have a same pattern that the model yields a good performance for train data, but not the same for validation data. This behavior is apparently due to overfitting to training data, which is stemmed from not performing regularization such as dropout aggressively. 
 
@@ -771,22 +769,6 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 % \subsection{Adaptive Beam Search} \label{sec:adaptive}
 
 % We have addressed the basic concept of beam search and conducted some experiments on different beam size. For the final project, we will implement an adaptive beam search design. The original beam-search strategy generates the optimal prediction by approximately maximizing the conditional probability given by a Seq2seq model.  It builds the mapping from encoder-decoder and keeps a fixed number (beam) of candidates with the highest log-probability at each epoch. The search stops when the beam is full and the candidate with highest log-probability is picked from the candidate list. The problem of fixed-sized beam search is that all the candidates in the candidate list might not be the best possible scoring candidate, i.e. the best one is not added to the list before beam search stops. This issue can be avoided by increasing the beam size however it slows down the decoding speed. An adaptive beam search strategy can be much more flxible in terms of beam size at each epoch and do not increases the decoding time too much. Here is one possible design we come up with: Worse candidates pruning. This strategy discards those candidates in the candidate that are far worse than the best current candidate. In this case, we can keep beam size fixed, and continue pruning worst candidates to make space for next candidate. The pruning threshold can be various, e.g. relative threshold, abosulte threshold. We can tune it for the best performance. 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
