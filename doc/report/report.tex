@@ -64,8 +64,7 @@ Natural language processing tasks usually require to decode the most likely outp
 %         INTRODUCTION              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction} \label{sec:introduction}
-Since its invention, sequence-to-sequence model (Seq2Seq) \cite{seq2seq_2014} has been a go-to model for many translation-related tasks,  % probably more examples needed 
-especially since the advent of attention model \cite{bahdanau2014neural,luong2015effective}. Despite its great successes in many domains, how to train and decode seq2seq model is still an open problem because of the drawback of traditional maximum likelihood training which is, most of the cases, unable to find the maximum-a-posteriori of a to-be-decoded single sentence over the whole corpus. 
+Since its invention, sequence-to-sequence model (Seq2Seq) \cite{seq2seq_2014} has been a go-to model for many translation-related tasks. Despite its great successes in many domains, how to train and decode seq2seq model is still an open problem because of the drawback of traditional maximum likelihood training which is, most of the cases, unable to find the maximum-a-posteriori of a to-be-decoded single sentence over the whole corpus. 
 
 Amongst many heuristic approaches to remediate that problem, \textit{greedy search} and \textit{beam search} are the most popular. While greedy search is known for its lightweight, elegant characteristics, beam search is generally better in practice by considering not only the best-scored word at each time step but maintaining a window of best words. 
 % In this project, we will be addressing the disadvantages of previous approaches for seq2seq using beam search and proposing an improvement for it in training and decoding phases. We also present our results on the Name Entity Recognition task.
@@ -74,7 +73,7 @@ In this paper, we will revisit recent researches on related topic in Section 2 a
 %         RELATED WORK              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Related Work} \label{sec:related_work}% Literature Review 
-The straightforward approach to improve seq2seq model trained with the traditional maximum likelihood method  of ground truths is to improve the decoding phase. While beam search is considered the de-factor approach \cite{seq2seq_2014}, greedy search, if designed properly, can yield a comparable performance, if not better in some cases, while having a much more lightweight architecture. \citet{goyal2017differentiable} proposed an approximated version of greedy search over the scheduled sampling training procedure \cite{bengio2015scheduled}. 
+While beam search is considered the de-factor approach \cite{seq2seq_2014}, greedy search, if designed properly, can yield a comparable performance, if not better in some cases, while having a much more lightweight architecture. \citet{goyal2017differentiable} proposed an approximated version of greedy search over the scheduled sampling training procedure \cite{bengio2015scheduled}. 
 %% PROBABLY NEED MORE REFERENCE for REINFORCE
 % Reinforcement learning 
 Unlike tackling with decoding phase solely, another useful approach to improve seq2seq is to design a better architecture or technique of helping decode right on the training phase. One widely-employed approach is to 
@@ -85,10 +84,9 @@ A naturally connected method is to use reinforcement learning \cite{sutton1998re
 % Reinforcement learning
 While discriminative training is the straightforward method for seq2seq training, another generalized method is to pose it as a generative model. Amongst such solutions, Generative Adversarial Network \cite{goodfellow2014generative} broadly used for diverse tasks, predominantly in generating images \cite{dcgan2015,berthelot2017began,zhang2017stackgan,progressive_gan_2017,li2017mmd} and videos \cite{vondrick2016generating} based on what model learned from training, or \textit{translating} them given a style of images \cite{conditional_gan_2014,pix2pix2017,discoGAN2017,mechrez2017photorealistic,luan2017deep,zhu2017unpaired,ma2018gan} and videos \cite{ruder2016artistic,liu2017unsupervised}. Despite the booming trend of GAN, its application to text domain faces a difficult obstacle of inherent discrete properties of text domain. Nonetheless, there have been successes of translating text from a style to another 
 %using professor-forcing \cite{professor_forcing_2016} 
-to deal with discrete texts \cite{boundaryseeking_gan_2017,yu2017seqgan,shen2017style}.  
-Another workaround when facing discrete text in designing a generative model is to use variational autoencoder \cite{kingma2013auto} with maximum likelihood objective to learn the disentangled latent representations into some controlled attributes \cite{controlled_text_gen_2017}. 
+to deal with discrete texts \cite{boundaryseeking_gan_2017,yu2017seqgan,shen2017style}.
 
-Inspired by GAN's design, similar approaches have been made to seq2seq in conjunction with reinforcement learning \cite{kusner2016gans, yu2017seqgan,gu2017neural, gumbel2017}. And although not directly connected, actor-critic setting which shares a close equivalence with GAN \cite{pfau2016connecting}, has been also employed to replace maximum-likelihood method \cite{bahdanau2017actor}. And while sharing the same methodology in that we improve the decoding performance by making the model learn to decode right on the training phase, our approach still sticks to maximum likelihood method objective for its straightforwardness and more simplicity in its design.  
+Inspired by GAN's design, similar approaches have been made to seq2seq in conjunction with reinforcement learning \cite{kusner2016gans, yu2017seqgan,gu2017neural, gumbel2017}. And although not directly connected, actor-critic setting which shares a close equivalence with GAN \cite{pfau2016connecting}, has been also employed to replace maximum-likelihood method \cite{bahdanau2017actor}. And while sharing the same methodology in that we improve the decoding performance by making the model learn to decode right on the training phase, our approach still sticks to maximum likelihood method objective.  
 
 %%% TODO: discrete search-based 
 While reinforcement learning can yield a fast decoding model, training with maximum likelihood has its own merit of being simple yet comparably efficient. For such approach, some attempts to make the model learn how to decode right on the training phase have also taken place. There were some solutions that optimize beam search in discrete space such as from \citet{wiseman2016sequence, andor2016globally} whose target is to get rid of label bias problem and design a model that is globally--rather than locally--normalized. Another work, from which our work extends, instead aims at design a new surrogate training objective to convert from discrete space into a continuous approximation of the beam search \cite{goyal2018continuous}. In detail, because using beam search right at training phase largely degrades the performance due to its resources consumption and its search space, we plan to use a tactic of dynamic beam search \cite{buckman2016transition} to make the training faster while retaining its efficacy. 
@@ -254,8 +252,6 @@ One popular method is to employ a schedule where teacher-forcing is used at a ra
 
 In test time, as in training time, the decoder receives the last hidden and cell states from the encoder as initial states. The initial input at step $t = 1$ is also the universal special token $y^* =$ \texttt{<BEG>} or \texttt{<s>}. But, different from training time, the inputs at time steps $t = 2, \dots, T - 1$ depend on the predicted label at the previous step. Roughly speaking, we would $replace$ the input $y_{t-1}$ by $\hat{y}_{t-1}$ at test time. The exact way to do so is determined by the decoding algorithm.
 
-Note that, similar to the case of attention, we can have a much simpler decoding algorithm since we know beforehand the (equal) length of output given an input, so we will not take care of the difficulty of handling stopping criteria for this phase.  
-
 \subsubsection{Greedy Search}
 Greedy decoding at test time is to greedily pick the best prediction (with the highest probability) at each time step as the only selection criterion. 
 
@@ -296,9 +292,6 @@ The primed summation $\prod'_t$ notation is used to indicate that the product is
 %HERE...
 
 
-
-
-
 \section{Adaptive Beam Search by Reinforcement Learning}
 \label{sec:RL}
 
@@ -307,30 +300,37 @@ Using the heuristic rules to prune or grow the beam size has a downside that the
 To overcome the shortcomings of the heuristic algorithm above, we propose the second approach to perform the adaptive beam search by introducing an $agent$ to learn when to increase or decrease the beam size, with the help of reinforcement learning.
 
 \subsection{Reinforcement learning environment}
-Because our setting is very specific, it is difficult to inherit from the traditional environments such as OpenAI Gym. Consequently, we design our own Seq2Seq RL environment for this task. 
 
-In particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step $t$ of the decoder output, and then determines to take an action among three possible options towards the beam size, which are \textit{\{decrease, keep, increase \}}. Likewise, our action space is 3. 
+To apply reinforcement learning in the problems using seq2seq model, we need to first define the environment. In particular, we consider the scenario that there is an agent observing the predicted probability distribution at each step $t$ of the decoder output, and determines what action to take to adjust the beam size.
 
-%HERE...
+The state of our environment consists of the following information:
+\begin{itemize}
+	\item Log probabilities of the sequences in the current beams, which are the cumulative log probabilities along the paths defining the sequences.
+    \item Log probabilities of the labels in the current beam predicted at the current step; that is, the incremental contribution to the cumulative probabilities of the sequences.
+    \item Current beam size.
+\end{itemize}
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=1.0\linewidth]{adapt.png}
-\caption{Demonstration of how agent learns to adapt beam size for decoding. At $t=1$, it learns to increase the beam size from 3 to 4. At $t=2$, it reduce the beam size back to 3.}
+\caption{Demonstration of how agent learns to adapt beam size for decoding. At $t=1$, it learns to increase the beam size from 3 to 4. At $t=2$, it reduces the beam size back to 3. The agent will choose whether to decrease (-1), keep or increase (+1) the beam size.}
 \label{fig:adaptve}
 \end{figure}
 
-To determine which action is taken, we introduce the reward, by combining 3 different numbers given a time step $t$: 
-\begin{itemize}
-	\item Cumulative log probability of the beams from time step $t=0$. This criterion is traditionally used in beam search for Seq2Seq model. 
-    \item Current log probability of top words in the beams. 
-    \item Current beam size 
-\end{itemize}
+The action of the agent is among the three possible options: increasing, decreasing, or keeping the same beam size. We design the environment in such a way so that the task of the agent is greatly simplified; instead of making decisions within all the possible beam sizes, we limit the action space of the agent down to 3. This can make the reinforcement learning more likely to be successful.
 
-For implementation, we flatten out those numbers and thus obtain a vector of length \textit{l = $2 * \text{max\_beam\_size} + 1$}. As a result, our reward space would be in the range of $\mathbf{R}^{+(l \text{x} 1)}$.
+The reward is designed to dictate the learning goal of the agent. We define the learning goal of the agent to be consisting of two objectives:
+\begin{enumerate}
+\item To increase the F-score or accuracy, the measure of the task.
+\item To decrease the beam size whenever possible to increase the search efficiency.
+\end{enumerate}
+With these learning goals in mind, we design our reward function to be a linear combination of two terms: The incremental F-score or accuracy, and the amount of decrease of the beam size. That is,
+\begin{align}
+r_t = \alpha (\textrm{score}_t - \textrm{score}_{t-1}) - \beta (B_t - B_{t-1}),
+\end{align}
+where $B_t$ is the beam size at step $t$. In our experiments, we set $\alpha = 1$ and $\beta = 0.02$.
 
-Finally, the most important interface which interacts directly with the agent is the \texttt{step()} function, which takes an input of an action and current state and then return the resulting immediate reward for the being timestep. 
-TO BE ADDED 
+Finally, the main interface which interacts directly with the agent is the \texttt{step()} function, which takes an input of an action and current state and then return the resulting immediate reward for the being timestep. In our environment, each step would be to determine the tag for a specific word in a sentence. So at timestep $t$, we receive the current state which includes the most updated beam state, and perform a decoding step which returns the decoded (predicted) tag and the corresponding reward. To facilitate implementation speed, we perform the whole episode at once and populate all relevant states, rewards and actions before returning to the agent to update, which only needs to take place at the end of each episode. 
 
 \subsection{Training Decoder with Asynchronous Advantage Actor-Critic Method}
 
@@ -351,7 +351,7 @@ Formally, we have a main actor which aims to learn the policy function $\pi(a_t 
 The reward for each time step is traditionally calculated as the cumulative discounted rewards, with the last term is the value of critic network at that time: 
 \[
 % 	R_t = r(a_0, s_0) + \gamma r(a_{1}, s_{1}) + \cdots + \gamma^{T-1} r(a_{T-1}, s_{T-1}) + \gamma^T V() \\
-    R_t = \sum_{i=0}^{T-1} \gamma^i r(s_{t+i}, a_{t+i}) + \gamma^T V(s_{t+T; \theta_t})
+    R_t = \sum_{i=0}^{T-1} \gamma^i r(s_{t+i}, a_{t+i}) + \gamma^T V(s_{t+T}; \theta_v)
 \]
 where T is the episode length, which is the sentence's length being considered and $t$ is the current timestep. Here the sentence is always limited, so we don't have to bound the episode length as in such cases as game playing. 
 
@@ -363,9 +363,8 @@ The advantage at each time step is the difference between the discounted reward 
 The policy (actor) loss will be: 
 \begin{equation}
 \begin{aligned}
-	L_{actor} = \\
-    \sum_{i=1}^{N} \sum_{t=0}^{T} log \, \pi(a_t | s_t; \theta) \gamma^t (R_t - V(s_t; \theta_v)) + \\ 
-    \beta \, H(\pi \, (s_t; \theta))  
+	L_{actor} = &\sum_{i=1}^{N} \sum_{t=0}^{T} log \, \pi(a_t | s_t; \theta) \cdot \gamma^t \cdot\\
+    & A(s_t, a_t) + \beta \, H(\pi \, (s_t; \theta))  % (R_t - V(s_t; \theta_v))
 \end{aligned}
 \end{equation}
 where $H$ is the entropy of a state with the coefficient $\beta$. The critic network has its separate loss which is: 
@@ -385,40 +384,37 @@ Our implementation\footnote{The Github repository is accessible at: https://gith
 \subsection{Datasets}
 In order to make our experimental results comparable to the baseline \cite{goyal2017continuous}, we use the same datasets as well as evaluation metrics. 
 
-For named entity recognition, we use the data of CONLL-2003 shared task \cite{tjongkimsang2003conll} for German language. The data consists of three files per language: one training file and two test files, testa and testb. We use testa as the development data, testb as the final test data.  The label/entity has 9 possible values: 8 NER tags and a tag denoting the end of the sentence (EOS). Due to the extremely skewed label distribution towards the default label ($O$), the widely-used evaluation metrics for this dataset is F score.
+For named entity recognition, we use the data of CONLL-2003 shared task \cite{tjongkimsang2003conll} for German language. The data consists of three files per language: one training file and two test files, testa and testb. We use testa as the development data, testb as the final test data.  The label/entity has 9 possible values: 8 NER tags and a tag denoting the end of the sentence (EOS). Due to the extremely skewed label distribution towards the default label ($O$), the widely-used evaluation metrics is F score.
 
- For CCG Supertagging task, we use the data of CCGbank corpus \cite{hockenmaier2007ccgbank} and its provided splits for train, development, and test data. The label has 1321 possible values: 1320 CCG derivation grammar tags and a tag denoting the end of the sentence (EOS). In this task, accuracy of correct predictions is measured.
+ For CCG Supertagging task, we use the data of CCGbank corpus \cite{hockenmaier2007ccgbank}. The label has 1321 possible values: 1320 CCG derivation grammar tags and a tag denoting the end of the sentence (EOS). In this task, accuracy of correct predictions is measured.
 
 We perform very minor preprocessing on the data by creating and indexing the vocabulary of each datasets. Given the vocabulary of input words, we construct pre-trained word embedding matrix using GloVe for English and provided word embedding \cite{goyal2017continuous} for German. 
-As can be noticed above, CCG Supertagging task have larger label size (search space) than NER task. Thus it leads to the fact that CCG supertagging task is more appropriate for measuring the efficacy of the proposed dynamic beam search methods.  
+As can be noticed above, CCG Supertagging have larger label size (search space) than NER task. It leads to the fact that CCG supertagging task is more appropriate for measuring the efficacy of the proposed dynamic beam search methods.  
 
 
 
 \subsection{Results and Analysis}
 
-\subsubsection{Heuristic pruning and growing}
+\subsubsection{Heuristic Pruning and Growing Results}
 
-The results of the heuristic pruning and growing adaptive beam search on the NER and CCG datasets are shown in Table \ref{tab:NERHeuristic} and \ref{tab:CCGHeuristic}, respectively.
-
-From the results of NER dataset, we observe that using heuristic adaptive beam search effectively reduces the search space and the search time, while not sacrificing the F-score. In the case of initial beam size 9, the total number of beams explored during decoding in the adaptive case is only $42\%$ of that in the case of fixed beam size, while the F-score using adaptive search only decreases by less than $0.1\%$; measured in time, the decoding time is reduced to $52\%$ when using adaptive method. Note that in the NER dataset, greedy search gives higher F-score than the beam search methods do. This is consistent with the results from the baseline.
+The results of the heuristic pruning and growing adaptive beam search on the NER and CCG datasets are shown in Table \ref{tab:NERHeuristic} and \ref{tab:CCGHeuristic}, respectively. From the results of NER dataset, we observe that using heuristic adaptive beam search effectively reduces the search space and the search time, while not sacrificing the F-score. In the case of initial beam size 9, the total number of beams explored during decoding in the adaptive case is only $42\%$ of that in the case of fixed beam size, while the F-score using adaptive search only decreases by less than $0.1\%$; measured in time, the decoding time is reduced to $52\%$ when using adaptive method. Note that in the NER dataset, greedy search gives higher F-score than the beam search methods do. This is consistent with the results from the baseline. The performance of the adaptive search is better on the CCG dataset. We observe the following:
 
 
 \begin{table*}[ht]
 \centering
-\caption{Results on Named Entity Recognition task (CONLL-2003 German dataset) using heuristic pruning and growing rules. The F scores and other experimental results of greedy search, hard beam search (beam size = 3, 6, 9) and heuristic adaptive beam search (beam size is initialized as 3, 6, 9) are listed. The last row in the table is the baseline results.}
+\caption{Results on Named Entity Recognition task  using heuristic pruning and growing rules. The F scores and other experimental results of greedy search, hard beam search (beam size = 3, 6, 9) and heuristic adaptive beam search (beam size is initialized as 3, 6, 9) are listed. The last row is the baseline.}
 \label{tab:NERHeuristic}
 \begin{tabular}{lcccccccc}
 \toprule
 & Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 & Soft Beam \\
 & & Fixed & Adaptive & Fixed & Adaptive & Fixed & Adaptive & \\
 \midrule
-F-score & 58.09 & 57.69 & 57.71 & 57.76 & 57.71 & 57.76 & 57.71 & \\
-Total beam \# & 48,571 & 145,713 & 92,727 & 291,426 & 126,759 & 437,139 & 182,785 & \\
-Avg.~beam \# & 1 & 3 & 1.95 & 6 & 3.16 & 9 & 4.86 & \\
-Time (sec) & 22 & 76 & 61 & 132 & 73 & 178 & 92 & \\
+F-score & \textbf{58.09} & 57.69 & 57.71 & 57.76 & 57.71 & 57.76 & 57.71 & \\
+Total tokens \# & \textbf{48,571} & 145,713 & 92,727 & 291,426 & 126,759 & 437,139 & 182,785 & \\
+Avg.~beam \# & \textbf{1} & 3 & 1.95 & 6 & 3.16 & 9 & 4.86 & \\
+Time (sec) & \textbf{22} & 76 & 61 & 132 & 73 & 178 & 92 & \\
 \midrule
-Goyal 2017 & 54.92 & 51.34 & & & & & & 56.38 \\
-F-score \\
+(Goyal) F score & 54.92 & 51.34 & & & & & & 56.38 \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -427,26 +423,25 @@ F-score \\
 
 \begin{table*}[ht]
 \centering
-\caption{Results on CCG Supertagging task (CCGbank dataset) using heuristic pruning and growing rules. The F scores and other experimental results of greedy search, hard beam search (beam size = 2, 3) and heuristic adaptive beam search (beam size is initialized as 1, 2, 3) are listed. The last row in the table is the baseline results.}
+\caption{Results on CCG Supertagging task using heuristic pruning and growing rules. The F scores and other experimental results of greedy search, hard beam search (beam size = 2, 3) and heuristic adaptive beam search (beam size is initialized as 1, 2, 3) are listed.}
 \label{tab:CCGHeuristic}
 \begin{tabular}{lccccccc}
 \toprule
 & Greedy & Beam 1 & Beam 2 & Beam 2 & Beam 3 & Beam 3 & Soft Beam \\
 &  & Adaptive & Fixed & Adaptive & Fixed & Adaptive & \\
 \midrule
-Accuracy & 90.50 & 90.62 & 90.60 & 90.62 & 90.62 & 90.62 &  \\
-Total beam \# & 52,964 & 93,403 & 105,928 & 98,100 & 158,892 & 103,875 &  \\
-Avg.~beam \# & 1 & 1.61 & 2 & 1.72 & 3 & 1.87 &  \\
-Time (sec) & 22 & 87 & 92 & 130 & 184 & 141 &  \\
+Accuracy & 90.50 & \textbf{90.62} & 90.60 & \textbf{90.62} & \textbf{90.62} & \textbf{90.62} &  \\
+Total tokens \# & \textbf{52,964} & 93,403 & 105,928 & 98,100 & 158,892 & 103,875 &  \\
+Avg.~beam \# & \textbf{1} & 1.61 & 2 & 1.72 & 3 & 1.87 &  \\
+Time (sec) & \textbf{22} & 87 & 92 & 130 & 184 & 141 &  \\
 \midrule
-Goyal 2017 & 80.35 &  & & & 82.42 & & 82.00 \\
-Accuracy \\
+(Goyal) Accuracy & 80.35 &  & & & 82.42 & & 82.00 \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
 
-The performance of the adaptive search is better on the CCG dataset. We observe the following:
+
 \begin{enumerate}
 \item By starting with initial beam size of 1, and allow the beam size to be adaptively changed in the following steps during decoding, we obtain higher accuracy than the greedy search (always keep beam size 1) does.
 \item Using fixed beam size, one needs to use beam size 3 to obtain the same accuracy achieved by the adaptive beam search with initial beam size 1, while the latter only needs to explore about $59\%$ of the beam number, and spends only $47\%$ of the time.
@@ -455,11 +450,9 @@ The performance of the adaptive search is better on the CCG dataset. We observe 
 
 
 
-\subsubsection{Reinforcement Learning}
+\subsubsection{A3C Results}
 
-The results of the adaptive beam search using the reinforcement learning agent on the NER and CCG datasets are shown in Table \ref{tab:NERRL} and \ref{tab:CCGRL}.
-
-For the NER dataset, we observe that the reinforcement learning agent in general obtains lower F-score than that obtained by using greedy, fixed, or heuristic adaptive beam search. We find that the agent tends to learn to decrease the beam size more aggressively than the heuristic rules do. One possible reason for this behavior is that in the NER dataset the learning signals coming from the F-score are sparse, since most of the NER tags are ``O'' and do not contribute to the F-score. Therefore, the learning signals coming from decreasing the beam size dominates the learning process, and the agent does not learn to adjust the beam size to obtain higher F-score effectively.
+The results of the adaptive beam search using the RL agent on the NER and CCG datasets are shown in Tables \ref{tab:NERRL} and \ref{tab:CCGRL}. For the NER dataset, we observe that the reinforcement learning agent in general obtains lower F-score than that obtained by using greedy, fixed, or heuristic adaptive beam search. We find that the agent tends to learn to decrease the beam size more aggressively than the heuristic rules do. One possible reason for this behavior is that in the NER dataset the learning signals coming from the F-score are sparse, since most of the NER tags are ``O'' and do not contribute to the F-score. Therefore, the learning signals coming from decreasing the beam size dominates the learning process, and the agent does not learn to adjust the beam size to obtain higher F-score effectively.
 
 In the CCG dataset, we observe the following:
 \begin{enumerate}
@@ -473,8 +466,7 @@ The possible reason for the more effective learning with the CCG dataset is that
 \item The learning of the agent is not stable. The experiment of training the agent with initial beam size 2 is not successful and is significantly worse than the other two cases.
 \end{enumerate}
 
-
-
+Generally speaking, the RL cannot beat the heuristic methods in terms of quantitative performance (F score or accuracy) and overall runtime since reinforcement learning introduces agent training. The break point here is whether the adaptive beam search is used to solve multiple NLP tasks. If that is not the case, then heuristic method might be a better choice.
 
 %HERE...
 
@@ -486,10 +478,10 @@ The possible reason for the more effective learning with the CCG dataset is that
 \toprule
 & Beam 3 & Beam 6 & Beam 9 \\
 \midrule
-F-score & 57.66 & 57.61 & 57.52 \\
-Total~beam \# & 65,619 & 105,076 & 155,466 \\
+F-score & \textbf{57.66} & 57.61 & 57.52 \\
+Total~tokens \# & \textbf{65,619} & 105,076 & 155,466 \\
 
-Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
+Avg.~beam \# & \textbf{1.17} & 2.00 & 3.06 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -497,15 +489,15 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 
 \begin{table}
 \centering
-\caption{Results on CCG Supertagging using adaptive beam search by reinforcement learning. The beam size is initialized as 1, 2, 3.}
+\caption{Results on CCG SuperTagging using adaptive beam search by reinforcement learning. The beam size is initialized as 1, 2, 3.}
 \label{tab:CCGRL}
 \begin{tabular}{lccc}
 \toprule
 & Beam 1 & Beam 2 & Beam 3 \\
 \midrule
-Accuracy & 90.56 & 90.50 & 90.59 \\
-Total beam \# & 100,573 & 55,372 & 151,832 \\
-Avg. beam \# &1.80&0.99& 2.73 \\
+Accuracy & 90.56 & 90.50 & \textbf{90.59} \\
+Total tokens \# & 100,573 & \textbf{55,372} & 151,832 \\
+Avg. beam \# & 1.80 & \textbf{0.99} & 2.73 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -941,7 +933,6 @@ In this paper, we propose a novel strategy for optimizing the beam search for Se
 %\bibliographystyle{acl}
 %\bibliography{acl2018}
 
-\pagebreak
 \bibliography{acl2018}
 \bibliographystyle{acl_natbib}
 
