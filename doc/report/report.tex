@@ -295,8 +295,6 @@ We propose the following heuristic rules to dynamically change the beam size at 
 \end{itemize}
 The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. The thresholds  $r^{\textrm{sen}}_{\textrm{low}}$ and $ r^{\textrm{word}}_{\textrm{low}}$ are chosen heuristically. Note that to avoid numerical underflow, we work in the logarithmic space as we implement the rules.
 
-%HERE...
-
 
 
 
@@ -311,7 +309,7 @@ To overcome the shortcoming of the heuristic algorithm, we propose the second ap
 \subsection{Reinforcement learning environment}
 Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions towards the beam size, which are \textit{\{decrease, keep, increase \}}.
 
-%HERE...
+
 
 \begin{figure}[ht]
 \centering
@@ -360,7 +358,11 @@ As can be noticed above, CCG Supertagging task have larger label size (search sp
 
 \subsection{Results and Analysis}
 
-The results of the heuristic pruning and growing adaptive beam search on the NER and CCG datasets are shown in Table \ref{tab:NERHeuristic} and \ref{tab:CCGHeuristic}, respectively. From the results of NER dataset, we observe that using heuristic adaptive beam search effectively reduces the search space and the search time, while not sacrificing the F-score. In the case of initial beam size 9, the total number of beams explored during decoding in the adaptive case is only $42\%$ of that in the case of fixed beam size, while the F-score using adaptive search only decreases by less than $0.1\%$; measured in time, the decoding time is reduced to $52\%$ when using adaptive method. Note that in the NER dataset, greedy search gives higher F-score than the beam search methods do. This is consistent with the results from the baseline.
+\subsubsection{Heuristic pruning and growing}
+
+The results of the heuristic pruning and growing adaptive beam search on the NER and CCG datasets are shown in Table \ref{tab:NERHeuristic} and \ref{tab:CCGHeuristic}, respectively.
+
+From the results of NER dataset, we observe that using heuristic adaptive beam search effectively reduces the search space and the search time, while not sacrificing the F-score. In the case of initial beam size 9, the total number of beams explored during decoding in the adaptive case is only $42\%$ of that in the case of fixed beam size, while the F-score using adaptive search only decreases by less than $0.1\%$; measured in time, the decoding time is reduced to $52\%$ when using adaptive method. Note that in the NER dataset, greedy search gives higher F-score than the beam search methods do. This is consistent with the results from the baseline.
 
 
 \begin{table*}[ht]
@@ -415,10 +417,21 @@ The performance of the adaptive search is better on the CCG dataset. We observe 
 
 
 
+\subsubsection{Reinforcement Learning}
+
+The results of the adaptive beam search using the reinforcement learning agent on the NER and CCG datasets are shown in Table \ref{tab:NERRL} and \ref{tab:CCGRL}.
+
+For the NER dataset, we observe that the reinforcement learning agent in general obtains lower F-score than that obtained by using greedy, fixed, or heuristic adaptive beam search. We find that the agent tends to learn to decrease the beam size more aggressively than the heuristic rules do. One possible reason for this behavior is that in the NER dataset the learning signals coming from the F-score are sparse, since most of the NER tags are ``O'' and do not contribute to the F-score. Therefore, the learning signals coming from decreasing the beam size dominates the learning process, and the agent does not learn to adjust the beam size to obtain higher F-score effectively.
+
+In the CCG dataset, we observe the following:
+\begin{enumerate}
+\item In general the agent is able to learn to dynamically adjust the beam size to obtain the accuracy that is higher than that using the greedy search. In the worst case (initial beam size 2), the accuracy is the same as using greedy search. Nevertheless, the accuracy obtained by the agent is still lower than that obtained using the heuristic adaptive beam search.
+\item In
+\end{enumerate}
 
 
-The results of the adaptive beam search using the reinforcement learning agent on the NER dataset is shown in Table \ref{tab:NERRL}.
 
+%HERE...
 
 \begin{table}
 \centering
@@ -435,7 +448,19 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 \end{table}
 
 
-
+\begin{table}
+\centering
+\caption{Reinforcement learning results. CCG.}
+\label{tab:CCGRL}
+\begin{tabular}{lccc}
+\toprule
+& Beam 1 & Beam 2 & Beam 3 \\
+\midrule
+Accuracy & 90.56 & 90.50 & 90.59 \\
+Total beam \# & 100,573 & 55,372 & 151,832 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 
 
