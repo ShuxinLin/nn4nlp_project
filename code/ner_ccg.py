@@ -1410,7 +1410,9 @@ class ner(nn.Module):
     #print("label_pred_seq_padded=", label_pred_seq_padded)
 
     correct_count = (label_pred_seq_padded == label_var).sum()
+    print correct_count
     total_count = label_var.shape[1]
-    accuracy = float(correct_count) / total_count
+    print total_count
 
+    accuracy = float(correct_count) / total_count
     return accuracy
