@@ -286,14 +286,14 @@ To increase the search efficiency as well as the optimality of the resulting seq
 
 In this work, we adopt the novel approach that we only incrementally increase or decrease the beam size during the search process. Such design choice facilitates the comparison between the performance of the heuristic rules and the reinforcement learning agent we will be discussing later in Section ~\ref{sec:RL}.
 
-In detail, consider that at time step $t$ of the decoding, there are $B_{t-1}$ inputs, $\hat{y}_{t-1}^{(b)}$, $b = 1, \dots, B_{t-1}$, from the $B_{t-1}$ previous step of the decoder output. By decoding these $B_{t-1}$ inputs, we obtain $B_{t-1} \times |V^y|$ probability predictions for the $|V^y|$ possible targets in $B_{t-1}$ beams. We sort the $B_{t-1} \times |V^y|$ probabilities into a sorted list $\{ P_1, \dots, P_{B_{t-1} |V^y|} \}$, with $P_1$ being the highest probability. We then pick the first $B_t$ elements from the list to form the new beam produced by this decoding step, with the corresponding target words $\{ \hat{y}_{t}^{(1)}, \dots, \hat{y}_{t}^{(B_t)} \}$. In the standard beam search where the beam size is kept fixed, we have $B_t = B_{t-1}$ at each step.
-
-We propose the following heuristic rules to dynamically change the beam size at each step.
+In detail, consider that at time step $t$ of the decoding, there are $B_{t-1}$ inputs, $\hat{y}_{t-1}^{(b)}$, $b = 1, \dots, B_{t-1}$, from the $B_{t-1}$ previous step of the decoder output. By decoding these $B_{t-1}$ inputs, we obtain $B_{t-1} \times |V^y|$ probability predictions for the $|V^y|$ possible targets in $B_{t-1}$ beams. We sort the $B_{t-1} \times |V^y|$ probabilities into a sorted descending list $\{ P_1, \dots, P_{B_{t-1} |V^y|} \}$, with $P_1$ being the highest probability. We then pick the top $B_t$ elements from the sorted list to form the new beam produced by this decoding step, with the corresponding target words $\{ \hat{y}_{t}^{(1)}, \dots, \hat{y}_{t}^{(B_t)} \}$. In the standard beam search where the beam size is kept fixed, we have $B_t = B_{t-1}$ at each step. Then in our proposed adaptive beam search approach, we have the following two deterministic rules to dynamically change the beam size to new $B_t$ at each time step $t$. 
 \begin{itemize}
 \item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} \leq r^{\textrm{word}}_{\textrm{low}}$, then decrease the beam size: $B_t = B_{t-1} - 1$.
 \item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} > r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} > r^{\textrm{word}}_{\textrm{low}}$, then increase the beam size: $B_t = B_{t-1} + 1$.
 \end{itemize}
-The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. The thresholds  $r^{\textrm{sen}}_{\textrm{low}}$ and $ r^{\textrm{word}}_{\textrm{low}}$ are chosen heuristically. Note that to avoid numerical underflow, we work in the logarithmic space as we implement the rules.
+The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. The thresholds  $r^{\textrm{sen}}_{\textrm{low}}$ and $r^{\textrm{word}}_{\textrm{low}}$ are chosen heuristically. In our experiments, we set $r^{\textrm{sen}}_{\textrm{low}} = 0.1$ and $r^{\textrm{word}}_{\textrm{low}} = 0.1$. Note that to avoid numerical underflow issue, we work in the logarithmic space as we implement the rules just like in the hard beam search.
+
+%HERE...
 
 
 
@@ -302,14 +302,16 @@ The primed summation $\prod'_t$ notation is used to indicate that the product is
 \section{Adaptive Beam Search by Reinforcement Learning}
 \label{sec:RL}
 
-Using the heuristic rules to prune or grow the beam size has a downside that the thresholds of pruning or growing (the parameters $r^{\textrm{sen}}_{\textrm{low}}$ and $r^{\textrm{word}}_{\textrm{low}}$ in our case) are set by hand, which may require some tuning to find the suitable values. Moreover, the thresholds suitable for one task is generally different from those for another task, so additional human labor is needed to identify the suitable thresholds for each new task.
+Using the heuristic rules to prune or grow the beam size has a downside that the thresholds of pruning or growing (the parameters $r^{\textrm{sen}}_{\textrm{low}}$ and $r^{\textrm{word}}_{\textrm{low}}$ in our case) are set by hand, which may require some tuning process to find the most suitable values. Moreover, the thresholds suitable for one task is generally different from those for another task. Thus, additional human labor is needed to identify the suitable thresholds for each new task.
 
-To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn when to increase or decrease the beam size, using reinfor
+To overcome the shortcomings of the heuristic algorithm above, we propose the second approach to perform the adaptive beam search by introducing an $agent$ to learn when to increase or decrease the beam size, with the help of reinforcement learning.
 
 \subsection{Reinforcement learning environment}
-Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions towards the beam size, which are \textit{\{decrease, keep, increase \}}.
+Because our setting is very specific, it is difficult to inherit from the traditional environments such as OpenAI Gym. Consequently, we design our own Seq2Seq RL environment for this task. 
 
+In particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step $t$ of the decoder output, and then determines to take an action among three possible options towards the beam size, which are \textit{\{decrease, keep, increase \}}. Likewise, our action space is 3. 
 
+%HERE...
 
 \begin{figure}[ht]
 \centering
@@ -318,14 +320,18 @@ Particularly, we consider the scenario that there is an agent observing the pred
 \label{fig:adaptve}
 \end{figure}
 
-For the most important part is the reward, we combine 3 different numbers given a timestep $t$: 
+To determine which action is taken, we introduce the reward, by combining 3 different numbers given a time step $t$: 
 \begin{itemize}
 	\item Cumulative log probability of the beams from timestep $0$. This criterion is traditionally used in beam search for Seq2Seq model. 
     \item Current log probability of top words in the beams. 
     \item Current beam size 
 \end{itemize}
 
-For implementation, we flatten out those numbers and thus obtain a vector of length $2 * \text{max\_beam\_size} + 1$. 
+For implementation, we flatten out those numbers and thus obtain a vector of length \textit{l = $2 * \text{max\_beam\_size} + 1$}. As a result, our reward space would be in the range of $\mathbf{R}^{+(l \text{x} 1)}$.
+
+Finally, the most important interface which interacts directly with the agent is the \texttt{step()} function, which takes an input of an action and current state and then return the resulting immediate reward for the being timestep. 
+TO BE ADDED 
+
 \subsection{Training Decoder with Asynchronous Advantage Actor-Critic Method}
 
 
@@ -339,6 +345,8 @@ For implementation, we flatten out those numbers and thus obtain a vector of len
 Actor-Critic RL \cite{sutton1998reinforcement} is known to be a popular method to effectively training a RL agent using REINFORCE \cite{williams1992simple} because it allows to end the episode early. But we choose Asynchronous Advantage Actor-Critic (A3C) \cite{mnih2016asynchronous} to implement our algorithm for simplicity (compared with other state-of-the-art methods), ability to resolve high variance and high sample complexity in training of Actor-Critic and parallelism which helps speed up the training. 
 
 Our A3C architecture is shown in Figure \ref{fig:a3c}. From the environment defined above, we use a shared model and initialize many training agents which share the same optimizer as well, to asynchronously update the model policy network during training. Each episode stands for each sentence containing the tagging task for each token in the sentence. 
+
+Formally, we have a main actor which aims to learn the policy function $\pi()$
 
 \section{Experiments}
 
@@ -367,12 +375,12 @@ From the results of NER dataset, we observe that using heuristic adaptive beam s
 
 \begin{table*}[ht]
 \centering
-\caption{Heuristic pruning and growing rules results. NER.}
+\caption{Results on Named Entity Recognition task (CONLL-2003 German dataset) using heuristic pruning and growing rules. The F scores and other experimental results of greedy search, hard beam search (beam size = 3, 6, 9) and heuristic adaptive beam search (beam size is initialized as 3, 6, 9) are listed. The last row in the table is the baseline results.}
 \label{tab:NERHeuristic}
 \begin{tabular}{lcccccccc}
 \toprule
 & Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 & Soft Beam \\
-& & & Adaptive & & Adaptive & & Adaptive & \\
+& & Fixed & Adaptive & Fixed & Adaptive & Fixed & Adaptive & \\
 \midrule
 F-score & 58.09 & 57.69 & 57.71 & 57.76 & 57.71 & 57.76 & 57.71 & \\
 Total beam \# & 48,571 & 145,713 & 92,727 & 291,426 & 126,759 & 437,139 & 182,785 & \\
@@ -389,12 +397,12 @@ F-score \\
 
 \begin{table*}[ht]
 \centering
-\caption{Heuristic pruning and growing rules results. CCG.}
+\caption{Results on CCG Supertagging task (CCGbank dataset) using heuristic pruning and growing rules. The F scores and other experimental results of greedy search, hard beam search (beam size = 2, 3) and heuristic adaptive beam search (beam size is initialized as 1, 2, 3) are listed. The last row in the table is the baseline results.}
 \label{tab:CCGHeuristic}
 \begin{tabular}{lccccccc}
 \toprule
 & Greedy & Beam 1 & Beam 2 & Beam 2 & Beam 3 & Beam 3 & Soft Beam \\
-& & Adaptive & & Adaptive & & Adaptive & \\
+&  & Adaptive & Fixed & Adaptive & Fixed & Adaptive & \\
 \midrule
 Accuracy & 90.50 & 90.62 & 90.60 & 90.62 & 90.62 & 90.62 &  \\
 Total beam \# & 52,964 & 93,403 & 105,928 & 98,100 & 158,892 & 103,875 &  \\
@@ -426,8 +434,9 @@ For the NER dataset, we observe that the reinforcement learning agent in general
 In the CCG dataset, we observe the following:
 \begin{enumerate}
 \item In general the agent is able to learn to dynamically adjust the beam size to obtain the accuracy that is higher than that using the greedy search. In the worst case (initial beam size 2), the accuracy is the same as using greedy search. Nevertheless, the accuracy obtained by the agent is still lower than that obtained using the heuristic adaptive beam search.
-\item In
+\item Unlike in the case of NER dataset, the agent here is able to learn to increase the beam size to raise the accuracy. We observe that as the total number of beams explored increases, the accuracy obtained by the agent increases as well. In the worst case (initial beam size 2), the agent does not learn to increase the beam size to get higher accuracy effectively, and the total number of beam size stays at the similar level of that of the greedy search. In that case, it obtains the same accuracy as that obtained by the greedy search as well.
 \end{enumerate}
+
 
 
 
@@ -435,7 +444,7 @@ In the CCG dataset, we observe the following:
 
 \begin{table}
 \centering
-\caption{Reinforcement learning results. NER.}
+\caption{Results on Named Entity Recognition using adaptive beam search by reinforcement learning. The beam size is initialized as 3, 6, 9.}
 \label{tab:NERRL}
 \begin{tabular}{lccc}
 \toprule
@@ -450,7 +459,7 @@ Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
 
 \begin{table}
 \centering
-\caption{Reinforcement learning results. CCG.}
+\caption{Results on CCG Supertagging using adaptive beam search by reinforcement learning. The beam size is initialized as 1, 2, 3.}
 \label{tab:CCGRL}
 \begin{tabular}{lccc}
 \toprule
@@ -461,6 +470,9 @@ Total beam \# & 100,573 & 55,372 & 151,832 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+
+
 
 
 
@@ -808,6 +820,7 @@ Total beam \# & 100,573 & 55,372 & 151,832 \\
 \section{Conclusion} \label{sec:conclusion}
 In this report we have demonstrated our improved seq2seq model with many new features, e.g. pre-trained word embeddings, bi-directional LSTM, beam search, attention and extra penalization. We have conducted experiments on NER tasks using our model, and the results of each experiments are shown and compared to the baseline as well. All the code is now made available in our github repository. 
 
+In this paper, we propose the novel strategies for optimizing the beam search for Seq2Seq model. We implement the two dynamic beam search methods - heuristic rules and reinforcement l
 
 
 
@@ -900,6 +913,8 @@ In this report we have demonstrated our improved seq2seq model with many new fea
 % include your own bib file like this:
 %\bibliographystyle{acl}
 %\bibliography{acl2018}
+
+\pagebreak
 \bibliography{acl2018}
 \bibliographystyle{acl_natbib}
 
