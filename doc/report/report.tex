@@ -35,7 +35,7 @@
 
 \newcommand\BibTeX{B{\sc ib}\TeX}
 
-\title{Dynamic Beam Search in Sequence-to-Sequence Models}
+\title{Adaptive Beam Search in Sequence-to-Sequence Models}
 
 \author{Yu-Hsiang Lin \quad Shuxin Lin \quad Hai Pham \\
   Language Technologies Institute \\
@@ -57,7 +57,7 @@
 \maketitle
 \begin{abstract}
 % We plan to apply new techniques such as combining dynamical beam size with trainable beam search to boost up the training and test-time decoding of the sequence-to-sequence model. We review the related approaches, and report our work in replicating state-of-the-art results.
-Natural language processing tasks usually require to decode the most likely output sequence which involves searching through all the possible output sequences based on their likelihood. Beam search is a heuristic search algorithm used in the test-time decoding of sequence-to-sequence model. While it might have an advantage over greedy search for accuracy, it leads to time and resource hunger due to keeping and searching through a fixed amount of beams at each step as the beam size increases. We aim to address this problem and propose methods of adapting the beam size for decoding with help of deterministic agent and reinforcement learning. In the experiments we show that the proposed adaptive beam search strategies yield better results on two NLP tasks compared with baseline.
+Natural language processing tasks usually require to decode the most likely output sequence which involves searching through all the possible output sequences based on their likelihood. Beam search is a heuristic search algorithm used in the test-time decoding of sequence-to-sequence model. While it might have an advantage over greedy search for accuracy, it leads to time and resource hunger due to keeping and searching through a fixed amount of beams at each step as the beam size increases. We aim to address this problem and propose methods of adapting the beam size for decoding with help of deterministic agent and reinforcement learning, in particular for the decoding phase in Seq2Seq model. In the experiments we show that the proposed adaptive beam search strategies yield better results on two NLP tasks compared with baseline models.
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -69,32 +69,32 @@ especially since the advent of attention model \cite{bahdanau2014neural,luong201
 
 Amongst many heuristic approaches to remediate that problem, \textit{greedy search} and \textit{beam search} are the most popular. While greedy search is known for its lightweight, elegant characteristics, beam search is generally better in practice by considering not only the best-scored word at each time step but maintaining a window of best words. 
 % In this project, we will be addressing the disadvantages of previous approaches for seq2seq using beam search and proposing an improvement for it in training and decoding phases. We also present our results on the Name Entity Recognition task.
-In this paper, we will address the disadvantages of previous Seq2seq model using beam search and introduce our improvement with attention in Section 2. Our novel dynamic beam search algorithms will be discussed in Section 3. We also present our experimental results and analysis in Section 4.
+In this paper, we will revisit recent researches on related topic in Section 2 and address the disadvantages of previous Seq2seq model using beam search and introduce our improvement with attention in Section 3. Our novel dynamic beam search algorithms will be discussed in Section 4 and 5. We also present our experimental results and analysis in Section 6 and 7	.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %         RELATED WORK              
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \section{Related Work} \label{sec:related_work}% Literature Review 
-% The straightforward approach to improve seq2seq model trained with the traditional maximum likelihood method  of ground truths is to improve the decoding phase. While beam search is considered the de-factor approach \cite{seq2seq_2014}, greedy search, if designed properly, can yield a comparable performance, if not better in some cases, while having a much more lightweight architecture. \citet{goyal2017differentiable} proposed an approximated version of greedy search over the scheduled sampling training procedure \cite{bengio2015scheduled}. 
-% %% PROBABLY NEED MORE REFERENCE for REINFORCE
-% % Reinforcement learning 
-% Unlike tackling with decoding phase solely, another useful approach to improve seq2seq is to design a better architecture or technique of helping decode right on the training phase. One widely-employed approach is to 
-% %is to avoid the low performance of greedy search and high delay of beam search, 
-% convert it into an imitation learning problem \cite{daume2009search,ross2011reduction,bengio2015scheduled} where expert guidance from human is injected to make the agent more robust and efficient. 
-% A naturally connected method is to use reinforcement learning \cite{sutton1998reinforcement} which employs a reward-based loss instead of maximum likelihood-based \cite{ranzato2015sequence, gu2017learning}, giving rise to a new family of techniques which is fitted to the discrete text domain. 
+\section{Related Work} \label{sec:related_work}% Literature Review 
+The straightforward approach to improve seq2seq model trained with the traditional maximum likelihood method  of ground truths is to improve the decoding phase. While beam search is considered the de-factor approach \cite{seq2seq_2014}, greedy search, if designed properly, can yield a comparable performance, if not better in some cases, while having a much more lightweight architecture. \citet{goyal2017differentiable} proposed an approximated version of greedy search over the scheduled sampling training procedure \cite{bengio2015scheduled}. 
+%% PROBABLY NEED MORE REFERENCE for REINFORCE
+% Reinforcement learning 
+Unlike tackling with decoding phase solely, another useful approach to improve seq2seq is to design a better architecture or technique of helping decode right on the training phase. One widely-employed approach is to 
+%is to avoid the low performance of greedy search and high delay of beam search, 
+convert it into an imitation learning problem \cite{daume2009search,ross2011reduction,bengio2015scheduled} where expert guidance from human is injected to make the agent more robust and efficient. 
+A naturally connected method is to use reinforcement learning \cite{sutton1998reinforcement} which employs a reward-based loss instead of maximum likelihood-based \cite{ranzato2015sequence, gu2017learning}, giving rise to a new family of techniques which is fitted to the discrete text domain. 
 
-% % Reinforcement learning
-% While discriminative training is the straightforward method for seq2seq training, another generalized method is to pose it as a generative model. Amongst such solutions, Generative Adversarial Network \cite{goodfellow2014generative} broadly used for diverse tasks, predominantly in generating images \cite{dcgan2015,berthelot2017began,zhang2017stackgan,progressive_gan_2017,li2017mmd} and videos \cite{vondrick2016generating} based on what model learned from training, or \textit{translating} them given a style of images \cite{conditional_gan_2014,pix2pix2017,discoGAN2017,mechrez2017photorealistic,luan2017deep,zhu2017unpaired,ma2018gan} and videos \cite{ruder2016artistic,liu2017unsupervised}. Despite the booming trend of GAN, its application to text domain faces a difficult obstacle of inherent discrete properties of text domain. Nonetheless, there have been successes of translating text from a style to another 
-% %using professor-forcing \cite{professor_forcing_2016} 
-% to deal with discrete texts \cite{boundaryseeking_gan_2017,yu2017seqgan,shen2017style}.  
-% Another workaround when facing discrete text in designing a generative model is to use variational autoencoder \cite{kingma2013auto} with maximum likelihood objective to learn the disentangled latent representations into some controlled attributes \cite{controlled_text_gen_2017}. 
+% Reinforcement learning
+While discriminative training is the straightforward method for seq2seq training, another generalized method is to pose it as a generative model. Amongst such solutions, Generative Adversarial Network \cite{goodfellow2014generative} broadly used for diverse tasks, predominantly in generating images \cite{dcgan2015,berthelot2017began,zhang2017stackgan,progressive_gan_2017,li2017mmd} and videos \cite{vondrick2016generating} based on what model learned from training, or \textit{translating} them given a style of images \cite{conditional_gan_2014,pix2pix2017,discoGAN2017,mechrez2017photorealistic,luan2017deep,zhu2017unpaired,ma2018gan} and videos \cite{ruder2016artistic,liu2017unsupervised}. Despite the booming trend of GAN, its application to text domain faces a difficult obstacle of inherent discrete properties of text domain. Nonetheless, there have been successes of translating text from a style to another 
+%using professor-forcing \cite{professor_forcing_2016} 
+to deal with discrete texts \cite{boundaryseeking_gan_2017,yu2017seqgan,shen2017style}.  
+Another workaround when facing discrete text in designing a generative model is to use variational autoencoder \cite{kingma2013auto} with maximum likelihood objective to learn the disentangled latent representations into some controlled attributes \cite{controlled_text_gen_2017}. 
 
-% Inspired by GAN's design, similar approaches have been made to seq2seq in conjunction with reinforcement learning \cite{kusner2016gans, yu2017seqgan,gu2017neural, gumbel2017}. And although not directly connected, actor-critic setting which shares a close equivalence with GAN \cite{pfau2016connecting}, has been also employed to replace maximum-likelihood method \cite{bahdanau2017actor}. And while sharing the same methodology in that we improve the decoding performance by making the model learn to decode right on the training phase, our approach still sticks to maximum likelihood method objective for its straightforwardness and more simplicity in its design.  
+Inspired by GAN's design, similar approaches have been made to seq2seq in conjunction with reinforcement learning \cite{kusner2016gans, yu2017seqgan,gu2017neural, gumbel2017}. And although not directly connected, actor-critic setting which shares a close equivalence with GAN \cite{pfau2016connecting}, has been also employed to replace maximum-likelihood method \cite{bahdanau2017actor}. And while sharing the same methodology in that we improve the decoding performance by making the model learn to decode right on the training phase, our approach still sticks to maximum likelihood method objective for its straightforwardness and more simplicity in its design.  
 
-% %%% TODO: discrete search-based 
-% While reinforcement learning can yield a fast decoding model, training with maximum likelihood has its own merit of being simple yet comparably efficient. For such approach, some attempts to make the model learn how to decode right on the training phase have also taken place. There were some solutions that optimize beam search in discrete space such as from \citet{wiseman2016sequence, andor2016globally} whose target is to get rid of label bias problem and design a model that is globally--rather than locally--normalized. Another work, from which our work extends, instead aims at design a new surrogate training objective to convert from discrete space into a continuous approximation of the beam search \cite{goyal2018continuous}. In detail, because using beam search right at training phase largely degrades the performance due to its resources consumption and its search space, we plan to use a tactic of dynamic beam search \cite{buckman2016transition} to make the training faster while retaining its efficacy. 
-% % Our work instead tackles with the training phase rather than only looking at improving decoding. 
+%%% TODO: discrete search-based 
+While reinforcement learning can yield a fast decoding model, training with maximum likelihood has its own merit of being simple yet comparably efficient. For such approach, some attempts to make the model learn how to decode right on the training phase have also taken place. There were some solutions that optimize beam search in discrete space such as from \citet{wiseman2016sequence, andor2016globally} whose target is to get rid of label bias problem and design a model that is globally--rather than locally--normalized. Another work, from which our work extends, instead aims at design a new surrogate training objective to convert from discrete space into a continuous approximation of the beam search \cite{goyal2018continuous}. In detail, because using beam search right at training phase largely degrades the performance due to its resources consumption and its search space, we plan to use a tactic of dynamic beam search \cite{buckman2016transition} to make the training faster while retaining its efficacy. 
+% Our work instead tackles with the training phase rather than only looking at improving decoding. 
 
-% % Other more efficient seq2seq improvement approach is to address the disadvantages of maximum likelihood training and so change the target objective.
+% Other more efficient seq2seq improvement approach is to address the disadvantages of maximum likelihood training and so change the target objective.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % %           MODEL
@@ -178,7 +178,7 @@ The second phase is to convert the hidden state of tokens to the probability ove
   \end{equation}
 where $W_{s}$ and $b_{s}$ are the shared weight and bias vector on top of the decoder's hidden layer. 
 
-\subsection{Fixed Attention}
+\subsection{Fixed Attention} \label{ssec:atten}
 Attention model \cite{bahdanau2014neural,luong2015effective} is one of the useful tricks in training Seq2Seq models. The idea is, instead of using the RNN function as in Equation \ref{eq:rnn_dec} in which every output only depends on current input token and the previous hidden state, we augment this by giving it a chance to look back and calculate the similarity with each token in the encoder \textit{output} sequence. The similarity functions are varied in practice. 
 
 Then the Equation \ref{eq:pt} for decoder output at step $t$ is transformed to: 
@@ -273,7 +273,7 @@ $\{ p(y^{(1)}_{1}), p(y^{(1)}_{2}), \dots, p(y^{(1)}_{K}) \}$. We start to build
 
 In detail, later at time step $t$, we have $K$ options of inputs $\{ y^{(t)}_k\}^{k=1}_K$, and for each input $y^{(t-1)}_{k}$, we also calculate K best probabilities $\{ p({y}^{(t)}_{k1}), p({y}^{(t)}_{k2}), \dots, p({y}^{(t)}_{kK}) \}$. Note that this time step, we still only keep $K$ branches in total, i.e. we keep only the best global cases across all beams (also based on the accumulated log probabilities) along with recording the mapped label associated with that probability. Finally, the highest accumulated sum-log will be chosen and the predicted label sequence is pulled out by backtracking the mapping table. 
 
-Compared with greedy search, hard beam search with fixed beam size trades processing time with the accuracy since best scoring sequence will eventually be captured as the beam size grows. However, it always process $|B| * |V_{label}|$ tokens where $|B|$ is beam size at each time step, which consumes not only a a large amount of time but memory as well. 
+Compared with greedy search, hard beam search with fixed beam size trades processing time with the accuracy since best scoring sequence will eventually be captured as the beam size grows. However, it always process $B * |V_{label}|$ tokens where $B$ is beam size at each time step, which consumes not only a a large amount of time but memory as well. 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -291,9 +291,13 @@ In detail, consider that at time step $t$ of the decoding, there are $B_{t-1}$ i
 We propose the following heuristic rules to dynamically change the beam size at each step.
 \begin{itemize}
 \item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} \leq r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} \leq r^{\textrm{word}}_{\textrm{low}}$, then decrease the beam size: $B_t = B_{t-1} - 1$.
-\item If $\displaystyle{\frac{\prod'_t P_{B_{t-1} + 1}}{\prod'_t P_1}} > r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1} + 1}}{P_1}} > r^{\textrm{word}}_{\textrm{low}}$, then increase the beam size: $B_t = B_{t-1} + 1$.
+\item If $\displaystyle{\frac{\prod'_t P_{B_{t-1}}}{\prod'_t P_1}} > r^{\textrm{sen}}_{\textrm{low}}$ or $\displaystyle{\frac{P_{B_{t-1}}}{P_1}} > r^{\textrm{word}}_{\textrm{low}}$, then increase the beam size: $B_t = B_{t-1} + 1$.
 \end{itemize}
-The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. Note that to avoid numerical underflow, we work in the logarithmic space as we implement the rules.
+The primed summation $\prod'_t$ notation is used to indicate that the product is taken over the path of this beam from $t = 1$ to this step. For example, $\prod'_t P_1$ denotes the cumulative probability for the sequence of the top-1 beam. The thresholds  $r^{\textrm{sen}}_{\textrm{low}}$ and $ r^{\textrm{word}}_{\textrm{low}}$ are chosen heuristically. Note that to avoid numerical underflow, we work in the logarithmic space as we implement the rules.
+
+%HERE...
+
+
 
 
 
@@ -302,104 +306,220 @@ The primed summation $\prod'_t$ notation is used to indicate that the product is
 
 Using the heuristic rules to prune or grow the beam size has a downside that the thresholds of pruning or growing (the parameters $r^{\textrm{sen}}_{\textrm{low}}$ and $r^{\textrm{word}}_{\textrm{low}}$ in our case) are set by hand, which may require some tuning to find the suitable values. Moreover, the thresholds suitable for one task is generally different from those for another task, so additional human labor is needed to identify the suitable thresholds for each new task.
 
-To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn learn when to increase or decrease the beam size.
+To overcome the shortcoming of the heuristic algorithm, we propose the second approach to perform the adaptive beam search by introducing an ``agent'' to learn when to increase or decrease the beam size, using reinfor
 
-... Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions
+\subsection{Reinforcement learning environment design}
+Particularly, we consider the scenario that there is an agent observing the predicted probability distribution at each step of the decoder output, and then determines to take an action among three possible actions towards the beam size, which are \textit{\{decrease, keep, increase \}}.
 
 %HERE...
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1.0\linewidth]{adapt.png}
+\caption{Demonstration of how agent learns to adapt beam size for decoding. At $t=1$, it learns to increase the beam size from 3 to 4. At $t=2$, it reduce the beam size back to 3.}
+\label{fig:adaptve}
+\end{figure}
 
+For the most important part is the reward, we combine 3 different numbers given a timestep $t$: 
+\begin{itemize}
+	\item Cumulative log probability of the beams from timestep $0$. This criterion is traditionally used in beam search for Seq2Seq model. 
+    \item Current log probability of top words in the beams. 
+    \item Current beam size 
+\end{itemize}
 
-
+For implementation, we flatten out those numbers and thus obtain a vector of length $2 * \text{max\_beam\_size} + 1$. 
 \subsection{Training Decoder with Asynchronous Advantage Actor-Critic Method}
 
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1.0\linewidth]{a3c.png}
+\caption{A3C training with multiple training agents which are all able to update the parameters to the shared model. For validation and testing, these parameters are copied to the respective validation and test agents.}
+\label{fig:a3c}
+\end{figure}
+
+
+
+
+\section{Experiments}
+
+Our implementation\footnote{The Github repository can be accessed at: https://github.com/ShuxinLin/nn4nlp\_project/.} is built based on PyTorch \cite{paszke2017automatic}. We conducted all experiments on AWS EC2 as well as private computers. As it is discussed in Section \ref{ssec:model}, the current Seq2Seq model is built on the encoder-decoder architecture. For encoder, we use one-layer bi-directional LSTM, and for the decoder we use one-layer single-directional LSTM with a fixed attention mechanism. We perform the training using mini-batch stochastic gradient descent with Adam optimizer and use different beam search strategies in testing time. The task we are trying to solve is two common natural language processing tasks, the named entity recognition (NER) and CCG Supertagging.
+
+\subsection{Datasets}
+In order to make our experimental results comparable to the baseline \cite{goyal2017continuous}, we use the same datasets as well as evaluation metrics. 
+
+For named entity recognition, we use the data of CONLL-2003 shared task \cite{tjongkimsang2003conll} for German language. The data consists of three files per language: one training file and two test files, testa and testb. We use testa as the development data, testb as the final test data.  The label/entity has 9 possible values: 8 NER tags and a tag denoting the end of the sentence (EOS). Due to the extremely skewed label distribution towards the default label ($O$), the widely-used evaluation metrics for this dataset is F score.
+
+ For CCG Supertagging task, we use the data of CCGbank corpus \cite{hockenmaier2007ccgbank} and its provided splits for train, development, and test data. The label has 1321 possible values: 1320 CCG derivation grammar tags and a tag denoting the end of the sentence (EOS). In this task, accuracy of correct predictions is measured.
+
+We perform very minor preprocessing on the data by creating and indexing the vocabulary of each datasets. Given the vocabulary of input words, we construct pre-trained word embedding matrix using GloVe for English and provided word embedding \cite{goyal2017continuous} for German. 
+As can be noticed above, CCG Supertagging task have larger label size (search space) than NER task. Thus it leads to the fact that CCG supertagging task is more appropriate for measuring the efficacy of the proposed dynamic beam search methods.  
+
+
+
+
+\subsection{Results and Analysis}
+
+The results of the heuristic pruning and growing adaptive beam search on the NER and CCG datasets are shown in Table \ref{tab:NERHeuristic} and \ref{tab:CCGHeuristic}, respectively. From the results of NER dataset, we observe that using heuristic adaptive beam search effectively reduces the search space and the search time, while not sacrificing the F-score. In the case of initial beam size 9, the total number of beams explored during decoding in the adaptive case is only $42\%$ of that in the case of fixed beam size, while the F-score using adaptive search only decreases by less than $0.1\%$; measured in time, the decoding time is reduced to $52\%$ when using adaptive method. Note that in the NER dataset, greedy search gives higher F-score than the beam search methods do. This is consistent with the results from the baseline.
+
+
+\begin{table*}
+\centering
+\caption{Heuristic pruning and growing rules results. NER.}
+\label{tab:NERHeuristic}
+\begin{tabular}{lcccccccc}
+\toprule
+& Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 & Soft Beam \\
+& & & Adaptive & & Adaptive & & Adaptive & \\
+\midrule
+F-score & 58.09 & 57.69 & 57.71 & 57.76 & 57.71 & 57.76 & 57.71 & \\
+Total beam \# & 48,571 & 145,713 & 92,727 & 291,426 & 126,759 & 437,139 & 182,785 & \\
+Avg.~beam \# & 1 & 3 & 1.95 & 6 & 3.16 & 9 & 4.86 & \\
+Time (sec) & 22 & 76 & 61 & 132 & 73 & 178 & 92 & \\
+\midrule
+Goyal 2017 & 54.92 & 51.34 & & & & & & 56.38 \\
+F-score \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+
+
+\begin{table*}
+\centering
+\caption{Heuristic pruning and growing rules results. CCG.}
+\label{tab:CCGHeuristic}
+\begin{tabular}{lccccccc}
+\toprule
+& Greedy & Beam 1 & Beam 2 & Beam 2 & Beam 3 & Beam 3 & Soft Beam \\
+& & Adaptive & & Adaptive & & Adaptive & \\
+\midrule
+Accuracy & 90.50 & 90.62 & 90.60 & 90.62 & 90.62 & 90.62 &  \\
+Total beam \# & 52,964 & 93,403 & 105,928 & 98,100 & 158,892 & 103,875 &  \\
+Avg.~beam \# & 1 & 1.61 & 2 & 1.72 & 3 & 1.87 &  \\
+Time (sec) & 22 & 87 & 92 & 130 & 184 & 141 &  \\
+\midrule
+Goyal 2017 & 80.35 &  & & & 82.42 & & 82.00 \\
+Accuracy \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The performance of the adaptive search is better on the CCG dataset. We observe the following:
+\begin{enumerate}
+\item By starting with initial beam size of 1, and allow the beam size to be adaptively changed in the following steps during decoding, we obtain higher accuracy than the greedy search (always keep beam size 1) does.
+\item Using fixed beam size, one needs to use beam size 3 to obtain the same accuracy achieved by the adaptive beam search with initial beam size 1, while the latter only needs to explore about $59\%$ of the beam number, and spends only $47\%$ of the time.
+\item The F-scores obtained by using different initial beam size for the adaptive search are stable (actually the same value in this experiment), and the total number of beams explored by using initial beam size 3 increases by only $11\%$ compared to that by using initial beam size 1.
+\end{enumerate}
 
 
 
 
 
-\section{Experiment}
+The results of the adaptive beam search using the reinforcement learning agent on the NER dataset is shown in Table \ref{tab:NERRL}.
 
-Our implementation\footnote{The Github repository can be accessed at: https://github.com/ShuxinLin/nn4nlp\_project/.} is built based on PyTorch \cite{paszke2017automatic}. We conducted all experiments on AWS EC2 as well as private computers. As it is discussed in Section \ref{ssec:model}, the current Seq2Seq model is the encoder-decoder architecture. For encoder, we use one-layer bi-directional LSTM, and for the decoder we use one-layer single-directional LSTM. We perform the training using mini-batch stochastic gradient descent with Adam optimizer. The task we are trying to solve is a common natural language processing task, the named entity recognition (NER). The purpose of this project is to evaluate the effectiveness of our improvement to the seq2seq models, so we choose NER as our task even though the encoder-decoder model may not be the most suitable model for this task.
 
-For named entity recognition, we use the data of CONLL-2003 shared task \cite{tjongkimsang2003conll} for German language. 
+\begin{table}
+\centering
+\caption{Reinforcement learning results. NER.}
+\label{tab:NERRL}
+\begin{tabular}{lccc}
+\toprule
+& Beam 3 & Beam 6 & Beam 9 \\
+\midrule
+F-score & 57.66 & 57.61 & 57.52 \\
+Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+
+
 
 % The data consists of three files per language: one training file and two test files, testa and testb. We use testa as the development data, testb as the final test data. In the current development phase, only the train data and the development data are used for finding good parameters for the seq2seq model.
 
 % We perform minimum preprocessing on the data, since the best performance is not our ultimate goal of this project, but the effectiveness of the improvement we propose. The label has 9 possible values: 8 NER tags and an additional tag denoting the beginning of the sentence ($\langle$BEG$\rangle$).
 
 
-\subsection{Design Improvements over Assignment 1 and Results}
+% \subsection{Design Improvements over Assignment 1 and Results}
 
 
 
-\subsubsection{New data batching scheme}
-In the previous impelementation, mini batches of data inputs were fixed-sized sentences, so that paddings were appended the original sentences which introduces irrelevant information. Now we impelement the scheme to support variable-sized batches. In this case, the paddings are not needed. Moreover, we add data shuffling at the beginning of each epoch. This avoids the order of incoming sequences have impact on the results.
+% \subsubsection{New data batching scheme}
+% In the previous impelementation, mini batches of data inputs were fixed-sized sentences, so that paddings were appended the original sentences which introduces irrelevant information. Now we impelement the scheme to support variable-sized batches. In this case, the paddings are not needed. Moreover, we add data shuffling at the beginning of each epoch. This avoids the order of incoming sequences have impact on the results.
 
-\subsubsection{Initialized by pre-trained word embeddings}
-We initialized word embeddings by pretrained weights as discussed in the Section 3.2. The word embedding dimension of Word2Vec, GloVe and fastText is 300 for each word; while the dimension of the version provided by \citet{goyal2018continuous} is 64. One commmon issue of pretrained word embedding model is Out-of-Vocabulary issue, i.e. some of words in our vocabulary are not in the vocabulary of pretrained word embeddings. For English datasets, GloVe model has larger vocabulary set, and mismatched cases using GloVe are much less than using Word2Vec. Thus GloVe is our choice. For German datasets, we use the version provided by \citet{goyal2018continuous} since the word embedding dimension is smaller.
+% \subsubsection{Initialized by pre-trained word embeddings}
+% We initialized word embeddings by pretrained weights as discussed in the Section 3.2. The word embedding dimension of Word2Vec, GloVe and fastText is 300 for each word; while the dimension of the version provided by \citet{goyal2018continuous} is 64. One commmon issue of pretrained word embedding model is Out-of-Vocabulary issue, i.e. some of words in our vocabulary are not in the vocabulary of pretrained word embeddings. For English datasets, GloVe model has larger vocabulary set, and mismatched cases using GloVe are much less than using Word2Vec. Thus GloVe is our choice. For German datasets, we use the version provided by \citet{goyal2018continuous} since the word embedding dimension is smaller.
 
-The vectorized word embeddings are pre-computed and saved as the Numpy array format of shape (vocabulary\_size, embedding\_dimension). The results are shown in Table \ref{embed}. The experiments set up in the same configureation except whether use the pretrained word embeddings or not. From the table, we can see that although the accuracy does not make differences, the F score of train data using pre-trained word embeddings significantly improves.
+% The vectorized word embeddings are pre-computed and saved as the Numpy array format of shape (vocabulary\_size, embedding\_dimension). The results are shown in Table \ref{embed}. The experiments set up in the same configureation except whether use the pretrained word embeddings or not. From the table, we can see that although the accuracy does not make differences, the F score of train data using pre-trained word embeddings significantly improves.
 
 % Please add the following required packages to your document preamble:
 % \usepackage{booktabs}
-\begin{table}[ht]
-\centering
-\caption{After 30 epoches, the results of models on train data with and without pre-trained word embeddings. The model without pre-trained word embeddings creates word embeddings by random initialization. }
-\label{embed}
-\begin{tabular}{@{}llll@{}}
-\toprule
-Model                     & CE loss  & Accuracy & F-score \\ \midrule
-w/ pre-trained          & 0.1377 & 94.21\%  & 46.84   \\
-w/o pre-trained & 0.1927 & 92.76\%  & 30.82   \\ \bottomrule
-\end{tabular}
-\end{table}
+% \begin{table}[ht]
+% \centering
+% \caption{After 30 epoches, the results of models on train data with and without pre-trained word embeddings. The model without pre-trained word embeddings creates word embeddings by random initialization. }
+% \label{embed}
+% \begin{tabular}{@{}llll@{}}
+% \toprule
+% Model                     & CE loss  & Accuracy & F-score \\ \midrule
+% w/ pre-trained          & 0.1377 & 94.21\%  & 46.84   \\
+% w/o pre-trained & 0.1927 & 92.76\%  & 30.82   \\ \bottomrule
+% \end{tabular}
+% \end{table}
 
-\subsubsection{Using bi-directional LSTM in encoder}
+% \subsubsection{Using bi-directional LSTM in encoder}
 
-	In assignment 1 we use single directional LSTM as the encoder. In this assignment, we extend the encoder to bi-directional LSTM network. To feed the last hidden state and cell state into the encoder, we use a linear layer (without bias term) to combine the two $R^h$ vectors into a single $R^h$ one. The very linear layer for the hidden state is later used again in the attention mechanism to prepare the ``annotation'' of the encoded sequence.
+% 	In assignment 1 we use single directional LSTM as the encoder. In this assignment, we extend the encoder to bi-directional LSTM network. To feed the last hidden state and cell state into the encoder, we use a linear layer (without bias term) to combine the two $R^h$ vectors into a single $R^h$ one. The very linear layer for the hidden state is later used again in the attention mechanism to prepare the ``annotation'' of the encoded sequence.
 
-\subsubsection{Beam search implementation}
+% \subsubsection{Beam search implementation}
 
-	We implemented beam search for test-time decoding in this assignment. The beam search implementation is compatible with the attention mechanism. We handled the back-tracking of the beam search process, so that the function will return the optimal output sequence found with given constant beam size, as well as the predicted score distribution and attention coefficient matrix of this sequence.
+% 	We implemented beam search for test-time decoding in this assignment. The beam search implementation is compatible with the attention mechanism. We handled the back-tracking of the beam search process, so that the function will return the optimal output sequence found with given constant beam size, as well as the predicted score distribution and attention coefficient matrix of this sequence.
     
-    We compare the cross-entropy loss function and the F-score of experiments with and without beam search. For beam search, we use beam size of 3 and 10. We train our model for 50 epochs. The resulting F-score is listed in Table \ref{tab:beam}. The training curve is given in Figure \ref{fig:no_attn_losses_fscore}.
+%     We compare the cross-entropy loss function and the F-score of experiments with and without beam search. For beam search, we use beam size of 3 and 10. We train our model for 50 epochs. The resulting F-score is listed in Table \ref{tab:beam}. The training curve is given in Figure \ref{fig:no_attn_losses_fscore}.
 
 % ========================================================================================================
 % ========================================================================================================
 
-\begin{table}[ht]
-\centering
-\caption{The training and validation F-score of experiments with and without beam search. Beam sizes are 3 and 10.}
-\label{tab:beam}
-\begin{tabular}{lrr}
-\toprule
-                  & F-score  & F-score    \\
-                  & (train)  & (val)    \\ \midrule
-Greedy            & 52.81            & 2.88                    \\
-Beam search (size 3)   & 43.47            & 4.05                    \\
-Beam search (size 10)  & 25.60            & 3.35                    \\ \bottomrule
-\end{tabular}
-\end{table}
+% \begin{table}[ht]
+% \centering
+% \caption{The training and validation F-score of experiments with and without beam search. Beam sizes are 3 and 10.}
+% \label{tab:beam}
+% \begin{tabular}{lrr}
+% \toprule
+%                   & F-score  & F-score    \\
+%                   & (train)  & (val)    \\ \midrule
+% Greedy            & 52.81            & 2.88                    \\
+% Beam search (size 3)   & 43.47            & 4.05                    \\
+% Beam search (size 10)  & 25.60            & 3.35                    \\ \bottomrule
+% \end{tabular}
+% \end{table}
 
 % ========================================================================================================
 % ========================================================================================================
-\begin{table*}[ht]
-\centering
-\begin{tabular}{cc}
-\end{tabular}
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_loss.pdf}\caption{Greedy Search Decoding Loss}\end{subfigure} %\&
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_f.pdf}\caption{Greedy Search Decoding F-Score}\end{subfigure} \\
-%%%%%%%%%
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_3_loss.pdf}\caption{Beam Search Decoding Loss}\end{subfigure} %\&
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_3_f.pdf}\caption{Beam Search Decoding F-Score}\end{subfigure} \\
-%%%%%%%%%
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_10_loss.pdf}\caption{Beam Search Decoding Loss}\end{subfigure} %\&
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_10_f.pdf}\caption{Beam Search Decoding F-Score}\end{subfigure} \\
-\captionof{figure}[]{The cross-entropy losses and F-scores of greedy and beam search decoding \textbf{without} attention. Red curve is training set, and blue curve is validation set. Learning rate is 0.001. For beam search, the beam size used in (c) and (d) is 3, and the beam size in (e) and (f) is 10.}
-\label{fig:no_attn_losses_fscore}
-\end{table*}
+% \begin{table*}[ht]
+% \centering
+% \begin{tabular}{cc}
+% \end{tabular}
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_loss.pdf}\caption{Greedy Search Decoding Loss}\end{subfigure} %\&
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_f.pdf}\caption{Greedy Search Decoding F-Score}\end{subfigure} \\
+% %%%%%%%%%
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_3_loss.pdf}\caption{Beam Search Decoding Loss}\end{subfigure} %\&
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_3_f.pdf}\caption{Beam Search Decoding F-Score}\end{subfigure} \\
+% %%%%%%%%%
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_10_loss.pdf}\caption{Beam Search Decoding Loss}\end{subfigure} %\&
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_10_f.pdf}\caption{Beam Search Decoding F-Score}\end{subfigure} \\
+% \captionof{figure}[]{The cross-entropy losses and F-scores of greedy and beam search decoding \textbf{without} attention. Red curve is training set, and blue curve is validation set. Learning rate is 0.001. For beam search, the beam size used in (c) and (d) is 3, and the beam size in (e) and (f) is 10.}
+% \label{fig:no_attn_losses_fscore}
+% \end{table*}
 % ========================================================================================================
 % ========================================================================================================
 
@@ -432,40 +552,40 @@ Beam search (size 10)  & 25.60            & 3.35                    \\ \bottomru
 % \end{figure}
 
 
-\subsubsection{Attention implementation}
+% \subsubsection{Attention implementation}
 
-	We implemented a general class for attention mechanism. It currently focuses on fixed attention, which is used in our NER experiments, but it can be readily extended to support other attention mechanism such as Bahdanau attention. In our implementation for fixed attention, the attention module takes in the sequence of hidden state vectors from the bi-directional LSTM encoder, and the hidden state vector of the decoder at some current time step, as well as a ``combiner'' layer that is used to combine the two directions of the hidden vectors (each of dimension of $R^h$) of encoder into a single vector of dimension $R^h$. This single vector is the so-called ``annotation'' vector. This combiner used in our experiments is the same as the layer we used to transform the last two hidden state vectors (from two directions) of the encoder into one initial hidden state as the input of the decoder. We do not include bias term in the combiner. The result of adding attention is shown in Table \ref{tab:atten}.
+% 	We implemented a general class for attention mechanism. It currently focuses on fixed attention, which is used in our NER experiments, but it can be readily extended to support other attention mechanism such as Bahdanau attention. In our implementation for fixed attention, the attention module takes in the sequence of hidden state vectors from the bi-directional LSTM encoder, and the hidden state vector of the decoder at some current time step, as well as a ``combiner'' layer that is used to combine the two directions of the hidden vectors (each of dimension of $R^h$) of encoder into a single vector of dimension $R^h$. This single vector is the so-called ``annotation'' vector. This combiner used in our experiments is the same as the layer we used to transform the last two hidden state vectors (from two directions) of the encoder into one initial hidden state as the input of the decoder. We do not include bias term in the combiner. The result of adding attention is shown in Table \ref{tab:atten}.
 
-\begin{table}[ht]
-\centering
-\caption{The training and validation F-score of experiments with and without attention. For beam search, the beam size is 3.}
-\label{tab:atten}
-\begin{tabular}{lrr}
-\toprule
-                  & F-score  & F-score    \\
-                  & (train)  & (val)    \\ \midrule
-Greedy          & 52.81            & 2.88                    \\
-Greedy + Atten  & 96.60            & 3.14                    \\ 
-Beam              & 43.47            & 4.05                    \\
-Beam + Atten          & 78.78            & 3.87               \\ \bottomrule
-\end{tabular}
-\end{table}
+% \begin{table}[ht]
+% \centering
+% \caption{The training and validation F-score of experiments with and without attention. For beam search, the beam size is 3.}
+% \label{tab:atten}
+% \begin{tabular}{lrr}
+% \toprule
+%                   & F-score  & F-score    \\
+%                   & (train)  & (val)    \\ \midrule
+% Greedy          & 52.81            & 2.88                    \\
+% Greedy + Atten  & 96.60            & 3.14                    \\ 
+% Beam              & 43.47            & 4.05                    \\
+% Beam + Atten          & 78.78            & 3.87               \\ \bottomrule
+% \end{tabular}
+% \end{table}
 
 % ========================================================================================================
 % ========================================================================================================
-\begin{table*}[ht]
-\centering
-\begin{tabular}{cc}
-\end{tabular}
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_atten_loss.pdf}\caption{Greedy Search Decoding Loss}\end{subfigure} %\&
-\begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_atten_f.pdf}\caption{Greedy Search Decoding F-Score}\end{subfigure} \\
+% \begin{table*}[ht]
+% \centering
+% \begin{tabular}{cc}
+% \end{tabular}
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_atten_loss.pdf}\caption{Greedy Search Decoding Loss}\end{subfigure} %\&
+% \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_atten_f.pdf}\caption{Greedy Search Decoding F-Score}\end{subfigure} \\
 
 % \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_3_loss.pdf}\caption{Beam Search Decoding Loss}\label{fig:tabc}\end{subfigure} %\&
 % \begin{subfigure}{0.4\textwidth}\centering\includegraphics[width=0.7\columnwidth]{fig_lrn_0p001_beam_3_f.pdf}\caption{Beam Search Decoding F-Score}\label{fig:tabd}\end{subfigure} \\
-\captionof{figure}[]{The cross-entropy losses and F-scores of greedy search decoding \textbf{with attention}. Red curve is training set, and blue curve is validation set. Learning rate is 0.001. }
-\label{fig:attn_losses_fscore}
-\end{table*}
-% ========================================================================================================
+% \captionof{figure}[]{The cross-entropy losses and F-scores of greedy search decoding \textbf{with attention}. Red curve is training set, and blue curve is validation set. Learning rate is 0.001. }
+% \label{fig:attn_losses_fscore}
+% \end{table*}
+% % ========================================================================================================
 % ========================================================================================================
 
 % \begin{figure}[ht]
@@ -485,29 +605,29 @@ Beam + Atten          & 78.78            & 3.87               \\ \bottomrule
 
 
 
-\subsubsection{Extra penalization of non-``O'' class}
+% \subsubsection{Extra penalization of non-``O'' class}
 
-	As analyzed in assignment 1, the label distribution is skewed toward the label ``O''; that is, there are much more words with label O than there are with other labels. Since label O refers to ``not belonging to one of the NER class'', these words are not our primary learning targets. However, since they dominate the dataset, the model would naturally receive stronger learning signals from these instances. To encourage the model to learn more from the instances with labels other than O, we do the following extra penalization trick. For the instances whose true label is not O, we add extra points (we use 1.5) to the O's component of the score vector predicted by our model. In this way, the model is forced to generate prediction that much more strongly favors the non-O labels in order to overcome the penalization added to the O component.
+% 	As analyzed in assignment 1, the label distribution is skewed toward the label ``O''; that is, there are much more words with label O than there are with other labels. Since label O refers to ``not belonging to one of the NER class'', these words are not our primary learning targets. However, since they dominate the dataset, the model would naturally receive stronger learning signals from these instances. To encourage the model to learn more from the instances with labels other than O, we do the following extra penalization trick. For the instances whose true label is not O, we add extra points (we use 1.5) to the O's component of the score vector predicted by our model. In this way, the model is forced to generate prediction that much more strongly favors the non-O labels in order to overcome the penalization added to the O component.
 
 
-\subsubsection{Different Optimizers}
+% \subsubsection{Different Optimizers}
 
-Pytorch has API for most commonly used optimizers. The default optimizer we use for the previous experiments is Adam Optimizer. In this section, we tried three other optimizers - RMSprop, SGD, and Adagrad. The results of comparisions are shown in Table \ref{opti}. From the table, we can see different optimizers do not make much differences. Thus we stick to Adam Opitimizer for all experiments we conduct. 
+% Pytorch has API for most commonly used optimizers. The default optimizer we use for the previous experiments is Adam Optimizer. In this section, we tried three other optimizers - RMSprop, SGD, and Adagrad. The results of comparisions are shown in Table \ref{opti}. From the table, we can see different optimizers do not make much differences. Thus we stick to Adam Opitimizer for all experiments we conduct. 
 
     
-\begin{table}[ht]
-\centering
-\caption{After 30 epoches, the results of train data using different optimizers.}
-\label{opti}
-\begin{tabular}{llll}
-\hline
-Optimizer        & CE loss & Accuracy & F score \\ \hline
-Adam    & 0.1377  & 94.21\%  & 46.84   \\
-RMSprop & 0.1845  & 91.35\%  & 29.82   \\
-SGD     & 0.1488  & 93.37\%  & 41.26   \\
-Adagrad & 0.1363  & 93.89\%  & 47.38   \\ \hline
-\end{tabular}
-\end{table}
+% \begin{table}[ht]
+% \centering
+% \caption{After 30 epoches, the results of train data using different optimizers.}
+% \label{opti}
+% \begin{tabular}{llll}
+% \hline
+% Optimizer        & CE loss & Accuracy & F score \\ \hline
+% Adam    & 0.1377  & 94.21\%  & 46.84   \\
+% RMSprop & 0.1845  & 91.35\%  & 29.82   \\
+% SGD     & 0.1488  & 93.37\%  & 41.26   \\
+% Adagrad & 0.1363  & 93.89\%  & 47.38   \\ \hline
+% \end{tabular}
+% \end{table}
 
 
 
@@ -518,22 +638,22 @@ Adagrad & 0.1363  & 93.89\%  & 47.38   \\ \hline
 
 \subsection{Comparison with the paper baseline}
 
-We compare our experimental result with the paper baseline from \cite{goyal2017continuous}. In particular, we compare with the Greedy Search and Hard Beam Search F-score of the NER task in Table 2 in \cite{goyal2017continuous}. Our experiment that is used for comparison uses beam size 3 and fixed attention. The result is given in Table \ref{tab:comp}.
+% We compare our experimental result with the paper baseline from \cite{goyal2017continuous}. In particular, we compare with the Greedy Search and Hard Beam Search F-score of the NER task in Table 2 in \cite{goyal2017continuous}. Our experiment that is used for comparison uses beam size 3 and fixed attention. The result is given in Table \ref{tab:comp}.
 
-\begin{table}[ht]
-\centering
-\caption{Comparison of the F-score between our experiment and \cite{goyal2017continuous} at the NER task.}
-\label{tab:comp}
-\begin{tabular}{lrr}
-\toprule
-                  & F-score  & F-score    \\
-                  & (train)  & (val)    \\ \midrule
-Our greedy search          & 96.60            & 3.14               \\
-\cite{goyal2017continuous} greedy  & N/A              & 50.21              \\
-Our beam search          & 78.78            & 3.87               \\
-\cite{goyal2017continuous} beam  & N/A              & 46.22              \\ \bottomrule
-\end{tabular}
-\end{table}
+% \begin{table}[ht]
+% \centering
+% \caption{Comparison of the F-score between our experiment and \cite{goyal2017continuous} at the NER task.}
+% \label{tab:comp}
+% \begin{tabular}{lrr}
+% \toprule
+%                   & F-score  & F-score    \\
+%                   & (train)  & (val)    \\ \midrule
+% Our greedy search          & 96.60            & 3.14               \\
+% \cite{goyal2017continuous} greedy  & N/A              & 50.21              \\
+% Our beam search          & 78.78            & 3.87               \\
+% \cite{goyal2017continuous} beam  & N/A              & 46.22              \\ \bottomrule
+% \end{tabular}
+% \end{table}
 
 
 
@@ -644,15 +764,13 @@ Our beam search          & 78.78            & 3.87               \\
 % \end{enumerate}
 \subsection{Error Analysis} \label{sec:improve}
 
-From the results in Table \ref{tab:comp}, Figures \ref{fig:no_attn_losses_fscore} and \ref{fig:attn_losses_fscore} we have a same pattern that the model yields a good performance for train data, but not the same for validation data. This behavior is apparently due to overfitting to training data, which is stemmed from not performing regularization such as dropout aggressively. 
+% From the results in Table \ref{tab:comp}, Figures \ref{fig:no_attn_losses_fscore} and \ref{fig:attn_losses_fscore} we have a same pattern that the model yields a good performance for train data, but not the same for validation data. This behavior is apparently due to overfitting to training data, which is stemmed from not performing regularization such as dropout aggressively. 
 
-There are some strategies of dropout that we plan to apply to fix this. First, we can apply a normal dropout before and after embedding layer of inputs. This strategy can varies: we can apply a random mask based on position of a sentence or we can apply another mask on word basis (if a word is chosen to be deactivated, any of its occurrences will be gone). Second, we can apply dropout on the RNN cells on random time steps for encoder and decoder. And finally, we can apply the strategy such as in \cite{gal2016theoretically} where we can apply the same dropout patterns for input, recurrent and output for every single time step. We project that by using dropout properly, this overfitting situation will be mostly solved. 
+% There are some strategies of dropout that we plan to apply to fix this. First, we can apply a normal dropout before and after embedding layer of inputs. This strategy can varies: we can apply a random mask based on position of a sentence or we can apply another mask on word basis (if a word is chosen to be deactivated, any of its occurrences will be gone). Second, we can apply dropout on the RNN cells on random time steps for encoder and decoder. And finally, we can apply the strategy such as in \cite{gal2016theoretically} where we can apply the same dropout patterns for input, recurrent and output for every single time step. We project that by using dropout properly, this overfitting situation will be mostly solved. 
 
-\subsection{Adaptive Beam Search} \label{sec:adaptive}
+% \subsection{Adaptive Beam Search} \label{sec:adaptive}
 
-We have addressed the basic concept of beam search and conducted some experiments on different beam size. For the final project, we will implement an adaptive beam search design. The original beam-search strategy generates the optimal prediction by approximately maximizing the conditional probability given by a Seq2seq model.  It builds the mapping from encoder-decoder and keeps a fixed number (beam) of candidates with the highest log-probability at each epoch. The search stops when the beam is full and the candidate with highest log-probability is picked from the candidate list. The problem of fixed-sized beam search is that all the candidates in the candidate list might not be the best possible scoring candidate, i.e. the best one is not added to the list before beam search stops. This issue can be avoided by increasing the beam size however it slows down the decoding speed. An adaptive beam search strategy can be much more flxible in terms of beam size at each epoch and do not increases the decoding time too much. Here is one possible design we come up with: Worse candidates pruning. This strategy discards those candidates in the candidate that are far worse than the best current candidate. In this case, we can keep beam size fixed, and continue pruning worst candidates to make space for next candidate. The pruning threshold can be various, e.g. relative threshold, abosulte threshold. We can tune it for the best performance. 
-
-
+% We have addressed the basic concept of beam search and conducted some experiments on different beam size. For the final project, we will implement an adaptive beam search design. The original beam-search strategy generates the optimal prediction by approximately maximizing the conditional probability given by a Seq2seq model.  It builds the mapping from encoder-decoder and keeps a fixed number (beam) of candidates with the highest log-probability at each epoch. The search stops when the beam is full and the candidate with highest log-probability is picked from the candidate list. The problem of fixed-sized beam search is that all the candidates in the candidate list might not be the best possible scoring candidate, i.e. the best one is not added to the list before beam search stops. This issue can be avoided by increasing the beam size however it slows down the decoding speed. An adaptive beam search strategy can be much more flxible in terms of beam size at each epoch and do not increases the decoding time too much. Here is one possible design we come up with: Worse candidates pruning. This strategy discards those candidates in the candidate that are far worse than the best current candidate. In this case, we can keep beam size fixed, and continue pruning worst candidates to make space for next candidate. The pruning threshold can be various, e.g. relative threshold, abosulte threshold. We can tune it for the best performance. 
 
 
 
@@ -662,69 +780,13 @@ We have addressed the basic concept of beam search and conducted some experiment
 
 
 
-\section{Adaptive Beam Search Results (temporary)}
-
-
-\begin{table*}
-\centering
-\caption{Heuristic pruning and growing rules results. NER.}
-%\label{tab:comp}
-\begin{tabular}{lcccccccc}
-\toprule
-& Greedy & Beam 3 & Beam 3 & Beam 6 & Beam 6 & Beam 9 & Beam 9 & Soft Beam \\
-& & & Adaptive & & Adaptive & & Adaptive & \\
-\midrule
-F-score & 58.09 & 57.69 & 57.71 & 57.76 & 57.71 & 57.76 & 57.71 & \\
-Total beam \# & 48,571 & 145,713 & 92,727 & 291,426 & 126,759 & 437,139 & 182,785 & \\
-Avg.~beam \# & 1 & 3 & 1.95 & 6 & 3.16 & 9 & 4.86 & \\
-Time (sec) & 22 & 76 & 61 & 132 & 73 & 178 & 92 & \\
-\midrule
-Goyal 2017 & 54.92 & 51.34 & & & & & & 56.38 \\
-F-score \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-
-
-
-\begin{table}
-\centering
-\caption{Reinforcement learning results. NER.}
-%\label{tab:comp}
-\begin{tabular}{lccc}
-\toprule
-& Beam 3 & Beam 6 & Beam 9 \\
-\midrule
-F-score & 57.66 & 57.61 & 57.52 \\
-Avg.~beam \# & 1.17 & 2.00 & 3.06 \\
-\bottomrule
-\end{tabular}
-\end{table}
 
 
 
 
 
-\begin{table*}
-\centering
-\caption{Heuristic pruning and growing rules results. CCG.}
-%\label{tab:comp}
-\begin{tabular}{lccccccc}
-\toprule
-& Greedy & Beam 1 & Beam 2 & Beam 2 & Beam 3 & Beam 3 & Soft Beam \\
-& & Adaptive & & Adaptive & & Adaptive & \\
-\midrule
-F-score & 90.50 & 90.62 & 90.60 & 90.62 & 90.62 & 90.62 &  \\
-Total beam \# & 52,964 & 93,403 & 105,928 & 98,100 & 158,892 & 103,875 &  \\
-Avg.~beam \# & 1 & 1.61 & 2 & 1.72 & 3 & 1.87 &  \\
-Time (sec) & 590 & 670 & 639 & 496 & 661 & 652 &  \\
-\midrule
-Goyal 2017 & 80.35 &  & & & 82.42 & & 82.00 \\
-F-score \\
-\bottomrule
-\end{tabular}
-\end{table*}
+
+
 
 
 
