@@ -617,7 +617,7 @@ def eval_adaptive(machine,
   total_beam_number_in_dataset = sum([sum(beam_size_seq) for beam_size_seq in beam_size_seqs])
   avg_beam_sizes = [(sum(beam_size_seq) / len(beam_size_seq) if len(beam_size_seq) else 0) for beam_size_seq in beam_size_seqs]
   avg_beam_sizes = list(filter(lambda xx: xx > 0, avg_beam_sizes))
-  avg_beam_size = sum(avg_beam_sizes) / len(avg_beam_sizes)
+  avg_beam_size = float(sum(avg_beam_sizes)) / len(avg_beam_sizes)
 
   if write_result:
     f_sen.close()
